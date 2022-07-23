@@ -7,7 +7,7 @@
 * [key-value storage](key-value-storage/README.md)
   * [MetaData (元数据)](key-value-storage/metadata.md)
   * [CAP therom](key-value-storage/cap-therom.md)
-  * [LSM-tree](key-value-storage/lsm-tree.md)
+  * [LSM Tree](key-value-storage/lsm-tree.md)
   * [BigTable: A Distributed Storage System for Structured Data](<key-value storage/BigTable.md>)
   * [GFS](key-value-storage/gfs.md)
   * [Google MapReduce](key-value-storage/mapreduce.md)
