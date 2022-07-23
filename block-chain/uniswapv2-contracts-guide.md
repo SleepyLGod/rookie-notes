@@ -1,41 +1,43 @@
 ---
-title: "Uniswap-v2 合约概览"
-description: Uniswap-v2 合约是如何工作的？ 为什么要如此编写？
+title: Uniswap-v2 合约概览
 author: Ori Pomerantz
 sidebar: true
 tags:
-  - "solidity"
-  - "uniswap"
+  - solidity
+  - uniswap
 skill: intermediate
-published: 2021-05-01
+published: 2021-05-01T00:00:00.000Z
 lang: zh
+description: Uniswap-v2 合约是如何工作的？ 为什么要如此编写？
 ---
 
-## 介绍 {#introduction}
+# Uniswap-v2 合约概览
+
+### 介绍 <a href="#introduction" id="introduction"></a>
 
 [Uniswap v2](https://uniswap.org/whitepaper.pdf) 可以在任何两个 ERC-20 代币之间创建一个兑换市场。 在这篇文章中， 我们将了解实现此协议的合约的源代码，看看为什么要 这样写代码。
 
-### Uniswap 是做什么的？ {#what-does-uniswap-do}
+#### Uniswap 是做什么的？ <a href="#what-does-uniswap-do" id="what-does-uniswap-do"></a>
 
 一般来说有两类用户：流动资金提供者和交易者。
 
-*流动资金提供者*为资金池提供两种可以兑换的代币（我们称之为 **Token0** 和 **Token1**）。 作为回报，他们会收到第三种代币，代表对资金池的 部分所有权，这个池叫做*流动代币*。
+_流动资金提供者_为资金池提供两种可以兑换的代币（我们称之为 **Token0** 和 **Token1**）。 作为回报，他们会收到第三种代币，代表对资金池的 部分所有权，这个池叫做_流动代币_。
 
-*交易者*将一种代币发送到资金池，并从流动资金提供者的资金池中接收另一种代币（例如，发送 **Token0** 并获得 **Token1**）。 兑换汇率由 **Token0** 和 **Token1** 的相对数量决定。 此外，资金池将收取汇率的一小部分作为流动资金池的奖励。
+_交易者_将一种代币发送到资金池，并从流动资金提供者的资金池中接收另一种代币（例如，发送 **Token0** 并获得 **Token1**）。 兑换汇率由 **Token0** 和 **Token1** 的相对数量决定。 此外，资金池将收取汇率的一小部分作为流动资金池的奖励。
 
 当流动资金提供者想要收回他们的代币资产时，他们可以消耗资金池代币并收回他们的代币， 其中包括他们在兑换过程中奖励的份额。
 
 [点击这里查看更完整的描述](https://uniswap.org/docs/v2/core-concepts/swaps/)。
 
-### 为什么选择 v2？ 而不是 v3？ {#why-v2}
+#### 为什么选择 v2？ 而不是 v3？ <a href="#why-v2" id="why-v2"></a>
 
 编写此教程时，[Uniswap v3](https://uniswap.org/whitepaper-v3.pdf) 已差不多准备就绪。 然而，此次升级 比原来的版本复杂得多。 比较容易的方法是先学习 v2，然后再学习 v3。
 
-### 核心合约与外围合约 {#contract-types}
+#### 核心合约与外围合约 <a href="#contract-types" id="contract-types"></a>
 
-Uniswap v2 可以分为两个部分，一个为核心部分，另一个为外围部分。 这种分法可以使拥有资产因而*必须*确保安全的核心合约更加简洁，且更易于审核。 而所有交易者需要的其它功能可以通过外围合约提供。
+Uniswap v2 可以分为两个部分，一个为核心部分，另一个为外围部分。 这种分法可以使拥有资产因而_必须_确保安全的核心合约更加简洁，且更易于审核。 而所有交易者需要的其它功能可以通过外围合约提供。
 
-## 数据和控制流程 {#flows}
+### 数据和控制流程 <a href="#flows" id="flows"></a>
 
 执行 Uniswap 的三个主要操作时，会出现以下数据和控制流程：
 
@@ -43,72 +45,72 @@ Uniswap v2 可以分为两个部分，一个为核心部分，另一个为外围
 2. 将资金添加到市场中提供流动性，并获得兑换中奖励的流动池 ERC-20 代币
 3. 消耗流动池 ERC-20 代币并收回交易所允许交易者兑换的 ERC-20 代币
 
-### 兑换 {#swap-flow}
+#### 兑换 <a href="#swap-flow" id="swap-flow"></a>
 
 这是交易者最常用的流程：
 
-#### 调用者 {#caller}
+**调用者**
 
 1. 向外围帐户提供兑换额度。
 2. 调用外围合约中的一个兑换函数。外围合约通常会有多种兑换函数，调用哪一个取决于是否涉及以太币、 交易者是否需要指定存入的代币金额，或指定提取的代币数量等）。 每个兑换函数都接受一个 `path`，即要执行的一系列兑换。
 
-#### 在外围合约 (UniswapV2Router02.sol) 中 {#in-the-periphery-contract-uniswapv2router02-sol}
+**在外围合约 (UniswapV2Router02.sol) 中**
 
-3. 确定兑换路径中，每次兑换所需交易的代币数额。
-4. 沿路径迭代。 对于路径上的每次兑换，首先发送输入代币，然后调用交易所的 `swap` 函数。 在大多数情况下，代币输出的目的地址是路径中下一个配对交易。 在最终的兑换中，该地址是 交易者提供的地址。
+1. 确定兑换路径中，每次兑换所需交易的代币数额。
+2. 沿路径迭代。 对于路径上的每次兑换，首先发送输入代币，然后调用交易所的 `swap` 函数。 在大多数情况下，代币输出的目的地址是路径中下一个配对交易。 在最终的兑换中，该地址是 交易者提供的地址。
 
-#### 在核心合约 (UniswapV2Pair.sol) 中 {#in-the-core-contract-uniswapv2pairsol-2}
+**在核心合约 (UniswapV2Pair.sol) 中**
 
-5. 验证核心合约没有被欺骗，可在兑换后保持足够的流动资金。
-6. 检查除了现有的储备金额外，还有多少额外的代币。 此数额是我们收到的要用于兑换的输入代币数量。
-7. 将输出代币发送到目的地址。
-8. 调用 `_update` 来更新储备金额
+1. 验证核心合约没有被欺骗，可在兑换后保持足够的流动资金。
+2. 检查除了现有的储备金额外，还有多少额外的代币。 此数额是我们收到的要用于兑换的输入代币数量。
+3. 将输出代币发送到目的地址。
+4. 调用 `_update` 来更新储备金额
 
-#### 回到外围合约 (UniswapV2Router02.sol) {#back-in-the-periphery-contract-uniswapv2router02-sol}
+**回到外围合约 (UniswapV2Router02.sol)**
 
-9. 执行所需的必要清理工作（例如，消耗包装以太币代币以返回以太币给交易者）
+1. 执行所需的必要清理工作（例如，消耗包装以太币代币以返回以太币给交易者）
 
-### 增加流动资金 {#add-liquidity-flow}
+#### 增加流动资金 <a href="#add-liquidity-flow" id="add-liquidity-flow"></a>
 
-#### 调用者 {#caller-2}
+**调用者**
 
 1. 向外围账户提交准备加入流动资金池的资金额度。
 2. 调用外围合约的一个 addLiquidity 函数。
 
-#### 在外围合约 (UniswapV2Router02.sol) 中 {#in-the-periphery-contract-uniswapv2router02sol-2}
+**在外围合约 (UniswapV2Router02.sol) 中**
 
-3. 必要时创建一个新的配对交易
-4. 如果存在现有配对交易，请计算要增加的代币数量。 两个代币应该有相同值，所以新代币与现有代币的比率是相同的。
-5. 检查金额是否可接受（调用者可以指定一个最低金额，低于此金额他们不能增加流动资金）
-6. 调用核心合约。
+1. 必要时创建一个新的配对交易
+2. 如果存在现有配对交易，请计算要增加的代币数量。 两个代币应该有相同值，所以新代币与现有代币的比率是相同的。
+3. 检查金额是否可接受（调用者可以指定一个最低金额，低于此金额他们不能增加流动资金）
+4. 调用核心合约。
 
-#### 在核心合约 (UniswapV2Pair.sol) 中 {#in-the-core-contract-uniswapv2pairsol-2}
+**在核心合约 (UniswapV2Pair.sol) 中**
 
-7. 生成流动池代币并将其发送给调用者
-8. 调用 `_update` 来更新储备金额
+1. 生成流动池代币并将其发送给调用者
+2. 调用 `_update` 来更新储备金额
 
-### 撤回流动资金 {#remove-liquidity-flow}
+#### 撤回流动资金 <a href="#remove-liquidity-flow" id="remove-liquidity-flow"></a>
 
-#### 调用者 {#caller-3}
+**调用者**
 
 1. 向外围帐户提供一个流动池代币的额度，作为兑换底层代币所需的消耗。
 2. 调用外围合约的一个 removeLiquidity 函数。
 
-#### 在外围合约 (UniswapV2Router02.sol) 中 {#in-the-periphery-contract-uniswapv2router02sol-3}
+**在外围合约 (UniswapV2Router02.sol) 中**
 
-3. 将流动池代币发送到该配对交易
+1. 将流动池代币发送到该配对交易
 
-#### 在核心合约 (UniswapV2Pair.sol) 中 {#in-the-core-contract-uniswapv2pairsol-3}
+**在核心合约 (UniswapV2Pair.sol) 中**
 
-4. 按照消耗代币的比例发送兑换后的代币到目标地址。 例如，如果 流动池里有 1000 个 A 代币，500 个 B 代币和 90 个流动池代币，而我们被要求消耗 9 个 流动池代币，那么，我们将消耗 10% 的流动池代币，然后将返还用户 100 个 A 代币和 50 个 B 代币。
-5. 消耗流动池代币
-6. 调用`_update`来更新储备金额
+1. 按照消耗代币的比例发送兑换后的代币到目标地址。 例如，如果 流动池里有 1000 个 A 代币，500 个 B 代币和 90 个流动池代币，而我们被要求消耗 9 个 流动池代币，那么，我们将消耗 10% 的流动池代币，然后将返还用户 100 个 A 代币和 50 个 B 代币。
+2. 消耗流动池代币
+3. 调用`_update`来更新储备金额
 
-## 核心合约 {#core-contracts}
+### 核心合约 <a href="#core-contracts" id="core-contracts"></a>
 
 这些是持有流动资金的安全合约。
 
-### UniswapV2Pair.sol {#UniswapV2Pair}
+#### UniswapV2Pair.sol <a href="#uniswapv2pair" id="uniswapv2pair"></a>
 
 [本合约](https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2Pair.sol) 实现了 用于兑换代币的实际资金池。 这是 Uniswap 的核心功能。
 
@@ -144,15 +146,15 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 
 流动池合约中的许多计算都需要分数。 但是，以太坊虚拟机本身不支持分数。 Uniswap 找到的解决方案是使用 224 位数值，整数值为 112 位，分数部分 为 112 位。 因此，`1.0` 用 `2^112` 表示，`1.5` 用 `2^112 + 2^111` 表示，以此类推。
 
-关于这个函数库的更详细内容在[文档的稍后部分](#FixedPoint)。
+关于这个函数库的更详细内容在[文档的稍后部分](uniswapv2-contracts-guide.md#FixedPoint)。
 
-#### 变量 {#pair-vars}
+**变量**
 
 ```solidity
     uint public constant MINIMUM_LIQUIDITY = 10**3;
 ```
 
-为了避免分母为零的情况，最低数量的流动池代币总是存在的 （但为账户零所拥有）。 该数字，即 **MINIMUM_LIQUIDITY**，为 1000。
+为了避免分母为零的情况，最低数量的流动池代币总是存在的 （但为账户零所拥有）。 该数字，即 **MINIMUM\_LIQUIDITY**，为 1000。
 
 ```solidity
     bytes4 private constant SELECTOR = bytes4(keccak256(bytes('transfer(address,uint256)')));
@@ -203,18 +205,18 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 
 下面是一个示例。 请注意，为了简单起见，表格中的数字仅保留了小数点后三位，我们忽略了 0.3% 交易费，因此数字并不准确。
 
-| 事件                                      | reserve0  | reserve1  | reserve0 \* reserve1 | 平均汇率 (token1 / token0) |
-| --------------------------------------- | ---------:| ---------:| --------------------:| ---------------------- |
-| 初始设置                                    | 1,000.000 | 1,000.000 | 1,000,000            |                        |
-| 交易者 A 用 50 个 token0 兑换 47.619 个 token1  | 1,050.000 | 952.381   | 1,000,000            | 0.952                  |
-| 交易者 B 用 10 个 token0 兑换 8.984 个 token1   | 1,060.000 | 943.396   | 1,000,000            | 0.898                  |
-| 交易者 C 用 40 个 token0 兑换 34.305 个 token1  | 1,100.000 | 909.090   | 1,000,000            | 0.858                  |
-| 交易者 D 用 100 个 token1 兑换 109.01 个 token0 | 990.990   | 1,009.090 | 1,000,000            | 0.917                  |
-| 交易者 E 用 10 个 token0 兑换 10.079 个 token1  | 1,000.990 | 999.010   | 1,000,000            | 1.008                  |
+| 事件                                      |  reserve0 |  reserve1 | reserve0 \* reserve1 | 平均汇率 (token1 / token0) |
+| --------------------------------------- | --------: | --------: | -------------------: | ---------------------- |
+| 初始设置                                    | 1,000.000 | 1,000.000 |            1,000,000 |                        |
+| 交易者 A 用 50 个 token0 兑换 47.619 个 token1  | 1,050.000 |   952.381 |            1,000,000 | 0.952                  |
+| 交易者 B 用 10 个 token0 兑换 8.984 个 token1   | 1,060.000 |   943.396 |            1,000,000 | 0.898                  |
+| 交易者 C 用 40 个 token0 兑换 34.305 个 token1  | 1,100.000 |   909.090 |            1,000,000 | 0.858                  |
+| 交易者 D 用 100 个 token1 兑换 109.01 个 token0 |   990.990 | 1,009.090 |            1,000,000 | 0.917                  |
+| 交易者 E 用 10 个 token0 兑换 10.079 个 token1  | 1,000.990 |   999.010 |            1,000,000 | 1.008                  |
 
 由于交易者提供了更多 token0，token1 的相对价值增加了，反之亦然，这取决于供求。
 
-#### 锁定 {#pair-lock}
+**锁定**
 
 ```solidity
     uint private unlocked = 1;
@@ -226,7 +228,7 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
     modifier lock() {
 ```
 
-此函数是一个 [ modifier](https://docs.soliditylang.org/en/v0.8.3/contracts.html#function-modifiers) 函数，用于以某种方式改变正常函数的行为。
+此函数是一个 [modifier](https://docs.soliditylang.org/en/v0.8.3/contracts.html#function-modifiers) 函数，用于以某种方式改变正常函数的行为。
 
 ```solidity
         require(unlocked == 1, 'UniswapV2: LOCKED');
@@ -248,7 +250,7 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 
 当主函数返回后，释放锁定。
 
-#### 其他 函数 {#pair-misc}
+**其他 函数**
 
 ```solidity
     function getReserves() public view returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) {
@@ -281,7 +283,7 @@ ERC-20 的转移调用有两种方式可能失败：
 
 一旦出现这两种情况，转移调用就会回退。
 
-#### 事件 {#pair-events}
+**事件**
 
 ```solidity
     event Mint(address indexed sender, uint amount0, uint amount1);
@@ -309,7 +311,7 @@ ERC-20 的转移调用有两种方式可能失败：
 
 最后，每次存入或提取代币时都会发出 `Sync`，无论出于何种原因，提供最新的储备信息 （从而提供汇率）。
 
-#### 设置函数 {#pair-setup}
+**设置函数**
 
 这些函数应在建立新的配对交易时调用。
 
@@ -332,9 +334,9 @@ ERC-20 的转移调用有两种方式可能失败：
 
 这个函数允许工厂（而且只允许工厂）指定配对中进行兑换的两种 ERC-20 代币。
 
-#### 内部更新函数 {#pair-update-internal}
+**内部更新函数**
 
-##### \_update
+**\_update**
 
 ```solidity
     // update reserves and, on the first call per block, price accumulators
@@ -366,14 +368,14 @@ ERC-20 的转移调用有两种方式可能失败：
 
 每个累积成本值都用最新成本值（另一个代币的储备金额/本代币的储备金额）乘以以秒为单位的流逝时间加以更新。 要获得平均兑换价格，需要读取两个累积成本值，并除以它们之间的时间差。 例如，假设下面这些事件序列：
 
-| 事件                                 | reserve0  | reserve1  | 时间戳   | 边际汇率 (reserve1 / reserve0) | price0CumulativeLast       |
-| ---------------------------------- | ---------:| ---------:| ----- | --------------------------:| --------------------------:|
-| 初始设置                               | 1,000.000 | 1,000.000 | 5,000 | 1.000                      | 0                          |
-| 交易者 A 存入 50 个代币 0 获得 47.619 个代币 1  | 1,050.000 | 952.381   | 5,020 | 0.907                      | 20                         |
-| 交易者 B 存入 10 个代币 0 获得 8.984 个代币 1   | 1,060.000 | 943.396   | 5,030 | 0.89                       | 20+10\*0.907 = 29.07       |
-| 交易者 C 存入 40 个代币 0 获得 34.305 个代币 1  | 1,100.000 | 909.090   | 5,100 | 0.826                      | 29.07+70\*0.890 = 91.37    |
-| 交易者 D 存入 100 个代币 0 获得 109.01 个代币 1 | 990.990   | 1,009.090 | 5,110 | 1.018                      | 91.37+10\*0.826 = 99.63    |
-| 交易者 E 存入 10 个代币 0 获得 10.079 个代币 1  | 1,000.990 | 999.010   | 5,150 | 0.998                      | 99.63+40\*1.1018 = 143.702 |
+| 事件                                 |  reserve0 |  reserve1 | 时间戳   | 边际汇率 (reserve1 / reserve0) |       price0CumulativeLast |
+| ---------------------------------- | --------: | --------: | ----- | -------------------------: | -------------------------: |
+| 初始设置                               | 1,000.000 | 1,000.000 | 5,000 |                      1.000 |                          0 |
+| 交易者 A 存入 50 个代币 0 获得 47.619 个代币 1  | 1,050.000 |   952.381 | 5,020 |                      0.907 |                         20 |
+| 交易者 B 存入 10 个代币 0 获得 8.984 个代币 1   | 1,060.000 |   943.396 | 5,030 |                       0.89 |       20+10\*0.907 = 29.07 |
+| 交易者 C 存入 40 个代币 0 获得 34.305 个代币 1  | 1,100.000 |   909.090 | 5,100 |                      0.826 |    29.07+70\*0.890 = 91.37 |
+| 交易者 D 存入 100 个代币 0 获得 109.01 个代币 1 |   990.990 | 1,009.090 | 5,110 |                      1.018 |    91.37+10\*0.826 = 99.63 |
+| 交易者 E 存入 10 个代币 0 获得 10.079 个代币 1  | 1,000.990 |   999.010 | 5,150 |                      0.998 | 99.63+40\*1.1018 = 143.702 |
 
 比如说我们想要计算时间戳 5,030 到 5,150 之间**代币 0** 的平均价格。 `price0Cumulative` 的差值 为 143.702-29.07=114.632。 此为两分钟（120 秒）间的平均值。 因此，平均价格为 114.632/120 = 0.955。
 
@@ -389,7 +391,7 @@ ERC-20 的转移调用有两种方式可能失败：
 
 最后，更新全局变量并发布一个 `Sync` 事件。
 
-##### \_mintFee
+**\_mintFee**
 
 ```solidity
     // if fee is on, mint liquidity equivalent to 1/6th of the growth in sqrt(k)
@@ -426,7 +428,7 @@ ERC-20 的转移调用有两种方式可能失败：
                 if (rootK > rootKLast) {
 ```
 
-如果有新的流动性变化需要收取协议费。 你可以在 [本文后面](#Math)看到平方根函数。
+如果有新的流动性变化需要收取协议费。 你可以在 [本文后面](uniswapv2-contracts-guide.md#Math)看到平方根函数。
 
 ```solidity
                     uint numerator = totalSupply.mul(rootK.sub(rootKLast));
@@ -453,18 +455,18 @@ ERC-20 的转移调用有两种方式可能失败：
 
 如果不需收费则将 `klast` 设为 0（如果 klast 不为 0）。 编写该合约时，有一个[燃料返还功能](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3298.md)，用于鼓励合约将其不需要的存储释放，从而减少以太坊上状态变量的整体存储大小。 此段代码在可行时返还。
 
-#### 外部可访问函数 {#pair-external}
+**外部可访问函数**
 
-请注意，虽然这些函数*可以*被任意交易或合约调用，其设计目的是用于外部合约调用。 如果直接调用，您无法骗过配对交易， 可能因错误而丢失价值。
+请注意，虽然这些函数_可以_被任意交易或合约调用，其设计目的是用于外部合约调用。 如果直接调用，您无法骗过配对交易， 可能因错误而丢失价值。
 
-##### 铸币
+**铸币**
 
 ```solidity
     // this low-level function should be called from a contract which performs important safety checks
     function mint(address to) external lock returns (uint liquidity) {
 ```
 
-当流动资金提供者为资金池增加流动资金时，将会调用此函数。 它将产生额外的流动池 代币作为奖励。 在 [外围合约](#UniswapV2Router02)中增加流动性后调用这个函数，以确保二者在同一交易中（因此其他人都不能提交向合法所有者要求新流动资金的交易）。
+当流动资金提供者为资金池增加流动资金时，将会调用此函数。 它将产生额外的流动池 代币作为奖励。 在 [外围合约](uniswapv2-contracts-guide.md#UniswapV2Router02)中增加流动性后调用这个函数，以确保二者在同一交易中（因此其他人都不能提交向合法所有者要求新流动资金的交易）。
 
 ```solidity
         (uint112 _reserve0, uint112 _reserve1,) = getReserves(); // gas savings
@@ -501,9 +503,9 @@ ERC-20 的转移调用有两种方式可能失败：
 我们可以相信这一点，因为提供同等价值、避免套利符合存款人的利益。 比方说，这两种代币的价值是相同的，但我们的存款人存入的 **Token1** 是 **Token0** 的四倍。 通过配对交易，交易者可以认为 **Token0** 的价值 比较高。
 
 | 事件                                            | reserve0 | reserve1 | reserve0 \* reserve1 | 流动池价值 (reserve0 + reserve1) |
-| --------------------------------------------- | --------:| --------:| --------------------:| ---------------------------:|
-| 初始设置                                          | 8        | 32       | 256                  | 40                          |
-| 交易者存入 8 个 **Token0** 代币，获得 16 个 **Token1** 代币 | 16       | 16       | 256                  | 32                          |
+| --------------------------------------------- | -------: | -------: | -------------------: | --------------------------: |
+| 初始设置                                          |        8 |       32 |                  256 |                          40 |
+| 交易者存入 8 个 **Token0** 代币，获得 16 个 **Token1** 代币 |       16 |       16 |                  256 |                          32 |
 
 正如您可以看到的，交易者额外获得了 8 个代币，这是由于流动池价值下降造成的，损害了拥有流动池的存款人。
 
@@ -517,12 +519,12 @@ ERC-20 的转移调用有两种方式可能失败：
 无论是最初存入还是后续存入，流动池的代币金额均等于 `reserve0*reserve1` 的 平方根，而流动池代币的价值不变（除非存入的资金为不等值的代币类型， 那么就会分派“罚金”）。 这里有另一个例子，两种代币具有相同价值，有三个良性的存款和一个恶性的存款 （即只存入一种类型的代币，所以不会产生任何流动池代币）。
 
 | 事件         | reserve0 | reserve1 | reserve0 \* reserve1 | 流动池价值 (reserve0 + reserve1) | 存入资金而产生的流动池代币 | 流动池代币总值 | 每个流动池代币的值 |
-| ---------- | --------:| --------:| --------------------:| ---------------------------:| -------------:| -------:| ---------:|
-| 初始设置       | 8.000    | 8.000    | 64                   | 16.000                      | 8             | 8       | 2.000     |
-| 每种代币存入 4 个 | 12.000   | 12.000   | 144                  | 24.000                      | 4             | 12      | 2.000     |
-| 每种代币存入 2 个 | 14.000   | 14.000   | 196                  | 28.000                      | 2             | 14      | 2.000     |
-| 不等值的存款     | 18.000   | 14.000   | 252                  | 32.000                      | 0             | 14      | ~2.286    |
-| 套利后        | ~15.874  | ~15.874  | 252                  | ~31.748                     | 0             | 14      | ~2.267    |
+| ---------- | -------: | -------: | -------------------: | --------------------------: | ------------: | ------: | --------: |
+| 初始设置       |    8.000 |    8.000 |                   64 |                      16.000 |             8 |       8 |     2.000 |
+| 每种代币存入 4 个 |   12.000 |   12.000 |                  144 |                      24.000 |             4 |      12 |     2.000 |
+| 每种代币存入 2 个 |   14.000 |   14.000 |                  196 |                      28.000 |             2 |      14 |     2.000 |
+| 不等值的存款     |   18.000 |   14.000 |                  252 |                      32.000 |             0 |      14 |   \~2.286 |
+| 套利后        | \~15.874 | \~15.874 |                  252 |                    \~31.748 |             0 |      14 |   \~2.267 |
 
 ```solidity
         }
@@ -541,14 +543,14 @@ ERC-20 的转移调用有两种方式可能失败：
 
 更新相应的状态变量（`reserve0`、`reserve1`，必要时还包含 `kLast`）并激发相应事件。
 
-##### 销毁
+**销毁**
 
 ```solidity
     // this low-level function should be called from a contract which performs important safety checks
     function burn(address to) external lock returns (uint amount0, uint amount1) {
 ```
 
-当流动资金被提取且相应的流动池代币需要被销毁时，将调用此函数。 还需要[从一个外围账户](#UniswapV2Router02)调用。
+当流动资金被提取且相应的流动池代币需要被销毁时，将调用此函数。 还需要[从一个外围账户](uniswapv2-contracts-guide.md#UniswapV2Router02)调用。
 
 ```solidity
         (uint112 _reserve0, uint112 _reserve1,) = getReserves(); // gas savings
@@ -586,14 +588,14 @@ ERC-20 的转移调用有两种方式可能失败：
 
 `burn` 函数的其余部分是上述 `mint` 函数的镜像。
 
-##### 兑换
+**兑换**
 
 ```solidity
     // this low-level function should be called from a contract which performs important safety checks
     function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external lock {
 ```
 
-此函数也应该从[外围合约](#UniswapV2Router02)调用。
+此函数也应该从[外围合约](uniswapv2-contracts-guide.md#UniswapV2Router02)调用。
 
 ```solidity
         require(amount0Out > 0 || amount1Out > 0, 'UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT');
@@ -629,7 +631,7 @@ ERC-20 的转移调用有两种方式可能失败：
         }
 ```
 
-获取当前余额。 外围合约在调用交换函数之前，需要向合约发送要兑换的代币。 这个功能可以使得合约检查它没有受到欺骗，这个检查*必须*通过核心合约调用（因为本功能可能被除我们外围合约之外的其它单位调用）。
+获取当前余额。 外围合约在调用交换函数之前，需要向合约发送要兑换的代币。 这个功能可以使得合约检查它没有受到欺骗，这个检查_必须_通过核心合约调用（因为本功能可能被除我们外围合约之外的其它单位调用）。
 
 ```solidity
         uint amount0In = balance0 > _reserve0 - amount0Out ? balance0 - (_reserve0 - amount0Out) : 0;
@@ -653,14 +655,14 @@ ERC-20 的转移调用有两种方式可能失败：
 
 更新 `reserve0` 和 `reserve1` 的值，并在必要时更新价格累积值和时间戳并激发相应事件。
 
-##### 同步或提取 {#sync-or-skim}
+**同步或提取**
 
 实际余额有可能与配对交易所认为的储备金余额没有同步。 没有合约的认同，就无法撤回代币，但存款却不同。 帐户 可以将代币转移到交易所，而无需调用 `mint` 或 `swap`。
 
 在这种情况下，有两种解决办法：
 
-- `sync`，将储备金更新为当前余额
-- `skim`，撤回额外的金额。 请注意任何账户都可以调用 `skim` 函数，因为无法知道是谁 存入的代币。 此信息是在一个事件中发布的，但这些事件无法从区块链中访问。
+* `sync`，将储备金更新为当前余额
+* `skim`，撤回额外的金额。 请注意任何账户都可以调用 `skim` 函数，因为无法知道是谁 存入的代币。 此信息是在一个事件中发布的，但这些事件无法从区块链中访问。
 
 ```solidity
     // force balances to match reserves
@@ -680,7 +682,7 @@ ERC-20 的转移调用有两种方式可能失败：
 }
 ```
 
-### UniswapV2Factory.sol {#UniswapV2Factory}
+#### UniswapV2Factory.sol <a href="#uniswapv2factory" id="uniswapv2factory"></a>
 
 [此合约](https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2Factory.sol)实现配对 兑换。
 
@@ -708,7 +710,7 @@ contract UniswapV2Factory is IUniswapV2Factory {
 
 第二个变量，`allPairs` 是一个数组，其中包括该工厂创建的所有 配对交易的地址。 在以太坊中，您无法循环访问映射内容， 或获取所有关键字的列表，所以，这个变量是唯一能够知道此工厂 管理哪个兑换的方法。
 
-注意: 您不能循环访问所有关键字的原因是合约数据 存储*十分昂贵*，所以我们越少用越好，且越少改变 越好。 您可以创建[支持循环访问的映射](https://github.com/ethereum/dapp-bin/blob/master/library/iterable_mapping.sol)， 但它们需要额外存储关键字列表。 但在大多数应用程序中并不需要。
+注意: 您不能循环访问所有关键字的原因是合约数据 存储_十分昂贵_，所以我们越少用越好，且越少改变 越好。 您可以创建[支持循环访问的映射](https://github.com/ethereum/dapp-bin/blob/master/library/iterable\_mapping.sol)， 但它们需要额外存储关键字列表。 但在大多数应用程序中并不需要。
 
 ```solidity
     event PairCreated(address indexed token0, address indexed token1, address pair, uint);
@@ -743,7 +745,7 @@ contract UniswapV2Factory is IUniswapV2Factory {
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
 ```
 
-我们希望新兑换的地址可以确定， 这样它可以在链下预计算 （这对于[第二层的交易](/developers/docs/layer-2-scaling/) 来说比较有用）。 为了做到这一点，我们需要代币地址始终按顺序排列，无论收到代币地址的顺序如何， 都需要在这里排序。
+我们希望新兑换的地址可以确定， 这样它可以在链下预计算 （这对于[第二层的交易](../developers/docs/layer-2-scaling/) 来说比较有用）。 为了做到这一点，我们需要代币地址始终按顺序排列，无论收到代币地址的顺序如何， 都需要在这里排序。
 
 ```solidity
         require(token0 != address(0), 'UniswapV2: ZERO_ADDRESS');
@@ -798,9 +800,9 @@ contract UniswapV2Factory is IUniswapV2Factory {
 
 这两个函数，允许 `setFeeTo` 管理费用的接收者（如有），并将 `setFeeToSetter` 更改为一个新 地址。
 
-### UniswapV2ERC20.sol {#UniswapV2ERC20}
+#### UniswapV2ERC20.sol <a href="#uniswapv2erc20" id="uniswapv2erc20"></a>
 
-[本合约](https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2ERC20.sol)实现了 ERC-20 流动代币。 这与 [OpenWhisk ERC-20 合约](/developers/tutorials/erc20-annotated-code)相似，因此 这里仅解释不同的部分，`permit` 的功能。
+[本合约](https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2ERC20.sol)实现了 ERC-20 流动代币。 这与 [OpenWhisk ERC-20 合约](../developers/tutorials/erc20-annotated-code/)相似，因此 这里仅解释不同的部分，`permit` 的功能。
 
 以太坊上的交易需要消耗以太币 (ETH)，相当于实际货币。 如果您有 ERC-20 代币但没有以太币，就无法发送 交易，因而不能用代币做任何事情。 避免该问题的一个解决方案是 [元交易](https://docs.uniswap.org/protocol/V2/guides/smart-contract-integration/supporting-meta-transactions/)。 代币的所有者签署一个交易，许可他人将代币从链上取出，并通过网络将其发送给 接收人。 接收人拥有以太币，可以代表所有者提交许可。
 
@@ -816,7 +818,7 @@ contract UniswapV2Factory is IUniswapV2Factory {
     mapping(address => uint) public nonces;
 ```
 
-接收人无法伪造数字签名。 但是，可以两次发送相同的交易 （这是一种[重放攻击](https://wikipedia.org/wiki/Replay_attack)形式）。 为防止这种情况，我们使用 一个[随机数](https://wikipedia.org/wiki/Cryptographic_nonce)。 如果新 `Permit` 的随机数不是上一次的使用的随机数加一， 我们便判定它无效。
+接收人无法伪造数字签名。 但是，可以两次发送相同的交易 （这是一种[重放攻击](https://wikipedia.org/wiki/Replay\_attack)形式）。 为防止这种情况，我们使用 一个[随机数](https://wikipedia.org/wiki/Cryptographic\_nonce)。 如果新 `Permit` 的随机数不是上一次的使用的随机数加一， 我们便判定它无效。
 
 ```solidity
     constructor() public {
@@ -883,15 +885,15 @@ contract UniswapV2Factory is IUniswapV2Factory {
 
 如果一切正常，则将其视为 [ERC-20 批准](https://eips.ethereum.org/EIPS/eip-20#approve)。
 
-## 外围合约 {#periphery-contracts}
+### 外围合约 <a href="#periphery-contracts" id="periphery-contracts"></a>
 
 外围合约是用于 Uniswap 的 API（应用程序接口）。 它们可用于来自 其他合约或去中心化应用程序的外部调用。 你可以直接调用核心合约，但这更为复杂， 如果您犯了错误，则可能会丢失值。 核心合约只包含确保它们不会遭受欺骗的测试，不会对其他调用者进行健全性检查。 它们在外围，因此可以根据需要进行更新。
 
-### UniswapV2Router01.sol {#UniswapV2Router01}
+#### UniswapV2Router01.sol <a href="#uniswapv2router01" id="uniswapv2router01"></a>
 
 [该合约](https://github.com/Uniswap/uniswap-v2-periphery/blob/master/contracts/UniswapV2Router01.sol) 存有问题，[不应该再使用](https://docs.uniswap.org/protocol/V2/reference/smart-contracts/router-01/)。 幸运的是， 外围合约无状态记录，也不拥有任何资产，所以很容易废弃。建议 使用 `UniswapV2Router02` 来替代。
 
-### UniswapV2Router02.sol {#UniswapV2Router02}
+#### UniswapV2Router02.sol <a href="#uniswapv2router02" id="uniswapv2router02"></a>
 
 在大多数情况下，您会通过[该合约](https://github.com/Uniswap/uniswap-v2-periphery/blob/master/contracts/UniswapV2Router02.sol)使用 Uniswap。 有关使用说明，您可以在[这里](https://docs.uniswap.org/protocol/V2/reference/smart-contracts/router-02/)找到。
 
@@ -946,7 +948,7 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
 
 当我们将代币从包装以太币合约换回以太币时，需要调用此函数。 只有我们使用的包装以太币合约才能授权 完成此操作。
 
-#### 增加流动资金 {#add-liquidity}
+**增加流动资金**
 
 这些函数添加代币进行配对交易，从而增大了流动资金池。
 
@@ -982,12 +984,12 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
 
 例如，想象汇率是一比一时，流动资金提供者 指定了这些值：
 
-| 参数             | 值    |
-| -------------- | ----:|
+| 参数             |    值 |
+| -------------- | ---: |
 | amountADesired | 1000 |
 | amountBDesired | 1000 |
-| amountAMin     | 900  |
-| amountBMin     | 800  |
+| amountAMin     |  900 |
+| amountBMin     |  800 |
 
 只要汇率保持在 0.9 至 1.25 之间，交易就会进行。 如果汇率超出这个范围，交易将被取消。
 
@@ -1048,7 +1050,7 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
 
 把数值汇总起来，我们就会得到这张图表。 假定您正在试图存入 1000 个 A 代币（蓝线）和 1000 个 B 代币（红线）。 X 轴是汇率，A/B。 如果 x=1，它们的价值相等，并且你每次可以存入 1000 个 A 代币和 1000 个 B 代币。 如果 x=2，A 的价值是 B 的两倍（每个 A 代币可换两个 B 代币），所以您可以存 1000 个 B 代币， 但只能存 500 个 A 代币。 如果是 x=0.5，情况就会逆转，即可存 1000 个 A 代币或 500 个 B 代币。
 
-![图表](liquidityProviderDeposit.png)
+![图表](../block%20chain/liquidityProviderDeposit.png)
 
 ```solidity
             }
@@ -1135,7 +1137,7 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
 
 用户已经向我们发送了以太币，如果还有任何额外的资金剩余（因为其他代币 比用户认定的价值更低），我们需要签发退款。
 
-#### 撤回流动资金 {#remove-liquidity}
+**撤回流动资金**
 
 下面的函数将撤回流动资金并还给流动资金提供者。
 
@@ -1242,7 +1244,7 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
     }
 ```
 
-这些函数转发元交易，通过[许可证机制](#UniswapV2ERC20)使没有以太币的用户能够从流动池中提取资金。
+这些函数转发元交易，通过[许可证机制](uniswapv2-contracts-guide.md#UniswapV2ERC20)使没有以太币的用户能够从流动池中提取资金。
 
 ```solidity
     // **** REMOVE LIQUIDITY (supporting fee-on-transfer tokens) ****
@@ -1292,7 +1294,7 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
 
 最后这个函数将存储费用计入元交易。
 
-#### 交易 {#trade}
+**交易**
 
 ```solidity
     // **** SWAP ****
@@ -1315,12 +1317,12 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
 3. 交易者卖出了 24.695 B 代币以得到 25.305 C 代币，大约获得 0.61 B 代币的利润。
 4. 交易者卖出了 24.695 C 代币以得到 25.305 A 代币，大约获得 0.61 C 代币的利润。 交易者还拥有剩下的 0.61 A 代币（交易者最终拥有的 25.305 A 代币，减去原始投资 24.695 A 代币）。
 
-| 步骤  | A-B 兑换                      | B-C 兑换                      | A-C 兑换                      |
-| --- | --------------------------- | --------------------------- | --------------------------- |
-| 1   | A:1000 B:1050 A/B=1.05      | B:1000 C:1050 B/C=1.05      | A:1050 C:1000 C/A=1.05      |
-| 2   | A:1024.695 B:1024.695 A/B=1 | B:1000 C:1050 B/C=1.05      | A:1050 C:1000 C/A=1.05      |
-| 3   | A:1024.695 B:1024.695 A/B=1 | B:1024.695 C:1024.695 B/C=1 | A:1050 C:1000 C/A=1.05      |
-| 4   | A:1024.695 B:1024.695 A/B=1 | B:1024.695 C:1024.695 B/C=1 | A:1024.695 C:1024.695 C/A=1 |
+| 步骤 | A-B 兑换                      | B-C 兑换                      | A-C 兑换                      |
+| -- | --------------------------- | --------------------------- | --------------------------- |
+| 1  | A:1000 B:1050 A/B=1.05      | B:1000 C:1050 B/C=1.05      | A:1050 C:1000 C/A=1.05      |
+| 2  | A:1024.695 B:1024.695 A/B=1 | B:1000 C:1050 B/C=1.05      | A:1050 C:1000 C/A=1.05      |
+| 3  | A:1024.695 B:1024.695 A/B=1 | B:1024.695 C:1024.695 B/C=1 | A:1050 C:1000 C/A=1.05      |
+| 4  | A:1024.695 B:1024.695 A/B=1 | B:1024.695 C:1024.695 B/C=1 | A:1024.695 C:1024.695 C/A=1 |
 
 ```solidity
             (address input, address output) = (path[i], path[i + 1]);
@@ -1647,17 +1649,17 @@ Solidity 中的函数参数可以存入 `memory` 或者 `calldata`。 如果此�
 }
 ```
 
-这些函数仅仅是调用 [UniswapV2Library 函数](#uniswapV2library)的代理。
+这些函数仅仅是调用 [UniswapV2Library 函数](uniswapv2-contracts-guide.md#uniswapV2library)的代理。
 
-### UniswapV2Migrator.sol {#UniswapV2Migrator}
+#### UniswapV2Migrator.sol <a href="#uniswapv2migrator" id="uniswapv2migrator"></a>
 
 这个合约用于将交易从旧版 v1 迁移至 v2。 目前版本已经迁移，便不再相关。
 
-## 程序库 {#libraries}
+### 程序库 <a href="#libraries" id="libraries"></a>
 
 [SafeMath 库](https://docs.openzeppelin.com/contracts/2.x/api/math)是一个文档很完备的程序库，这里 便无需赘述了。
 
-### 数学 {#Math}
+#### 数学 <a href="#math" id="math"></a>
 
 此库包含一些 Solidity 代码通常不需要的数学函数，因而它们不是 Solidity 语言的一部分。
 
@@ -1686,7 +1688,7 @@ library Math {
                 x = (y / x + x) / 2;
 ```
 
-获取一个更接近的估值，即前一个估值与我们试图找到的方根值的平均数除以 前一个估值。 重复计算，直到新的估值不再低于现有估值。 欲了解更多详情， [请参见此处](https://wikipedia.org/wiki/Methods_of_computing_square_roots#Babylonian_method)。
+获取一个更接近的估值，即前一个估值与我们试图找到的方根值的平均数除以 前一个估值。 重复计算，直到新的估值不再低于现有估值。 欲了解更多详情， [请参见此处](https://wikipedia.org/wiki/Methods\_of\_computing\_square\_roots#Babylonian\_method)。
 
 ```solidity
             }
@@ -1702,7 +1704,7 @@ library Math {
 }
 ```
 
-### 定点小数 (UQ112x112) {#FixedPoint}
+#### 定点小数 (UQ112x112) <a href="#fixedpoint" id="fixedpoint"></a>
 
 该库处理小数，这些小数通常不属于以太坊计算的一部分。 为此，它将数值 _x_ 编码为 _x\*2^112_。 这使我们能够使用原来的加法和减法操作码，无需更改。
 
@@ -1739,7 +1741,7 @@ library UQ112x112 {
 
 如果我们需要两个 `UQ112x112` 值相除，结果不需要再乘以 2^112。 因此， 我们为分母取一个整数。 我们需要使用类似的技巧来做乘法，但不需要将 `UQ112x112` 的值相乘。
 
-### UniswapV2Library {#uniswapV2library}
+#### UniswapV2Library <a href="#uniswapv2library" id="uniswapv2library"></a>
 
 此库仅被外围合约使用
 
@@ -1859,7 +1861,7 @@ Solidity 本身不能进行小数计算，所以不能简单地将金额乘以 0
 
 在需要进行数次配对交易时，可以通过这两个函数获得相应数值。
 
-### 转账帮助 {#transfer-helper}
+#### 转账帮助 <a href="#transfer-helper" id="transfer-helper"></a>
 
 [此库](https://github.com/Uniswap/uniswap-lib/blob/master/contracts/libraries/TransferHelper.sol)添加了围绕 ERC-20 和以太坊转账的成功检查，并以同样的方式处理回退和返回 `false` 值。
 
@@ -1881,8 +1883,8 @@ library TransferHelper {
 
 我们可以通过以下两种方式调用不同的合约：
 
-- 使用一个接口定义创建函数调用
-- 使用 [应用程序二进制接口 (ABI)](https://docs.soliditylang.org/en/v0.8.3/abi-spec.html)“手动” 创建调用。 这是代码作者的决定。
+* 使用一个接口定义创建函数调用
+* 使用 [应用程序二进制接口 (ABI)](https://docs.soliditylang.org/en/v0.8.3/abi-spec.html)“手动” 创建调用。 这是代码作者的决定。
 
 ```solidity
         require(
@@ -1939,7 +1941,7 @@ library TransferHelper {
 
 此函数将以太币转至一个帐户。 任何对不同合约的调用都可以尝试发送以太币。 因为我们 实际上不需要调用任何函数，就不需要在调用中发送数据。
 
-## 结论 {#conclusion}
+### 结论 <a href="#conclusion" id="conclusion"></a>
 
 本篇文章较长，约有 50 页。 如果您已读到此处，恭喜您！ 希望您现在已经了解 编写真实应用程序（相对于短小的示例程序）的考虑因素，并且能够更好地为您自己的 用例编写合约。
 

@@ -1,4 +1,4 @@
-# **如何对接 Uniswap V2 兑换代币**
+# 如何对接 Uniswap V2 兑换代币
 
 > [**Uniswap**](https://learnblockchain.cn/tags/Uniswap)
 
@@ -6,7 +6,7 @@
 
 > 参考原文：https://medium.com/uv-labs/uniswap-testing-1d88ca523bf0
 
-<img title="" src="https://img.learnblockchain.cn/pics/20220608144145.jpeg!/scale/60" alt="img" data-align="inline">
+![img](https://img.learnblockchain.cn/pics/20220608144145.jpeg!/scale/60)
 
 在本文中，我们将和正式的 Uniswap V2 交互，实现使用[Uniswap](https://uniswap.org/)进行代币兑换（swap）并通过测试验证兑换功能；
 
@@ -20,9 +20,9 @@
 
 Uniswap有3个主要功能:
 
-- 在不同的代币之间进行兑换
-- 添加代币对流动性，获得LP ERC-20流动性代币
-- 销毁 LP ERC-20流动性代币，取回配对的ERC-20代币
+* 在不同的代币之间进行兑换
+* 添加代币对流动性，获得LP ERC-20流动性代币
+* 销毁 LP ERC-20流动性代币，取回配对的ERC-20代币
 
 在这篇文章中，我们将重点讨论使用fork 主网在不同的代币之间进行兑换。
 
@@ -45,7 +45,7 @@ npm install --save hardhat @nomiclabs/hardhat-ethers @nomiclabs/hardhat-waffle e
 
 ## 初始化Hardhat项目
 
-要初始化你的Hardhat项目，在CLI中运行`npx hardhat`命令，并创建一个空的*config.js*文件。
+要初始化你的Hardhat项目，在CLI中运行`npx hardhat`命令，并创建一个空的_config.js_文件。
 
 并定制你的Hardhat配置，因为我们要fork主网来与Uniswap交互。因此，Hardhat配置应该看起来类似于这样：
 
@@ -65,7 +65,7 @@ mkdir contracts && mkdir scripts && mkdir tests
 
 为了编写兑换合约，在合约目录内创建一个文件，命名为`testSwap.sol`。
 
-在你的 `testSwap.sol `中导入Uniswap 等接口，并创建一个名为**testSwap**的合约。
+在你的 `testSwap.sol` 中导入Uniswap 等接口，并创建一个名为**testSwap**的合约。
 
 它应该看起来像这样：
 
@@ -93,24 +93,24 @@ address private constant UNISWAP_V2_ROUTER = 0x7a250d5630B4cF539739dF2C5dAcb4c65
     ) external {}
 ```
 
-函数命名为**swap，**里面有
+函数命名为\*\*swap，\*\*里面有
 
-- **_tokenIn**： 是我们要兑换的代币的地址。
-- **_tokenOut**：是我们想从这次交易中获得的代币的地址。
-- **_amountIn**： 是我们要交易的代币的数量。
-- **_to**：交易兑换出的代币发送到这个地址。
-- **_deadline**：是交易应该被执行的时间期限。如果超过了最后期限，交易就会失败。
+* **\_tokenIn**： 是我们要兑换的代币的地址。
+* **\_tokenOut**：是我们想从这次交易中获得的代币的地址。
+* **\_amountIn**： 是我们要交易的代币的数量。
+* **\_to**：交易兑换出的代币发送到这个地址。
+* **\_deadline**：是交易应该被执行的时间期限。如果超过了最后期限，交易就会失败。
 
-在兑换函数里面，我们要做的第一件事是在合约里面把所需数量的***_tokenIn*** 转移到合约里，使用`msg.sender`：
+在兑换函数里面，我们要做的第一件事是在合约里面把所需数量的_**\_tokenIn**_ 转移到合约里，使用`msg.sender`：
 
 ```solidity
 // 把 token 从用户转移到合约
 IERC20(_tokenIn).transferFrom(msg.sender, address(this), _amountIn);
 ```
 
-一旦调用执行，**_amountIn** 数量的 **_tokenIn**就会转入到`testSwap`合约中
+一旦调用执行，**\_amountIn** 数量的 **\_tokenIn**就会转入到`testSwap`合约中
 
-接下来，通过调用**IERC20** 授权，允许Uniswap合约花费`testSwap`合约中**_amountIn**数量的代币。
+接下来，通过调用**IERC20** 授权，允许Uniswap合约花费`testSwap`合约中**\_amountIn**数量的代币。
 
 ```solidity
 // by calling IERC20 approve you allow the uniswap contract to spend the tokens in this contract
@@ -119,7 +119,7 @@ IERC20(_tokenIn).approve(UNISWAP_V2_ROUTER, _amountIn);
 
 在使用 Uniswap Router 兑换，需要为兑换代币的设置**路径**，路径上第一“站”是使用的代币，最后一“站”期望收到的代币。
 
-所以，我们将声明一个名为`path`的地址数组，填入 **_tokenIn** 的地址和 **_tokenOut** 的地址。
+所以，我们将声明一个名为`path`的地址数组，填入 **\_tokenIn** 的地址和 **\_tokenOut** 的地址。
 
 ```solidity
 address[] memory path;
@@ -161,7 +161,7 @@ uint256[] memory amountsReceived = IUniswapV2Router(UNISWAP_V2_ROUTER).swapExact
 
 ## 编写测试脚本
 
-在*tests*文件夹中创建一个文件，并将其命名为***`sample-test.js`***。
+在_tests_文件夹中创建一个文件，并将其命名为\*\*\*`sample-test.js`\*\*\*。
 
 首先，要从Uniswap导入ERC20合约的ABI，同时，定义测试的结构和我们要使用的合约的地址。
 
@@ -178,9 +178,9 @@ describe("Test Swap", function () {
 
 这里，我们使用了4个地址：
 
-- **DAIAddress**和**WETHAddress**分别是Dai 合约和WETH 合约的地址，它们将在交易中使用
-- **MyAddress**是交易者的地址。
-- **DAIHolder**是我们要冒充的地址。
+* **DAIAddress**和**WETHAddress**分别是Dai 合约和WETH 合约的地址，它们将在交易中使用
+* **MyAddress**是交易者的地址。
+* **DAIHolder**是我们要冒充的地址。
 
 现在，在编写测试脚本之前，我们将部署**testSwap**智能合约。为此，我们使用以下代码：
 
@@ -270,12 +270,12 @@ expect(DAIHolderBalance_updated.eq(BigNumber.from(0))).to.be.true
 expect(myBalance_updated.gt(myBalance)).to.be.true;
 ```
 
-- 由于我们使用了所有的余额进行交易，因此在第一个测试中，我们期望DAI代币余额应该等于0。
-- 在第二个测试中，检查我们账户中的**余额**是否比之前的大。
+* 由于我们使用了所有的余额进行交易，因此在第一个测试中，我们期望DAI代币余额应该等于0。
+* 在第二个测试中，检查我们账户中的**余额**是否比之前的大。
 
 因此，这就是我们要进行的两个测试。
 
-sample-test.js 应该类似于下面的样子，请注意文件开头的 `require `语句：
+sample-test.js 应该类似于下面的样子，请注意文件开头的 `require` 语句：
 
 ![img](https://img.learnblockchain.cn/pics/20220608144317.png)
 
