@@ -2,7 +2,7 @@
 
 锁是一个常见的同步概念，我们都听说过加锁（lock）或者解锁（unlock），当然学术一点地说法是获取（acquire）和释放（release）。
 
-![img](https://pic1.zhimg.com/50/v2-b41c6cfeb6bfdb84480e7f9fc0c4761b_720w.jpg?source=1940ef5c)
+![img](https://s2.loli.net/2022/07/24/3gexCDnSULmpQqw.png)
 
 恰好`pthread`包含这几种锁的API，而`C++11`只包含其中的部分。接下来我将通过`pthread`的API来展开回答。
 

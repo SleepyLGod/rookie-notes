@@ -4,7 +4,7 @@
 
 **乐，我就是比你弔：**
 
-![img](https://segmentfault.com/img/remote/1460000039156265)
+![img](https://s2.loli.net/2022/07/24/OSfnMs3leCuqTpU.png)
 
 `Cukoo`解决了这个问题：用**更低的空间开销**解决了布隆过滤器**不能删除元素**的问题
 
@@ -25,11 +25,11 @@
 
 当然假如存在绝对的空间不足，那老是踢出也不是办法，所以一般会设置一个**踢出阈值**，如果在某次插入行为过程中连续踢出超过阈值，则进行扩容。
 
-![image-20210727104910960](https://img2020.cnblogs.com/blog/1617168/202107/1617168-20210727195627534-1821849951.png)
+![image-20210727104910960](https://s2.loli.net/2022/07/24/4URBirfyup3SGVm.png)
 
 _**换言之：**_
 
-![img](https://segmentfault.com/img/remote/1460000039156261)
+![img](https://s2.loli.net/2022/07/24/h5TSCN4qmMRQ7jK.png)
 
 它有两个 hash 表，记为 T1，T2。
 
@@ -45,9 +45,9 @@ _**换言之：**_
 
 被踢出去的元素怎么办呢？
 
-![img](https://segmentfault.com/img/remote/1460000039156266)
+![img](https://s2.loli.net/2022/07/24/ivVhZclT2Kqrjxu.png)
 
-![img](https://segmentfault.com/img/remote/1460000039156272)
+![img](https://s2.loli.net/2022/07/24/k9YiWG7tVD5nahw.png)
 
 这种类似于套娃的解决方式看是可行，但是总是有出现**循环踢出**导致放不进 x 的问题。
 
@@ -59,7 +59,7 @@ _**换言之：**_
 
 ## **Cuckoo Filter**
 
-![1](https://img2020.cnblogs.com/blog/1617168/202107/1617168-20210727195625561-1153589445.jpg)
+![1](https://s2.loli.net/2022/07/24/YeU32Z8WGgjxaqh.jpg)
 
 （a）(b)展示了一个基本的**布谷鸟哈希表的插入**操作，是由一个**桶数组**组成，每个插入项都有由**散列函数`h1(x)`和`h2(x)`确定的两个候选桶**，具体操作上文中已经描述。
 
@@ -69,11 +69,11 @@ _**换言之：**_
 
 查询数据的时候，就是看看对应的位置上有没有对应的“指纹”信息：
 
-![img](https://segmentfault.com/img/remote/1460000039156277)
+![img](https://s2.loli.net/2022/07/24/i57bxQrg8Ukhs16.png)
 
 删除数据的时候，也只是抹掉该位置上的“指纹”而已：
 
-![img](https://segmentfault.com/img/remote/1460000039156274)
+![img](https://s2.loli.net/2022/07/24/e7lcZzRQypOBakj.png)
 
 由于是对元素进行 hash 计算，那么必然会出现“指纹”相同的情况，也就是会出现误判的情况。
 
@@ -158,7 +158,7 @@ _**还有个问题：**_
 
     例如下面这种情况：
 
-    ![img](https://segmentfault.com/img/remote/1460000039156281)
+    ![img](https://s2.loli.net/2022/07/24/e9Gqcy4o7AbdXQk.png)
 
     why 已经插入了 8 次了，如果再次插入一个 why，则会出现循环踢出的问题，直到最大循环次数，然后返回一个 false。
 

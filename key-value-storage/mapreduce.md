@@ -50,7 +50,7 @@ reduce(String key, Iterator values):
 
 每一轮 MapReduce 的大致过程如下图所示：
 
-[![img](https://mr-dai.github.io/img/mapreduce_summary/mapreduce_architecture.png)](https://mr-dai.github.io/img/mapreduce_summary/mapreduce_architecture.png)
+[![img](https://s2.loli.net/2022/07/24/D8dExufbkRa52eT.png)](https://mr-dai.github.io/img/mapreduce_summary/mapreduce_architecture.png)
 
 首先，用户通过 MapReduce **客户端指定** Map 函数和 Reduce 函数，以及此次 MapReduce 计算的配置，包括中间结果键值对的 Partition 数量 `R `以及用于**切分中间结果**的哈希函数 `hash`。
 用户开始 MapReduce 计算后，整个 MapReduce 计算的流程可总结如下：

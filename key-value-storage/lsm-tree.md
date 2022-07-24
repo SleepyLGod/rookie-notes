@@ -55,7 +55,7 @@
 
 #### size-tiered strategy
 
-![img](https://pic2.zhimg.com/v2-bedb057fde7a4ce4d5be2ea34fe86f59\_b.jpg)
+<img src="https://s2.loli.net/2022/07/24/NkClzSVE6OpAfeR.jpg" alt="img" style="zoom: 80%;" />
 
 每层sstable大小相近，同时限制每一层sstable的数量N， 达到N后触发compact合并成为一个更大的sstable到下一层
 
@@ -67,7 +67,9 @@
 
 #### leveled
 
-![img](https://pic3.zhimg.com/v2-5f8de2e435e979936693631617a60d16\_b.jpg) ![img](https://pic1.zhimg.com/v2-8274669affe5b9602aff45ddff29e628\_b.jpg)
+<img src="https://s2.loli.net/2022/07/24/xvNIaosr56mVBAt.jpg" alt="img" style="zoom:80%;" />
+
+<img src="https://s2.loli.net/2022/07/24/wQA7VhStxNeR8Bl.jpg" alt="img"  />
 
 分层（顶层在上底层在下），每一层限制总文件的大小
 
@@ -122,7 +124,7 @@ leveled compaction策略中每一层的数据量是有阈值的，那么在`Rock
     >
     > `max_bytes_for_level_multiplier`的作用从乘法因子变成了除法因子。特别地，如果出现了**target\_size(Lk) < max\_bytes\_for\_level\_base / max\_bytes\_for\_level\_multiplier**的情况，那么这一层**及比它低的层**就都不会再存储任何数据。
     >
-    > ![img](https://upload-images.jianshu.io/upload\_images/195230-c051e4e1307232f3.png?imageMogr2/auto-orient/strip|imageView2/2/w/1200/format/webp)
+    > <img src="https://s2.loli.net/2022/07/24/LGnD7HNgYtyZU8M.webp" alt="img" style="zoom:50%;" />
 
 **= L0 (universal compaction)**
 

@@ -18,7 +18,7 @@
 
 假设我们想要保留一份可供许多不同项目使用的大量网页和相关信息的副本；让我们将这个特定的表称为 `Webtable`。在 `Webtable` 中，我们将使用 URL 作为行键，将网页的各个方面作为列名，并将网页的内容存储在获取时的时间戳下的 `contents`: 列中，
 
-![image-20220711123729151](https://s2.loli.net/2022/07/11/7HjDeXiBbKwv1cL.png)
+![image-20220711123729151](https://s2.loli.net/2022/07/24/XIviLCBwFZnVbQ2.png)
 
 存储网页的示例表的一部分。行名称是反向 URL。内容列族包含页面内容，锚列族包含引用页面的任何锚的文本。 CNN 的主页被 `Sports Illustrated` 和`MY-look`主页引用，因此该行包含名为 `anchor:cnnsi.com` 和 `anchor:my.look.ca` 的列。每个锚单元都有一个版本；内容列有三个版本，时间戳为 `t3`、`t5` 和 `t6`。
 
@@ -129,7 +129,7 @@ Bigtable 的 Tablet 之间会形成一个三层结构，类似B+树，具体如�
 * Root Tablet 保存着 一个特殊的`METADATA` Table，里面有所有 Tablet 的位置
 * `METADATA` Tablet 中保存着其他所有 Table 的 Tablet 的位置
 
-[<img src="https://mr-dai.github.io/img/bigtable/tablet-hierarchy.jpg" alt="img" data-size="original">](https://mr-dai.github.io/img/bigtable/tablet-hierarchy.jpg)
+[<img src="https://s2.loli.net/2022/07/24/2wi9V6HhdtnToa7.jpg" alt="img" data-size="original">](https://mr-dai.github.io/img/bigtable/tablet-hierarchy.jpg)
 
 值得注意的是，Root Tablet 是特殊的：**无论它的体积如何增长都不会被切分，保证唯一**。
 
@@ -163,7 +163,7 @@ Master 在检测到 Tablet Server 失效（互斥锁丢失）后，便会将其�
 
 如上所述，Tablet 的数据实际上存储在 GFS 中，由 GFS 提供数据的冗余备份。Tablet 数据读操作与写操作的示意图如下：
 
-[![img](https://mr-dai.github.io/img/bigtable/tablet.jpg)](https://mr-dai.github.io/img/bigtable/tablet.jpg)
+[![img](https://s2.loli.net/2022/07/24/hPolgFQUrGR5OxK.jpg)](https://mr-dai.github.io/img/bigtable/tablet.jpg)
 
 可见，一个 **Tablet 由若干个位于 GFS 上的 SSTable 文件**、一个**位于内存内的 MemTable 以及一份 Commit Log** 组成。
 

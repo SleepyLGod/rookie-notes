@@ -1,16 +1,3 @@
----
-title: Uniswap-v2 合约概览
-author: Ori Pomerantz
-sidebar: true
-tags:
-  - solidity
-  - uniswap
-skill: intermediate
-published: 2021-05-01T00:00:00.000Z
-lang: zh
-description: Uniswap-v2 合约是如何工作的？ 为什么要如此编写？
----
-
 # Uniswap-v2 合约概览
 
 ### 介绍 <a href="#introduction" id="introduction"></a>
