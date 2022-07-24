@@ -1,4 +1,4 @@
-# LSM-tree
+# LSM Tree
 
 > 目前`HBase`,`LevelDB`,`RocksDB`这些`NoSQL`存储都是采用的LSM树
 >
@@ -55,7 +55,7 @@
 
 #### size-tiered strategy
 
-<img src="https://s2.loli.net/2022/07/24/NkClzSVE6OpAfeR.jpg" alt="img" style="zoom: 80%;" />
+![](https://s2.loli.net/2022/07/24/NkClzSVE6OpAfeR.jpg)
 
 每层sstable大小相近，同时限制每一层sstable的数量N， 达到N后触发compact合并成为一个更大的sstable到下一层
 
@@ -67,9 +67,11 @@
 
 #### leveled
 
-<img src="https://s2.loli.net/2022/07/24/xvNIaosr56mVBAt.jpg" alt="img" style="zoom:80%;" />
+&#x20;
 
-<img src="https://s2.loli.net/2022/07/24/wQA7VhStxNeR8Bl.jpg" alt="img"  />
+![](https://s2.loli.net/2022/07/24/wQA7VhStxNeR8Bl.jpg)
+
+![](https://s2.loli.net/2022/07/24/xvNIaosr56mVBAt.jpg)
 
 分层（顶层在上底层在下），每一层限制总文件的大小
 
@@ -124,7 +126,9 @@ leveled compaction策略中每一层的数据量是有阈值的，那么在`Rock
     >
     > `max_bytes_for_level_multiplier`的作用从乘法因子变成了除法因子。特别地，如果出现了**target\_size(Lk) < max\_bytes\_for\_level\_base / max\_bytes\_for\_level\_multiplier**的情况，那么这一层**及比它低的层**就都不会再存储任何数据。
     >
-    > <img src="https://s2.loli.net/2022/07/24/LGnD7HNgYtyZU8M.webp" alt="img" style="zoom:50%;" />
+    >
+
+![](https://s2.loli.net/2022/07/24/LGnD7HNgYtyZU8M.webp)
 
 **= L0 (universal compaction)**
 

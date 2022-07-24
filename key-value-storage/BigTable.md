@@ -1,4 +1,8 @@
-# BigTable: A Distributed Storage System for Structured Data
+---
+description: A Distributed Storage System for Structured Data
+---
+
+# BigTable
 
 > 主要是对于论文的理解
 
@@ -129,7 +133,7 @@ Bigtable 的 Tablet 之间会形成一个三层结构，类似B+树，具体如�
 * Root Tablet 保存着 一个特殊的`METADATA` Table，里面有所有 Tablet 的位置
 * `METADATA` Tablet 中保存着其他所有 Table 的 Tablet 的位置
 
-[<img src="https://s2.loli.net/2022/07/24/2wi9V6HhdtnToa7.jpg" alt="img" data-size="original">](https://mr-dai.github.io/img/bigtable/tablet-hierarchy.jpg)
+![](https://s2.loli.net/2022/07/24/2wi9V6HhdtnToa7.jpg)
 
 值得注意的是，Root Tablet 是特殊的：**无论它的体积如何增长都不会被切分，保证唯一**。
 
@@ -163,7 +167,7 @@ Master 在检测到 Tablet Server 失效（互斥锁丢失）后，便会将其�
 
 如上所述，Tablet 的数据实际上存储在 GFS 中，由 GFS 提供数据的冗余备份。Tablet 数据读操作与写操作的示意图如下：
 
-[![img](https://s2.loli.net/2022/07/24/hPolgFQUrGR5OxK.jpg)](https://mr-dai.github.io/img/bigtable/tablet.jpg)
+![](https://s2.loli.net/2022/07/24/hPolgFQUrGR5OxK.jpg)
 
 可见，一个 **Tablet 由若干个位于 GFS 上的 SSTable 文件**、一个**位于内存内的 MemTable 以及一份 Commit Log** 组成。
 
