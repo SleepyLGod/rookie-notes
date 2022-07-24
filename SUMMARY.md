@@ -20,3 +20,12 @@
   * [🤩 RocksDB](key-value-storage/rocksdb.md)
   * [😇 Lock(pthread)](key-value-storage/lock-pthread.md)
   * [😇 Lock(c++ API)](key-value-storage/lock-c++.md)
+
+## Group 1
+
+* [🫂 🦸♂Personal diaries](group-1/personal-diaries/README.md)
+  * [😑 2021中秋杂感](group-1/personal-diaries/2021-zhong-qiu-za-gan.md)
+  * [😖 2022玉玉日记（一）](group-1/personal-diaries/2022-yu-yu-ri-ji-yi.md)
+  * [😚 2022玉玉日记（二）](group-1/personal-diaries/2022-yu-yu-ri-ji-er.md)
+  * [🤔 2022玉玉日记（三）](group-1/personal-diaries/2022-yu-yu-ri-ji-san.md)
+  * [☹ 2022玉玉日记（四）](group-1/personal-diaries/2022-yu-yu-ri-ji-si.md)
