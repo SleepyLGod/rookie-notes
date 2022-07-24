@@ -452,7 +452,108 @@ SSTable 中其实存储的不只是数据，其中还保存了一些**元数据�
 
 ![SSTable-Footer](https://img.draveness.me/2017-08-12-SSTable-Footer.jpg-1000width)
 
-整个 `Footer` 在文件中占用 48 个字节，我们能在其中拿到 **MetaIndex 块和 Index 块的位置**，再通过其中的索引继而找到对应值存在的位置。
+```cpp
+// 40B:(40==2*BlockHandle::kMaxEncodedLength)
+metaindex_handle: char[p];      // Block handle for metaindex
+index_handle:     char[q];      // Block handle for index
+padding:          char[40-p-q]; // zeroed bytes to make fixed length
+// 8B:static const uint64_t kTableMagicNumber = 0xdb4775248b80fb57ull;
+magic:            fixed64;      // == 0xdb4775248b80fb57 (little-endian)
+```
+
+整个 `Footer` 在文件中固定占用 48 个字节，我们能在其中拿到 **MetaIndex 块和 Index 块的位置**，再通过其中的索引继而找到对应值存在的位置。
+
+为了文件的自解释，内部必须要有**指针**指向文件的其他位置来表示某个`section`的开始和结束位置。负责记录这个的变量叫做<mark style="color:purple;">**BlockHandle**</mark>，他有两个成员变量`offset_ `和 `size_`，分别记录的某个数据块的起始位置和长度：
+
+```cpp
+class BlockHandle {
+private:
+  uint64_t offset_;
+  uint64_t size_;
+};
+```
+
+**一个uint64整数经过varint64编码后最大占用10个字节**，一个`BlockHandle`包含两个uint64类型(`size`和`offset`)，则一个`BlockHandle`最多占用20个字节，即<mark style="color:purple;">`BLockHandle::kMaxEncodedLength=20`</mark>。`metaindex_handle`和`index_handle`最大占用字节为40个字节。
+
+`magic number`占用8个字节，是个固定数值，用于**读取时校验是否跟填充时相同**，不相同的话就表示此文件不是一个SSTable文件(bad magic number)。`padding`用于**补齐**为40字节。
+
+sstable文件中`footer`中可以解码出在文件的结尾处距离`footer`最近的`index block`的`BlockHandle`，以及`metaindex block`的`BlockHandle`，从而确定这两个组成部分在文件中的位置。
+
+事实上，在**table/table_build.cc**中的`Status TableBuilder::Finish()`函数，我们可以看出，当生成sstable文件的时候，各个组成部分的写入顺序：
+
+```cpp
+Status TableBuilder::Finish() {
+  Rep* r = rep_;
+  Flush();  /* 写入尚未Flush的Block块 */
+  assert(!r->closed);
+  r->closed = true;
+
+  BlockHandle filter_block_handle, metaindex_block_handle, index_block_handle;
+
+  // 写入filter_block块，即图中的meta block
+  if (ok() && r->filter_block != NULL) {
+    WriteRawBlock(r->filter_block->Finish(), kNoCompression, &filter_block_handle);
+  }
+
+  // 写入metaindex block
+  if (ok()) {
+    BlockBuilder meta_index_block(&r->options);
+    if (r->filter_block != NULL) {
+      // Add mapping from "filter.Name" to location of filter data
+      std::string key = "filter.";
+      key.append(r->options.filter_policy->Name());
+      std::string handle_encoding;
+      filter_block_handle.EncodeTo(&handle_encoding);
+      meta_index_block.Add(key, handle_encoding);
+    }
+    // TODO(postrelease): Add stats and other meta blocks
+    WriteBlock(&meta_index_block, &metaindex_block_handle);
+  }
+
+  // 写入index block
+  if (ok()) {
+    if (r->pending_index_entry) {
+      r->options.comparator->FindShortSuccessor(&r->last_key);
+      std::string handle_encoding;
+      r->pending_handle.EncodeTo(&handle_encoding);
+      r->index_block.Add(r->last_key, Slice(handle_encoding));
+      r->pending_index_entry = false;
+    }
+    WriteBlock(&r->index_block, &index_block_handle);
+  }
+
+  // 写入footer， footer为固定长度，在文件的最尾部
+  if (ok()) {
+    Footer footer;
+    //将metaindex block在文件中的位置信息记录在footer
+    footer.set_metaindex_handle(metaindex_block_handle);
+    
+    //将index block在sstabke文件中的位置信息记录在footer
+    footer.set_index_handle(index_block_handle);
+    std::string footer_encoding;
+    footer.EncodeTo(&footer_encoding);
+    r->status = r->file->Append(footer_encoding);
+    if (r->status.ok()) {
+      r->offset += footer_encoding.size();
+    }
+  }
+  return r->status;
+}
+```
+
+从Finish函数也可以看出，各个部分在文件中的位置即是上图所绘制的那样。
+
+`index block`, `metaindex block` , `filter block`（图中的`meta block`），甚至最终的`data block`，这些block都是干啥用的，数据又是怎么组织的呢？
+
+- `Data Blocks`: 存储一系列有序的key-value
+- `Meta Block`：存储key-value对应的filter(默认为bloom filter)
+- `metaindex block`: 指向Meta Block的索引
+- `Index BLocks`: 指向Data Blocks的索引
+- `Footer `: 指向索引的索引
+
+它们之间的关系如下图所示, 后面备注会详细介绍这些部分的关系和存在的作用。
+
+![img](https://s2.loli.net/2022/07/24/qfa37TZkJtQVhAS.png)
 
 <mark style="color:purple;">**`TableBuilder::Rep`**</mark> 结构体中就包含了**一个文件需要创建的全部信息**，包括数据块、索引块等等：
 
@@ -480,9 +581,7 @@ struct TableBuilder::Rep {
 
 LevelDB 的源代码非常易于阅读，也是学习 C++ 语言非常优秀的资源，如果对文章的内容有疑问，可以在博客下面留言。
 
-### **相关文章**
-
-### Reference
+### **Reference**
 
 * [Bigtable: A Distributed Storage System for Structured Data](https://static.googleusercontent.com/media/research.google.com/en/archive/bigtable-osdi06.pdf)
 * [LevelDB](https://github.com/google/leveldb)
