@@ -2,7 +2,7 @@
 description: A Distributed Storage System for Structured Data
 ---
 
-# BigTable
+# 😍 BigTable
 
 > 主要是对于论文的理解
 

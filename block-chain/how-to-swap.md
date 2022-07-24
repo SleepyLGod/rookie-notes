@@ -1,12 +1,14 @@
-# 如何对接 Uniswap V2 兑换代币
+---
+description: 参考原文：https://medium.com/uv-labs/uniswap-testing-1d88ca523bf0
+---
+
+# ⛏ 对接 Uniswap V2 兑换代币
 
 > [**Uniswap**](https://learnblockchain.cn/tags/Uniswap)
 
 对接 Uniswap V2 兑换代币，并测试验证。
 
-> 参考原文：https://medium.com/uv-labs/uniswap-testing-1d88ca523bf0
-
-![img](https://img.learnblockchain.cn/pics/20220608144145.jpeg!/scale/60)
+![Uniswap & eth](https://img.learnblockchain.cn/pics/20220608144145.jpeg!/scale/60)
 
 在本文中，我们将和正式的 Uniswap V2 交互，实现使用[Uniswap](https://uniswap.org/)进行代币兑换（swap）并通过测试验证兑换功能；
 

@@ -1,4 +1,4 @@
-# RocksDB
+# 🤩 RocksDB
 
 RocksDB 是用于快速存储环境的持久键值存储。以下是 RocksDB 的一些亮点功能：
 

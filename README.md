@@ -4,7 +4,7 @@ coverY: 0
 layout: editorial
 ---
 
-# Hi there 👋
+# 😁 Hi there 👋
 
 * ⚡ This is a book containing my notes while studying, and some of my ideas.
 * 👯 I’m looking to collaborate on databases, distributed, blockchain and k-v storage, etc.

@@ -1,4 +1,4 @@
-# Google MapReduce
+# 😍 Google MapReduce
 
 ## **MapReduce Model**
 

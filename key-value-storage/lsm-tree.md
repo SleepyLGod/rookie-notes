@@ -1,4 +1,4 @@
-# LSM Tree
+# 😇 LSM Tree
 
 > 目前`HBase`,`LevelDB`,`RocksDB`这些`NoSQL`存储都是采用的LSM树
 >
