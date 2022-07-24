@@ -2,7 +2,7 @@
 description: 转载自Draveness大神的文章，并作简单修改。
 ---
 
-# 🤩 LevelDB & BigTable
+# 🤓 LevelDB & BigTable
 
 在 2006 年的 OSDI 上，Google 发布了名为 [Bigtable: A Distributed Storage System for Structured Data](https://static.googleusercontent.com/media/research.google.com/en/archive/bigtable-osdi06.pdf) 的论文，其中描述了一个用于管理结构化数据的分布式存储系统 - Bigtable 的数据模型、接口以及实现等内容。
 
@@ -136,7 +136,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* my_batch) {
 
 从总体上看，LevelDB 在对数据库执行写操作时，会有三个步骤：
 
-1. 调用 ** **<mark style="color:purple;">**`MakeRoomForWrite`**</mark>** ** 方法为即将进行的写入提供足够的空间；
+1. 调用 \*\* `MakeRoomForWrite` \*\* 方法为即将进行的写入提供足够的空间；
    * 在这个过程中，由于 memtable 中空间的不足可能会冻结当前的 memtable，发生 <mark style="color:purple;">**Minor Compaction**</mark>并创建一个新的 `MemTable` 对象；
    * 在某些条件满足时，也可能发生 <mark style="color:purple;">**Major Compaction**</mark>，对数据库中的 SSTable 进行压缩；
 2. 通过 <mark style="color:purple;">**`AddRecord`**</mark> 方法向**日志中追加**一条写操作的记录；
@@ -246,7 +246,7 @@ virtual Status Sync() {
 
 ![LevelDB-Memtable-Key-Value-Format](https://img.draveness.me/2017-08-12-LevelDB-Memtable-Key-Value-Format.jpg-1000width)
 
-添加和删除的记录的区别就是它们使用了不用的 <mark style="color:purple;">`ValueType`</mark> <mark style="color:purple;"></mark><mark style="color:purple;"></mark> 标记，插入的数据会将其设置为 <mark style="color:purple;">`kTypeValue`</mark>，删除的操作会标记为 <mark style="color:purple;">`kTypeDeletion`</mark>；但是它们实际上都向 memtable 中插入了一条数据。
+添加和删除的记录的区别就是它们使用了不用的 <mark style="color:purple;">`ValueType`</mark> 标记，插入的数据会将其设置为 <mark style="color:purple;">`kTypeValue`</mark>，删除的操作会标记为 <mark style="color:purple;">`kTypeDeletion`</mark>；但是它们实际上都向 memtable 中插入了一条数据。
 
 ```cpp
 virtual void Put(const Slice& key, const Slice& value) {
@@ -321,7 +321,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key, std::string* va
 
 **多层级的 SSTable**
 
-当 LevelDB 在内存中没有找到对应的数据时，它才会到磁盘中多个层级的 SSTable 中进行查找，这个过程就稍微有一点复杂了，LevelDB 会在多个层级中逐级进行查找，并且不会跳过其中的任何层级；在查找的过程就涉及到一个非常重要的**数据结构 **<mark style="color:purple;">**`FileMetaData`**</mark>：
+当 LevelDB 在内存中没有找到对应的数据时，它才会到磁盘中多个层级的 SSTable 中进行查找，这个过程就稍微有一点复杂了，LevelDB 会在多个层级中逐级进行查找，并且不会跳过其中的任何层级；在查找的过程就涉及到一个非常重要的**数据结构 `FileMetaData`**：
 
 ![FileMetaData](https://img.draveness.me/2017-08-12-FileMetaData.jpg-1000width)
 
@@ -333,7 +333,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key, std::string* va
 
 ![LevelDB-LevelN-Layers](https://img.draveness.me/2017-08-12-LevelDB-LevelN-Layers.jpg-1000width)
 
-但是当涉及到**更高层级的 SSTable** 时，因为同一层级的 SSTable 都是没有重叠部分的，所以我们在查找时可以**利用已知的 SSTable 中的极值信息 `smallest/largest` 快速查找到对应的 SSTable**，再判断当前的 SSTable 是否包含查询的 key，如果不存在，就继续查找下一个层级直到**最后的一个层级 **<mark style="color:blue;">**`kNumLevels`**</mark>**（默认为 7 级）**或者查询到了对应的值。
+但是当涉及到**更高层级的 SSTable** 时，因为同一层级的 SSTable 都是没有重叠部分的，所以我们在查找时可以**利用已知的 SSTable 中的极值信息 `smallest/largest` 快速查找到对应的 SSTable**，再判断当前的 SSTable 是否包含查询的 key，如果不存在，就继续查找下一个层级直到**最后的一个层级 `kNumLevels`**\*\*（默认为 7 级）\*\*或者查询到了对应的值。
 
 **SSTable 的『合并』**
 
@@ -409,11 +409,11 @@ LevelDB 中的 <mark style="color:purple;">**`DoCompactionWork`**</mark> 方法�
 
 **存储 db 状态的 VersionSet**
 
-**LevelDB 中的所有状态其实都是被一个 **<mark style="color:purple;">**`VersionSet`**</mark>** 结构所存储的**，一个 `VersionSet` 包含**一组 `Version` 结构体**，所有的 `Version`包括历史版本都是通过<mark style="color:red;">**双向链表**</mark>连接起来的，但是只有一个版本是当前版本。
+**LevelDB 中的所有状态其实都是被一个 `VersionSet`**\*\* 结构所存储的\*\*，一个 `VersionSet` 包含**一组 `Version` 结构体**，所有的 `Version`包括历史版本都是通过<mark style="color:red;">**双向链表**</mark>连接起来的，但是只有一个版本是当前版本。
 
 ![VersionSet-Version-And-VersionEdit](https://img.draveness.me/2017-08-12-VersionSet-Version-And-VersionEdit.jpg-1000width)
 
-当 LevelDB 中的 SSTable 发生变动时，它会生成一个 **`VersionEdit` ** 结构，最终执行 **`LogAndApply` ** 方法：
+当 LevelDB 中的 SSTable 发生变动时，它会生成一个 \*\*`VersionEdit` \*\* 结构，最终执行 \*\*`LogAndApply` \*\* 方法：
 
 ```cpp
 Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
@@ -442,7 +442,7 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
 
 > **MANIFEST 文件**中记录了 LevelDB 中所有层级中的表、每一个 SSTable 的 Key 范围和其他重要的元数据，它以日志的格式存储，所有对文件的增删操作都会追加到这个日志中。
 
-**SSTable 的格式**
+**SSTable 的格式（此处为总述，具体详见下文**[sstable-in-leveldb.md](sstable-in-leveldb.md "mention")**）**
 
 SSTable 中其实存储的不只是数据，其中还保存了一些**元数据、索引**等信息，用于加速读写操作的速度，虽然在 Bigtable 的论文中并没有给出 SSTable 的数据格式，不过在 LevelDB 的实现中，我们可以发现 SSTable 是以这种格式存储数据的：
 
@@ -463,7 +463,7 @@ magic:            fixed64;      // == 0xdb4775248b80fb57 (little-endian)
 
 整个 `Footer` 在文件中固定占用 48 个字节，我们能在其中拿到 **MetaIndex 块和 Index 块的位置**，再通过其中的索引继而找到对应值存在的位置。
 
-为了文件的自解释，内部必须要有**指针**指向文件的其他位置来表示某个`section`的开始和结束位置。负责记录这个的变量叫做<mark style="color:purple;">**BlockHandle**</mark>，他有两个成员变量`offset_ `和 `size_`，分别记录的某个数据块的起始位置和长度：
+为了文件的自解释，内部必须要有**指针**指向文件的其他位置来表示某个`section`的开始和结束位置。负责记录这个的变量叫做<mark style="color:purple;">**BlockHandle**</mark>，他有两个成员变量`offset_` 和 `size_`，分别记录的某个数据块的起始位置和长度：
 
 ```cpp
 class BlockHandle {
@@ -479,7 +479,7 @@ private:
 
 sstable文件中`footer`中可以解码出在文件的结尾处距离`footer`最近的`index block`的`BlockHandle`，以及`metaindex block`的`BlockHandle`，从而确定这两个组成部分在文件中的位置。
 
-事实上，在**table/table_build.cc**中的`Status TableBuilder::Finish()`函数，我们可以看出，当生成sstable文件的时候，各个组成部分的写入顺序：
+事实上，在**table/table\_build.cc**中的`Status TableBuilder::Finish()`函数，我们可以看出，当生成sstable文件的时候，各个组成部分的写入顺序：
 
 ```cpp
 Status TableBuilder::Finish() {
@@ -545,13 +545,13 @@ Status TableBuilder::Finish() {
 
 `index block`, `metaindex block` , `filter block`（图中的`meta block`），甚至最终的`data block`，这些block都是干啥用的，数据又是怎么组织的呢？
 
-- `Data Blocks`: 存储一系列有序的key-value
-- `Meta Block`：存储key-value对应的filter(默认为bloom filter)
-- `metaindex block`: 指向Meta Block的索引
-- `Index BLocks`: 指向Data Blocks的索引
-- `Footer `: 指向索引的索引
+* `Data Blocks`: 存储一系列有序的key-value
+* `Meta Block`：存储key-value对应的filter(默认为bloom filter)
+* `metaindex block`: 指向Meta Block的索引
+* `Index BLocks`: 指向Data Blocks的索引
+* `Footer` : 指向索引的索引
 
-它们之间的关系如下图所示, 后面备注会详细介绍这些部分的关系和存在的作用。
+它们之间的关系如下图所示, 下文[sstable-in-leveldb.md](sstable-in-leveldb.md "mention")会详细介绍这些部分的关系和存在的作用。
 
 ![img](https://s2.loli.net/2022/07/24/qfa37TZkJtQVhAS.png)
 
