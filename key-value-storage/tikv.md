@@ -1,13 +1,20 @@
-# 🤩 RocksDB
+---
+description: RocksDB 进阶版！
+---
+
+# 🤩 TiKV
 
 RocksDB 是用于快速存储环境的持久键值存储。以下是 RocksDB 的一些亮点功能：
 
 1. RocksDB 使用完全用 C++ 编写的日志结构数据库引擎，以获得最佳性能。键和值只是任意大小的字节流。
 2. RocksDB 针对快速、低延迟的存储进行了优化，例如闪存驱动器和高速磁盘驱动器。RocksDB 充分利用了闪存或 RAM 提供的高读/写速率的全部潜力。
-3. RocksDB 可以适应不同的工作负载。从 MyRocks 等数据库存储引擎到应用程序数据缓存再到嵌入式工作负载，RocksDB 可用于满足各种数据需求。
-4. RocksDB 提供了基本操作，例如打开和关闭数据库，读取和写入更高级的操作，例如合并和压缩过滤器。
+3. RocksDB 可以适应不同的工作负载
+4. 从 MyRocks 等数据库存储引擎到应用程序数据缓存再到嵌入式工作负载，RocksDB 可用于满足各种数据需求。
+5. RocksDB 提供了基本操作，例如打开和关闭数据库，读取和写入更高级的操作，例如合并和压缩过滤器。
 
-TiKV 使用 RocksDB 是因为 RocksDB 成熟且高性能。在本节中，我们将探讨 TiKV 如何使用 RocksDB。我们不会在这里讨论 , , 和 等基本功能`Get`，`Put`因为`Delete`它们`Iterate`的用法简单明了，效果也很好。相反，我们将在下面重点介绍 TiKV 中使用的一些特殊功能。
+TiKV 使用 RocksDB 是因为 RocksDB 成熟且高性能。在本节中，我们将探讨 TiKV 如何使用 RocksDB。
+
+我们将在下面重点介绍 TiKV 中使用的一些特殊功能。
 
 ### [前缀布隆过滤器](https://github.com/facebook/rocksdb/wiki/RocksDB-Bloom-Filter)
 
