@@ -24,9 +24,13 @@
     * [😚 Optimization](key-value-storage/rocksdb/optimization.md)
   * [🤩 TiKV](key-value-storage/tikv/README.md)
     * [🥳 General](key-value-storage/tikv/general.md)
-  * [😇 Lock(pthread)](key-value-storage/lock-pthread.md)
-  * [😇 Lock(c++ API)](key-value-storage/lock-c++.md)
-* [🦸 🦸♂DPU &](dpu-and.md)
+* [🦸 🦸♂DPU &](dpu-and/README.md)
+  * [😄 General](dpu-and/general.md)
+* [🦸♂ 🦸♂Utils](utils/README.md)
+  * [😇 Lock(c++ API)](utils/lock-c++.md)
+  * [😇 Lock(pthread)](utils/lock-pthread.md)
+  * [😩 Skiplist](utils/skiplist.md)
+  * [🥰 Thread Pooling](utils/thread-pooling.md)
 
 ## Group 1
 
