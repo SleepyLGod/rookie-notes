@@ -36,7 +36,17 @@ description: 组成架构与原理介绍
 
 #### **Block Cache**:
 
-* RocksDB 在**内存中缓存数据**以供读取的地方。
+*   RocksDB 在**内存中缓存数据**以供读取的地方：
+
+    最近，高频访问的数据存储在Block Cache中；
+
+    其次依次按照写入最新时间查找MemTable；
+
+    再其次按从磁盘中的Level 0依次往后查找到SST文件；
+
+    根据查找的KEY 判断是否在SST的min\_key和max\_key中间；&#x20;
+
+    布隆过滤器判断如果KEY不在，则查找下一个SST文件，如果数据在该SST文件，则二分法查找；
 * **一个Cache对象可以被同一个进程中的多个RocksDB实例共享**，用户可以控制整体的缓存容量。
 *   存储**未压缩的块**。
 
@@ -63,7 +73,9 @@ description: 组成架构与原理介绍
 
       ClockCache 还不稳定，不建议使用
 
-> **Write Buffer Manager**:
+![查询操作](<../../.gitbook/assets/image (1).png>)
+
+#### **Write Buffer Manager**:
 
 用于控制**多个列族或者多个数据库实例**的内存表总使用量。
 
@@ -95,23 +107,23 @@ description: 组成架构与原理介绍
 
     具体来讲：
 
-    *   filter block: `bloom filter`实现
+    *   <mark style="color:purple;">**filter block**</mark>: `bloom filter`实现
 
         全局过滤器 **Full Filter**: 在此过滤器中，整个 SST 文件只有一个过滤器块。
 
         分区过滤器 **Partitioned Filter**: Full Filter 被分成多个子过滤器块，在这些块的顶层有一个索引块用于将key映射到相应的子过滤器块。
-    *   index block：用于查找包含指定key的数据块。是一种**基于二分搜索**的数据结构。
+    *   <mark style="color:purple;">**index block**</mark>：用于查找包含指定key的数据块。是一种**基于二分搜索**的数据结构。
 
         一个文件可能包含一个索引块，也可能包含一组[**分区索引块**](https://github.com/facebook/rocksdb/wiki/Partitioned-Index-Filters)，这取决于使用配置。
 
         即存在**全局索引**与**分区索引**两种索引方式。
-    * Compression Dictionary Block：包含用于在压缩/解压缩每个块之前准备压缩库的字典。
-    *   range deletion block：包含**文件中key 与 序列号中的删除范围**。在读请求下发到sst的时候能够从sst中的指定区域判断key是否在deleterange 的范围内部，存在则直接返回NotFound。
+    * <mark style="color:purple;">**Compression Dictionary Block**</mark>：包含用于在压缩/解压缩每个块之前准备压缩库的字典。
+    *   <mark style="color:purple;">**range deletion block**</mark>：包含**文件中key 与 序列号中的删除范围**。在读请求下发到sst的时候能够从sst中的指定区域判断key是否在deleterange 的范围内部，存在则直接返回NotFound。
 
         memtable中也有一块区域实现同样的功能。
 
         compaction或者flush的时候会清除掉过时的tombstone数据。
-    *   properties block：每种属性都是一个键值对
+    *   <mark style="color:purple;">**properties block**</mark>：每种属性都是一个键值对
 
         `data size`：data block总大小
 
@@ -129,3 +141,12 @@ description: 组成架构与原理介绍
 * MetaIndexBlock (元索引块) ： 元索引块包含一个**映射表**指向**每个meta block**，**key是meta block的名称，value是指向该meta block的指针，指针通过offset、size指向数据块**。
 * Footer (页脚) ：文件末尾是固定长度的页脚。包括指向**metaindex block**的指针，指向**index block**(metablock中)的指针，以及一个**magic number**。
 
+#### Column Family：
+
+![CF 列族](../../.gitbook/assets/image.png)
+
+可以将数据的键值对按照不同的属性分配给不同的CF，可以让某些内存和SST文件中存的都是相同类型的数据，可以极大地增加读写的效率、提升数据压缩率；
+
+落数的时候会自带CF1、CF2、default 来决定落入哪个分片中；
+
+**内存和SST**文件都按照CF分了，但是**WAL**没有按照CF区分

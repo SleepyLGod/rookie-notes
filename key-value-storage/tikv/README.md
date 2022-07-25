@@ -4,6 +4,18 @@ description: RocksDB 进阶版！
 
 # 🤩 TiKV
 
+TiKV 是一个分布式事务型的键值数据库，提供了满足 ACID 约束的分布式事务接口，并且通过 [Raft 协议](https://raft.github.io/raft.pdf)保证了多副本数据一致性以及高可用。TiKV 作为 TiDB 的存储层，为用户写入 TiDB 的数据提供了持久化以及读写服务，同时还存储了 TiDB 的统计信息数据。
+
+#### 优势
+
+* 异地复制：使用Raft和Placement Driver进行异地复制来保证数据的安全性。
+* 水平扩展：直接增加节点即可实现系统扩容
+* 一致性分布式事务：使用基于Google Percolator、优化后的两阶段提交协议来支持分布式事务。可以使用“begin”来开启事务，再使用“commit”提交事务或者“rollback”来回滚事务。
+* 分布式计算的协处理器：跟HBase一样，支持协处理器框架来让用户直接在Tikv中做计算。
+* 与TiDB深度融合：使用TiKV作为TiDB的后端存储引擎，提供分布式关系型数据库
+
+#### RocksDB in TiKV（摘自官方文档）
+
 RocksDB 是用于快速存储环境的持久键值存储。以下是 RocksDB 的一些亮点功能：
 
 1. RocksDB 使用完全用 C++ 编写的日志结构数据库引擎，以获得最佳性能。键和值只是任意大小的字节流。
