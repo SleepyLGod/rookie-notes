@@ -1,6 +1,6 @@
 # 😩 Skiplist
 
-### Import:
+### Introduction:
 
 SkipList是一个实现快速查找、增删数据的概率数据结构，可以做到![{\mathcal {O\}}(\log n)](https://wikimedia.org/api/rest\_v1/media/math/render/svg/74a9dfea91c47d1c6563e89bbcd891771b91acfa)复杂度的查找和![{\mathcal {O\}}(\log n)](https://wikimedia.org/api/rest\_v1/media/math/render/svg/74a9dfea91c47d1c6563e89bbcd891771b91acfa)的增删改。
 
@@ -82,3 +82,9 @@ Node类中的方法：
 来个wiki上的动图：
 
 ![Inserting elements to skip list](../.gitbook/assets/Skip\_list\_add\_element-en.gif)
+
+{% tabs %}
+{% tab title="P.S." %}
+<mark style="color:purple;">**这里放一个我自己写的**</mark>  [<mark style="color:purple;background-color:blue;">**C++示例**</mark>](https://github.com/SleepyLGod/miscellaneous/tree/main/skiplist) <mark style="color:purple;background-color:blue;">****</mark> 👈
+{% endtab %}
+{% endtabs %}
