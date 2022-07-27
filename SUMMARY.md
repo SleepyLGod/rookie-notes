@@ -1,7 +1,7 @@
 # Table of contents
 
 * [😁 🦸♂Hi there 👋](README.md)
-* [🦸♂ 🦸♂  Block Chain](<README (1).md>)
+* [🦸♂ 🦸♂ Block Chain](<README (1).md>)
   * [😈 Uniswap-v2 合约概览](block-chain/uniswapv2-contracts-guide.md)
   * [⛏ 对接 Uniswap V2 兑换代币](block-chain/how-to-swap.md)
   * [👏 bignumer.js中常见运算](readme/bignumer.js-zhong-chang-jian-yun-suan.md)
@@ -28,12 +28,13 @@
   * [😄 General](dpu-and/general.md)
   * [😁 SSD](dpu-and/ssd.md)
   * [😆 NVMe](dpu-and/nvme.md)
-* [🦸♂ 🦸♂ Utils](utils/README.md)
+* [🦸♂ 🦸♂  Utils](utils/README.md)
   * [😅 typename or class?](utils/typename-or-class.md)
   * [😇 Lock(c++ API)](key-value-storage/lock-c++.md)
   * [😇 Lock(pthread)](key-value-storage/lock-pthread.md)
   * [😩 Skiplist](utils/skiplist.md)
   * [🥰 Thread Pooling](utils/thread-pooling.md)
+  * [🥲 智能指针](utils/zhi-neng-zhi-zhen.md)
 
 ## Group 1
 

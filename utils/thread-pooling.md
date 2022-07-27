@@ -1,5 +1,7 @@
 ---
-description: 线程池C++11实现
+description: >-
+  C++11实现 参考： https://github.com/progschj/ThreadPool AND
+  https://github.com/vit-vit/ctpl
 ---
 
 # 🥰 Thread Pooling
@@ -10,16 +12,16 @@ description: 线程池C++11实现
 
 #### **线程池的组成部分：**
 
-* 线程池管理器（ThreadPoolManager）:用于创建并管理线程池
-* 工作线程（WorkThread）: 线程池中线程
-* 任务接口（Task）:每个任务必须实现的接口，以供工作线程调度任务的执行。
-* 任务队列:用于存放没有处理的任务。提供一种缓冲机制。
+* 线程池管理器（ThreadPoolManager）：用于创建并管理线程池
+* 工作线程（WorkThread）：线程池中线程
+* 任务接口（Task）：每个任务必须实现的接口，以供工作线程调度任务的执行。
+* 任务队列：用于存放没有处理的任务。提供一种缓冲机制。
 
-<mark style="color:purple;">**idea**</mark>**：管理一个任务队列，一个线程队列，然后每次取一个任务分配给一个线程去做，循环往复**
+<mark style="color:purple;">**Idea**</mark>**：管理一个任务队列，一个线程队列，然后每次取一个任务分配给一个线程去做，循环往复；**
 
 **让每一个 thread 都去执行调度函数：循环获取一个 task，然后执行之。**
 
-### 👉[<mark style="color:purple;">`源码`</mark>](https://github.dev/progschj/ThreadPool)分析
+### 👉[<mark style="color:purple;">`源码`</mark>](https://github.com/SleepyLGod/miscellaneous/blob/main/thread%20pooling)分析
 
 #### **首先打基础：**
 
@@ -91,11 +93,11 @@ concurrency ) ./ConditionVariable-wait
 通过新建一个线程池类，以类来管理资源。该类包含3个公有成员函数与5个私有成员：构造函数与析构函数即满足(RAII:Resource Acquisition Is Initialization)。
 
 * 构造函数接受一个size\_t类型的数，表示连接数
-* `enqueue`表示线程池部分中的任务管道，是一个模板函数
-* **`workers`**是一个成员为thread的vector，用来监视线程状态
-* **`tasks`**表示线程池部分中的任务队列，提供缓冲机制
-* `queue_mutex`表示互斥锁
-* `condition`表示条件变量(互斥锁，条件变量以及stop将在后面通过例子说明)
+* **`enqueue`**表示线程池部分中的任务管道，是一个模板函数
+* **`workers_`**是一个成员为thread的vector，用来监视线程状态
+* **`tasks_`**表示线程池部分中的任务队列，提供缓冲机制
+* `queue_mutex_`表示互斥锁
+* `condition_`表示条件变量(互斥锁，条件变量以及stop\_将在后面通过例子说明)
 
 #### <mark style="background-color:green;">**奇淫技巧详解：**</mark>
 
@@ -111,6 +113,35 @@ concurrency ) ./ConditionVariable-wait
 
 **构造函数ThreadPool(size\_t):**
 
+```cpp
+// the constructor just launches some amount of workers
+inline ThreadPool::ThreadPool(size_t thread_number) : stop_(false) {
+    for(size_t i = 0; i < thread_number; ++i) {
+        workers_.emplace_back( // 压入
+            [this] { // lamda表达式获取参数值方式
+                for(;;) { // 无限循环作为线程
+                    std::function< void() > task;
+                    { // 大括号作用：临时变量的生存期，即控制lock的时间
+                        std::unique_lock<std::mutex> lock(this->queue_mutex_);
+                        this->condition_.wait(lock,
+                            [this] {
+                                // 当stop_==false(在运行/在消费) && tasks_.empty(),该线程被阻塞
+                                return this->stop_ || !this->tasks_.empty(); 
+                            }); 
+                        if (this->stop_ && this->tasks_.empty()) {
+                            return; // 如果线程池运行或者任务列表不为空则继续后续操作，否则退出函数
+                        }
+                        task = std::move(this->tasks_.front()); // 移动构造函数
+                        this->tasks_.pop();
+                    }
+                    task(); // 执行任务
+                }
+            }
+        );
+    }
+}
+```
+
 * 声明为inline，会建议编译器把函数以直接展开的形式放入目标代码而不是以入栈调用的形式
 * 省略了参数
 * **`emplace_back`**相当于**`push_back`**但比**`push_back`**更为高效（更适合用来传递对象，因为它可以**避免对象作为参数被传递时**在拷贝成员上的开销）
@@ -119,12 +150,53 @@ concurrency ) ./ConditionVariable-wait
   * `for(;;)`里面: 每次循环首先声明一个`std::function< void()> task`，task是一个可以被封装成对象的函数，在此作为**最小任务单位**。然后用{}添加了一个作用域。
   * 作用域里面: 在这个作用域中进行了一些线程上锁和线程状态的判断。
   * `lock(this->queue_mutex)`: 声明上锁原语
-  *   `condition.wait(lock, [this]{…})`: 使当前线程进入阻塞状态： 当第二个参数为false时，wait()会阻塞当前线程，为true时解除阻塞；
+  *   `condition.wait(lock, [this]{…})`: 使当前线程进入阻塞状态：&#x20;
 
-      在本例中的条件就是，当线程池运行或者任务列表为空时，线程进入阻塞态。 然后判断，如果线程池运行或者任务列表为空则继续后续操作，否则退出这个`[this]{…}`线程函数。 `std::move()`是移动构造函数，相当于效率更高的拷贝构造函数。最后将`tasks[]`任务队列的第一个任务出栈。
+      当第二个参数为false时，`wait()`会阻塞当前线程，为true时解除阻塞；
+
+      在本例中的条件就是，当线程池运行或者任务列表为空时，线程进入阻塞态。&#x20;
+
+      然后判断，如果线程池运行或者任务列表非空则继续后续操作，否则退出这个`[this]{…}`线程函数。
+
+      `std::move()`是移动构造函数，相当于效率更高的拷贝构造函数。
+
+      最后将`tasks[]`任务队列的第一个任务出栈。
   * 离开作用域: 然后执行task()，当前一轮循环结束。&#x20;
 
 **任务队列函数enqueue(F&& f, Args&&… args) 即 `template < class F, class… Args> auto enqueue(F&& f, Args&&… args) -> std::future< typename std::result_of< F(Args…)>::type>;`**
+
+```cpp
+// add new work item to the pool
+template<class F, class... Args>
+auto ThreadPool::enqueue(F&& f, Args&&... args)  // && 引用限定符，参数的右值引用，  此处表示参数传入一个函数
+    -> std::future<typename std::result_of<F(Args...)>::type> {
+    using return_type = typename std::result_of<F(Args...)>::type;
+    // packaged_task是对任务的一个抽象，我们可以给其传递一个函数来完成其构造。之后将任务投递给任何线程去完成，
+    // 通过packaged_task.get_future()方法获取的future来获取任务完成后的产出值
+    auto task = std::make_shared< std::packaged_task<return_type()> > ( // 指向F函数的智能指针
+            std::bind(std::forward<F>(f), std::forward<Args>(args)...) // 传递函数进行构造
+        );
+    // future为期望，get_future获取任务完成后的产出值
+    std::future<return_type> res = task->get_future(); // 获取future对象，如果task的状态不为ready，会阻塞当前调用者
+    {
+        std::unique_lock<std::mutex> lock(this->queue_mutex_); // 保持互斥性，避免多个线程同时运行一个任务
+
+        // don't allow enqueueing after stopping the pool
+        if (this->stop_) {
+            throw std::runtime_error("enqueue on stopped ThreadPool");
+        }
+
+        this->tasks_.emplace([task](){ 
+            (*task)(); 
+        });
+        // 将task投递给线程去完成，vector尾部压入,
+        // std::packaged_task 重载了 operator()，重载后的operator()执行function。
+        // 因此可以(*task)()可以压入vector<function<void()>>
+    }
+    this->condition_.notify_one(); //选择一个wait状态的线程进行唤醒，并使他获得对象上的锁来完成任务(即其他线程无法访问对象)
+    return res;
+} // notify_one不能保证获得锁的线程真正需要锁，并且因此可能产生死锁
+```
 
 * 这类多参数模板的格式就是如此首先，这是一个函数模板，而不是类模板
 * template<> 部分: `template < class F, class… Args>` 其中 `class… Args`代表接受多个参数
@@ -159,6 +231,20 @@ concurrency ) ./ConditionVariable-wait
 * 返回异步结果res&#x20;
 
 **析构函数\~ThreadPool()**
+
+```cpp
+// the distructor joins all threads
+inline ThreadPool::~ThreadPool() {
+    {
+        std::unique_lock<std::mutex> lock(queue_mutex_);
+        this->stop_ = true;
+    }
+    condition_.notify_all(); // 通知所有wait状态的线程竞争对象的控制权，唤醒所有线程执行
+    for (std::thread &worker: workers_) { // for-each循环
+        worker.join(); // 因为线程都开始竞争了，所以一定会执行完，join可等待线程执行完
+    }
+}
+```
 
 * 通过`notify_all`可以唤醒线程竞争任务的执行，从而使所有任务不被遗漏
 * 当所有线程执行完毕时返回主线程`worker.join()`
