@@ -142,22 +142,24 @@ void f(const Foo &) {
 int main() {
     std::unique_ptr<Foo> p1(std::make_unique<Foo>());
     // p1 不空, 输出
-    if (p1) p1->foo();
+    if (p1) {
+        p1->foo();
+    }
     {
         std::unique_ptr<Foo> p2(std::move(p1));
         // p2 不空, 输出
         f(*p2);
         // p2 不空, 输出
-        if(p2) p2->foo();
+        if(p2) {p2->foo();}
         // p1 为空, 无输出
-        if(p1) p1->foo();
+        if(p1) {p1->foo();}
         p1 = std::move(p2);
         // p2 为空, 无输出
-        if(p2) p2->foo();
+        if(p2) {p2->foo();}
         std::cout << "p2 被销毁" << std::endl;
     }
     // p1 不空, 输出
-    if (p1) p1->foo();
+    if (p1) {p1->foo();}
     // Foo 的实例会在离开作用域时被销毁
 }
 ```
@@ -208,34 +210,34 @@ int main() {
 
 * 有一个指针数组，并使用一些辅助指针来标示特定的元素，如最大的元素和最小的元素；
 * 两个对象包含都指向第三个对象的指针；
-* STL容器包含指针。很多STL算法都支持复制和赋值操作，这些操作可用于shared\_ptr，但不能用于unique\_ptr（编译器发出warning）和auto\_ptr（行为不确定）。如果你的编译器没有提供shared\_ptr，可使用Boost库提供的shared\_ptr。
+* STL容器包含指针。很多STL算法都支持复制和赋值操作，这些操作可用于`shared_ptr`，但不能用于`unique_ptr`（编译器发出warning）和`auto_ptr`（行为不确定）。如果你的编译器没有提供`shared_ptr`，可使用**Boost库**提供的`shared_ptr`。
 
-如果程序不需要多个指向同一个对象的指针，则可使用unique\_ptr。如果函数使用new分配内存，并返还指向该内存的指针，将其返回类型声明为unique\_ptr是不错的选择。这样，所有权转让给接受返回值的unique\_ptr，而该智能指针将负责调用delete。可将unique\_ptr存储到STL容器在那个，只要不调用将一个unique\_ptr复制或赋给另一个算法（如sort()）。例如，可在程序中使用类似于下面的代码段
+如果程序不需要多个指向同一个对象的指针，则可使用`unique_ptr`。
+
+如果函数使用`new`分配内存，并返还指向该内存的指针，将其返回类型声明为`unique_ptr`是不错的选择。这样，所有权转让给接受返回值的`unique_ptr`，而该智能指针将负责调用`delete`。可将`unique_ptr`存储到STL容器，**只要不调用将一个`unique_ptr`复制或赋给另一个**算法（`如sort()`）。例如，可在程序中使用类似于下面的代码段
 
 ```cpp
-unique_ptr<int> make_int(int n)
-{
+unique_ptr<int> make_int(int n) {
     return unique_ptr<int>(new int(n));
 }
-void show(unique_ptr<int> &p1)
-{
+void show(unique_ptr<int> &p1) {
     cout << *a << ' ';
 }
-int main()
-{
+int main() {
     ...
     vector<unique_ptr<int> > vp(size);
-    for(int i = 0; i < vp.size(); i++)
-        vp[i] = make_int(rand() % 1000);              // copy temporary unique_ptr
-    vp.push_back(make_int(rand() % 1000));     // ok because arg is temporary
-    for_each(vp.begin(), vp.end(), show);           // use for_each()
+    for(int i = 0; i < vp.size(); i++) {
+        vp[i] = make_int(rand() % 1000); // copy temporary unique_ptr
+    }
+    vp.push_back(make_int(rand() % 1000)); // ok because arg is temporary
+    for_each(vp.begin(), vp.end(), show); // use for_each()
     ...
-
+}
 ```
 
-其中push\_back调用没有问题，因为它返回一个临时unique\_ptr，该unique\_ptr被赋给vp中的一个unique\_ptr。另外，如果按值而不是按引用给show()传递对象，for\_each()将非法，因为这将导致使用一个来自vp的非临时unique\_ptr初始化pi，而这是不允许的。前面说过，编译器将发现错误使用unique\_ptr的企图。
+其中`push_back`调用没有问题，因为它**返回一个临时`unique_ptr`**，该`unique_ptr`被赋给vp中的一个`unique_ptr`。另外，如果**按值而不是按引用**给`show()`传递对象，`for_each()`将非法，因为这将导致使用一个来自vp的非临时`unique_ptr`初始化p1，而这是不允许的。前面说过，编译器将发现错误使用`unique_ptr`的企图。
 
-在unique\_ptr为右值时，可将其赋给shared\_ptr，这与将一个unique\_ptr赋给一个需要满足的条件相同。与前面一样，在下面的代码中，make\_int()的返回类型为unique\_ptr\<int>：
+在`unique_ptr`为右值时，可将其赋给`shared_ptr`，这与将一个`unique_ptr`赋给一个需要满足的条件相同。与前面一样，在下面的代码中，`make_int()`的返回类型为`unique_ptr<int>`：
 
 ```cpp
 unique_ptr<int> pup(make_int(rand() % 1000));   // ok
@@ -243,6 +245,6 @@ shared_ptr<int> spp(pup);                       // not allowed, pup as lvalue
 shared_ptr<int> spr(make_int(rand() % 1000));   // ok
 ```
 
-模板shared\_ptr包含一个显式构造函数，可用于将右值unique\_ptr转换为shared\_ptr。shared\_ptr将接管原来归unique\_ptr所有的对象。
+模板`shared_ptr`包含一个显式构造函数，可用于将右值`unique_ptr`转换为`shared_ptr`。`shared_ptr`将接管原来归`unique_ptr`所有的对象。
 
-在满足unique\_ptr要求的条件时，也可使用auto\_ptr，但unique\_ptr是更好的选择。如果你的编译器没有unique\_ptr，可考虑使用Boost库提供的scoped\_ptr，它与unique\_ptr类似。
+在满足`unique_ptr`要求的条件时，也可使用`auto_ptr`，但`unique_ptr`是更好的选择。如果你的编译器没有`unique_ptr`，可考虑使用**Boost库提供的`scoped_ptr`**，它与`unique_ptr`类似。

@@ -35,6 +35,7 @@
   * [😩 Skiplist](utils/skiplist.md)
   * [🥰 Thread Pooling](utils/thread-pooling.md)
   * [🥲 Smart Pointers](utils/smart-pointers.md)
+  * [🤣 Parallelism and Concurrency](utils/parallelism-and-concurrency.md)
 
 ## Group 1
 
