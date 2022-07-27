@@ -34,7 +34,7 @@
   * [😇 Lock(pthread)](key-value-storage/lock-pthread.md)
   * [😩 Skiplist](utils/skiplist.md)
   * [🥰 Thread Pooling](utils/thread-pooling.md)
-  * [🥲 智能指针](utils/zhi-neng-zhi-zhen.md)
+  * [🥲 Smart Pointers](utils/smart-pointers.md)
 
 ## Group 1
 
