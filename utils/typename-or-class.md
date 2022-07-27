@@ -1,6 +1,10 @@
+---
+description: 整合了几篇官方文档的翻译，内容很好我很菜
+---
+
 # 😅 typename or class?
 
-typename 用来说明一个`qualified name`是一个类型。比如：&#x20;
+typename 用来说明一个`qualified name`是一个类型。比如：
 
 ```cpp
 template<class C> void f(C& rc) { 
@@ -26,9 +30,9 @@ class A {
 } 
 ```
 
-In the second definition, "`typename A::a i`" means the **`A::a` is a type**, not a data member.&#x20;
+In the second definition, "`typename A::a i`" means the **`A::a` is a type**, not a data member.
 
-And   "`i`" is **an instance of type `A::a`**
+And "`i`" is **an instance of type `A::a`**
 
 **在模板定义时的class和typename是没有区别的**，因为最初发明模板时决定使用class以减少一个关键字，但后来发现还是不得不加上typename关键字，原因如上。
 
@@ -71,17 +75,16 @@ void print2nd(const C& container) // container;
 
 我突出了这个函数中的两个 `local variables`，iter 和 value。
 
-+ **iter** 的类型是 C::const_iterator，一个依赖于 template parameter C 的类型。一个 template中的依赖于一个 template parameter的名字被称为 **dependent names**。
+*   **iter** 的类型是 C::const\_iterator，一个依赖于 template parameter C 的类型。一个 template中的依赖于一个 template parameter的名字被称为 **dependent names**。
 
-  当一个 dependent names 嵌套在一个 class的内部时，我称它为 **nested dependent name**（嵌套依赖名字）。
+    当一个 dependent names 嵌套在一个 class的内部时，我称它为 **nested dependent name**（嵌套依赖名字）。
 
-  C::const_iterator 是一个 nested dependent name。实际上，它是一个 **nested dependent type name**（嵌套依赖类型名），也就是说，一个涉及到一个 type的 nested dependent name（嵌套依赖名字）。
+    C::const\_iterator 是一个 nested dependent name。实际上，它是一个 **nested dependent type name**（嵌套依赖类型名），也就是说，一个涉及到一个 type的 nested dependent name（嵌套依赖名字）。
+*   `print2nd` 中的另一个 局部变量 **value** 具有 int 类型。int 是一个不依赖于任何 template parameter的名字。这样的名字以 non-dependent names闻名。（我想不通为什么他们不称它为 independent names（无依赖名字）。如果，像我一样，你发现术语 "non-dependent" 是一个令人厌恶的东西，你就和我产生了共鸣，但是 "non-dependent" 就是这类名字的术语，所以，像我一样，转转眼睛放弃你的自我主张。）
 
-+ `print2nd` 中的另一个 局部变量 **value** 具有 int 类型。int 是一个不依赖于任何 template parameter的名字。这样的名字以 non-dependent names闻名。（我想不通为什么他们不称它为 independent names（无依赖名字）。如果，像我一样，你发现术语 "non-dependent" 是一个令人厌恶的东西，你就和我产生了共鸣，但是 "non-dependent" 就是这类名字的术语，所以，像我一样，转转眼睛放弃你的自我主张。）
+    **nested dependent name会导致解析困难**。
 
-  **nested dependent name会导致解析困难**。
-
-  例如，假设我们更加愚蠢地以这种方法开始 `print2nd`：
+    例如，假设我们更加愚蠢地以这种方法开始 `print2nd`：
 
 ```cpp
 template<typename C>
@@ -91,23 +94,23 @@ void print2nd(const C& container) {
 }
 ```
 
-这看上去好像是我们将 x 声明为一个指向 C::const_iterator 的 local variable。
+这看上去好像是我们将 x 声明为一个指向 C::const\_iterator 的 local variable。
 
-但是它看上去如此仅仅是因为我们知道 C::const_iterator 是一个 type。
+但是它看上去如此仅仅是因为我们知道 C::const\_iterator 是一个 type。
 
-**但是如果 C::const_iterator 不是一个 type呢？**
+**但是如果 C::const\_iterator 不是一个 type呢？**
 
-如果 C 有一个静态数值变量，碰巧就叫做 const_iterator 呢？再如果 x 碰巧是一个全局变量的名字呢？
+如果 C 有一个静态数值变量，碰巧就叫做 const\_iterator 呢？再如果 x 碰巧是一个全局变量的名字呢？
 
-在这种情况下，上面的代码就不是声明一个局部变量，而是成为 C::const_iterator 乘以 x！当然，这听起来有些愚蠢，但它是可能的，而编写 C++ 解析器的人必须考虑所有可能的输入，甚至是愚蠢的。
+在这种情况下，上面的代码就不是声明一个局部变量，而是成为 C::const\_iterator 乘以 x！当然，这听起来有些愚蠢，但它是可能的，而编写 C++ 解析器的人必须考虑所有可能的输入，甚至是愚蠢的。
 
-直到 C 成为已知之前，没有任何办法知道 C::const_iterator 到底是不是一个 type，而当 template `print2nd` 被解析的时候，C 还不是已知的。
+直到 C 成为已知之前，没有任何办法知道 C::const\_iterator 到底是不是一个 type，而当 template `print2nd` 被解析的时候，C 还不是已知的。
 
 C++ 有一条规则解决这个歧义：**如果解析器在一个 template（模板）中遇到一个 nested dependent name（嵌套依赖名字），它假定那个名字不是一个 type（类型），除非你用其它方式告诉它。**
 
 缺省情况下，nested dependent name不是 types。（对于这条规则有一个例外，我待会儿告诉你。）
 
-记住这个，再看看 `print2nd `的开头：
+记住这个，再看看 `print2nd` 的开头：
 
 ```cpp
 template<typename C>
@@ -119,7 +122,7 @@ void print2nd(const C& container) {
 
 这为什么不是合法的 C++ 现在应该很清楚了：
 
-iter 的声明仅仅在 C::const_iterator 是一个 type时才有意义，但是我们没有告诉 C++ 它是，而 C++ 就假定它不是。要想转变这个形势，我们必须告诉 C++ C::const_iterator 是一个 type。我们将 typename 放在紧挨着它的前面来做到这一点：
+iter 的声明仅仅在 C::const\_iterator 是一个 type时才有意义，但是我们没有告诉 C++ 它是，而 C++ 就假定它不是。要想转变这个形势，我们必须告诉 C++ C::const\_iterator 是一个 type。我们将 typename 放在紧挨着它的前面来做到这一点：
 
 ```cpp
 template<typename C> // this is valid C++
@@ -133,7 +136,7 @@ void print2nd(const C& container) {
 
 通用的规则很简单：**在你涉及到一个在 template中的 nested dependent type name（的任何时候，你必须把单词 typename 放在紧挨着它的前面。**（重申一下，我待会儿要描述一个例外。）
 
-**typename 应该仅仅被用于标识 nested dependent type name；**其它名字不应该用它。
+\*\*typename 应该仅仅被用于标识 nested dependent type name；\*\*其它名字不应该用它。
 
 例如，这是一个取得一个 container和这个 container中的一个 iterator的 function template：
 
@@ -183,7 +186,7 @@ void workWithIterator(IterT iter) {
 
 如果 IterT 是 `vector<int>::iterator`，temp 就是 int 类型。
 
-如果 IterT 是 `list<string>::iterator`，temp 就是 string 类型。因为 `std::iterator_traits<IterT>::value_type` 是一个 nested dependent type name（嵌套依赖类型名）（value_type 嵌套在` iterator_traits<IterT> `内部，而且 IterT 是一个 template parameter（模板参数）），我们必须让它被 typename 前置。
+如果 IterT 是 `list<string>::iterator`，temp 就是 string 类型。因为 `std::iterator_traits<IterT>::value_type` 是一个 nested dependent type name（嵌套依赖类型名）（value\_type 嵌套在`iterator_traits<IterT>`内部，而且 IterT 是一个 template parameter（模板参数）），我们必须让它被 typename 前置。
 
 如果你觉得读 `std::iterator_traits<IterT>::value_type` 令人讨厌，就想象那个与它相同的东西来代表它。如果你像大多数程序员，对多次输入它感到恐惧，那么你就需要创建一个 typedef。对于像 `value_type` 这样的 traits member names（特性成员名），**一个通用的惯例是 typedef name 与 traits member name 相同**，所以这样的一个 local typedef 通常定义成这样：
 
@@ -208,6 +211,8 @@ void workWithIterator(IterT iter) {
 
 这就意味着 typename 和 nested dependent type names（嵌套依赖类型名）的交互作用会导致一些轻微的可移植性问题。
 
-**Things to Remember**
-**1. template parameters（模板参数）时，class 和 typename 是可互换的。**
+**Things to Remember**&#x20;
+
+**1. template parameters（模板参数）时，class 和 typename 是可互换的。**&#x20;
+
 **2. typename 去标识 nested dependent type names，在 base class lists 中或在一个 member initialization list 中作为一个 base class identifier 时除外。**
