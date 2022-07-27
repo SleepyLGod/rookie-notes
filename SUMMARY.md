@@ -29,6 +29,7 @@
   * [😁 SSD](dpu-and/ssd.md)
   * [😆 NVMe](dpu-and/nvme.md)
 * [🦸♂ 🦸♂ Utils](utils/README.md)
+  * [😅 typename or class?](utils/typename-or-class.md)
   * [😇 Lock(c++ API)](key-value-storage/lock-c++.md)
   * [😇 Lock(pthread)](key-value-storage/lock-pthread.md)
   * [😩 Skiplist](utils/skiplist.md)

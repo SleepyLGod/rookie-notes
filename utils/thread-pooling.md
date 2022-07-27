@@ -4,6 +4,8 @@ description: 线程池C++11实现
 
 # 🥰 Thread Pooling
 
+### Introduction
+
 线程池是一种多线程处理形式，处理过程中将任务添加到队列，然后在创建线程后自动启动这些任务。线程池线程都是后台线程。每个线程都使用默认的堆栈大小，以默认的优先级运行，并处于多线程单元中。
 
 #### **线程池的组成部分：**
@@ -13,20 +15,13 @@ description: 线程池C++11实现
 * 任务接口（Task）:每个任务必须实现的接口，以供工作线程调度任务的执行。
 * 任务队列:用于存放没有处理的任务。提供一种缓冲机制。
 
-管理一个任务队列，一个线程队列，然后每次取一个任务分配给一个线程去做，循环往复
+<mark style="color:purple;">**idea**</mark>**：管理一个任务队列，一个线程队列，然后每次取一个任务分配给一个线程去做，循环往复**
 
-让每一个 thread 都去执行调度函数：循环获取一个 task，然后执行之。
+**让每一个 thread 都去执行调度函数：循环获取一个 task，然后执行之。**
 
-#### 👉[<mark style="color:purple;">`源码`</mark>](https://github.dev/progschj/ThreadPool)分析
+### 👉[<mark style="color:purple;">`源码`</mark>](https://github.dev/progschj/ThreadPool)分析
 
-通过新建一个线程池类，以类来管理资源。该类包含3个公有成员函数与5个私有成员：构造函数与析构函数即满足(RAII:Resource Acquisition Is Initialization)。
-
-* 构造函数接受一个size\_t类型的数，表示连接数
-* `enqueue`表示线程池部分中的任务管道，是一个模板函数
-* **`workers`**是一个成员为thread的vector，用来监视线程状态
-* **`tasks`**表示线程池部分中的任务队列，提供缓冲机制
-* `queue_mutex`表示互斥锁
-* `condition`表示条件变量(互斥锁，条件变量以及stop将在后面通过例子说明)
+#### **首先打基础：**
 
 互斥到底是什么意思？为什么需要一个bool量来控制？条件变量condition又是什么？👇\
 [<mark style="background-color:purple;">**多线程的生产者与消费者模型**</mark>](https://segmentfault.com/a/1190000024444906)\
@@ -93,9 +88,28 @@ concurrency ) ./ConditionVariable-wait
 10
 ```
 
+通过新建一个线程池类，以类来管理资源。该类包含3个公有成员函数与5个私有成员：构造函数与析构函数即满足(RAII:Resource Acquisition Is Initialization)。
 
+* 构造函数接受一个size\_t类型的数，表示连接数
+* `enqueue`表示线程池部分中的任务管道，是一个模板函数
+* **`workers`**是一个成员为thread的vector，用来监视线程状态
+* **`tasks`**表示线程池部分中的任务队列，提供缓冲机制
+* `queue_mutex`表示互斥锁
+* `condition`表示条件变量(互斥锁，条件变量以及stop将在后面通过例子说明)
 
-**构造函数ThreadPOOL(size\_t):**
+#### **奇淫技巧详解：**
+
+< thread>: 是 C++ 11的新特性，主要包含了线程对象std::thread的构造。&#x20;
+
+< mutex>: C++ 11新特性，主要包含各种Mutex的类的构造，主要是std::mutex。&#x20;
+
+< condition\_variable>: C++ 11新特性， 包含多线程中常用的条件变量的声明，例如notify\_one、wait、wait\_for等等。
+
+< future>: C++ 11新特性，**可以获取异步任务的结果，可用来实现同步**。包括std::sync和std::future。
+
+< functional>: C++ 11增加了一些新特性，简单来说可以**实现函数到对象的绑定**，如bind()函数。
+
+**构造函数ThreadPool(size\_t):**
 
 * 省略了参数
 * **`emplace_back`**相当于**`push_back`**但比**`push_back`**更为高效
@@ -103,10 +117,20 @@ concurrency ) ./ConditionVariable-wait
 
 **任务队列函数enqueue(F&& f, Args&&… args)**
 
-* 这类多参数模板的格式就是如此
-* \-> 尾置限定符，语法就是如此，用来推断auto类型
-* [typename与class的区别](http://blog.csdn.net/zhouxuguang236/article/details/7911285)
-* `result_of`用来得到返回类型的对象，它有一个成员`::type`
+**即 `template < class F, class… Args> auto enqueue(F&& f, Args&&… args) -> std::future< typename std::result_of< F(Args…)>::type>;`**
+
+* 这类多参数模板的格式就是如此首先，这是一个函数模板，而不是类模板
+* template<> 部分: `template < class F, class… Args>` 其中 `class… Args`代表接受多个参数
+* 返回类型: `auto`&#x20;
+* 函数名： `enqueue`&#x20;
+* 形参表： `(F&& f, Args&&… args)`。&&是C++ 11新特性，代表右值引用。&#x20;
+*   不明觉厉: `-> std::future< typename std::result_of< F(Args…)>::type>`
+
+    这个`->`符号其实用到了C++ 11中的**lamda表达式**，后面的内容代表函数的返回类型。（-> 尾置限定符，语法就是如此，用来推断auto类型）
+
+    `result_of`用来得到返回类型的对象，它有一个成员`::type`
+* 总的来说就是，这句话声明了一个名为`enqueue()`的函数模板，它的模板类型为`class F`以及多个其他类型`Args`，它的形参是一个F&&类型的f以及多个Args&&类型的args，最后这个函数返回类型是`std::future< typename std::result_of < F(Args…)>::type >`。有点非人类。 对于这个冗长的返回类型，又可以继续分析： std::future在前面提到过了，它本身是一个模板，包含在 < future>中。通过std::future可以返回这个A类型的异步任务的结果。 std::result\_of::type就是这段代码中的A类型。result\_of获取了someTask的执行结果的类型。 F(Args…)\_就是这段代码的someTask，即函数F(Args…)。 所以最后这个模板函数enqueue()的返回值类型就是F(Args…)的异步执行结果类型。&#x20;
+* 推荐看看👉 [typename与class的区别](http://blog.csdn.net/zhouxuguang236/article/details/7911285)
 
 **析构函数\~ThreadPool()**
 
