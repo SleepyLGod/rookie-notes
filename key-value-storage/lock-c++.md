@@ -195,7 +195,7 @@ int main () {
 实现**线程安全的单例模式**
 
 ```cpp
-//h文件
+// h文件
 #pragma once
 #include <thread>
 #include <iostream>
