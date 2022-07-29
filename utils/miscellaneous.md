@@ -346,3 +346,89 @@ if (const std::vector<int>::iterator itr = std::find(vec.begin(), vec.end(), 3);
 }
 ```
 
+#### 初始化列表
+
+最常见的就是在对象进行初始化时进行使用
+
+传统 C++ 中，不同的对象有着不同的初始化方法，例如普通数组、 POD （**P**lain **O**ld **D**ata，即没有构造、析构和虚函数的类或结构体） 类型都可以使用 `{}` 进行初始化，也就是我们所说的初始化列表。 而对于类对象的初始化，要么需要通过拷贝构造、要么就需要使用 `()` 进行。 这些不同方法都针对各自对象，不能通用。
+
+为解决这个问题，C++11 首先把初始化列表的概念绑定到类型上，称其为 <mark style="color:green;background-color:green;">`std::initializer_list`</mark>，允许构造函数或其他函数像参数一样使用初始化列表，这就为**类对象的初始化与普通数组和 POD 的初始化**方法提供了统一的桥梁，例如：
+
+```cpp
+#include <initializer_list>
+#include <vector>
+#include <iostream>
+
+class MagicFoo {
+public:
+    std::vector<int> vec;
+    MagicFoo(std::initializer_list<int> list) {
+        for (std::initialozer_list<int>::iterator it = list.begin();
+             it != list.end(); ++it) {
+            vec.push_back(*it);
+        }
+    }
+};
+int main() {
+    // after C++11
+    MagicFoo magicFoo = {1, 2, 3, 4, 5};
+
+    std::cout << "magicFoo: ";
+    for (std::vector<int>::iterator it = magicFoo.vec.begin(); 
+        it != magicFoo.vec.end(); ++it) {
+        std::cout << *it << std::endl;
+    }
+}
+```
+
+这种构造函数被叫做初始化列表构造函数，具有这种构造函数的类型将在初始化时被特殊关照。
+
+初始化列表除了用在对象构造上，还能将其作为普通函数的形参，例如：
+
+```cpp
+public:
+    void foo(std::initializer_list<int> list) {
+        for (std::initializer_list<int>::iterator it = list.begin();
+            it != list.end(); ++it) {
+            vec.push_back(*it);
+        }
+    }
+
+magicFoo.foo({6,7,8,9});
+```
+
+其次，C++11 还提供了统一的语法来初始化任意的对象，例如：
+
+```
+Foo foo2 {3, 4};
+```
+
+#### 结构化绑定
+
+结构化绑定提供了类似其他语言中提供的多返回值的功能。C++11 新增了 `std::tuple` 容器用于构造一个元组，进而囊括多个返回值。但缺陷是，C++11/14 并没有提供一种简单的方法直接从元组中拿到并定义元组中的元素，尽管我们可以使用 `std::tie` 对元组进行拆包，但我们依然必须非常清楚这个元组包含多少个对象，各个对象是什么类型，非常麻烦。
+
+C++**17** 完善了这一设定，给出的结构化绑定可以让我们写出这样的代码：
+
+```cpp
+#include <iostream>
+#include <tuple>
+
+std::tuple<int, double, std::string> f() {
+    return std::make_tuple(1, 2.3, "456");
+}
+
+int main() {
+    auto [x, y, z] = f();
+    std::cout << x << ", " << y << ", " << z << std::endl;
+    return 0;
+}
+```
+
+### 类型推导
+
+C++11 引入了 `auto` 和 `decltype` 这两个关键字实现了类型推导，让编译器来操心变量的类型。
+
+这使得 C++ 也具有了和其他现代编程语言一样，某种意义上提供了无需操心变量类型的使用习惯。
+
+#### auto
+
