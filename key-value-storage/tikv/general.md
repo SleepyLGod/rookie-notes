@@ -48,7 +48,7 @@ Raft的优化：
 
 Placement Driver监控的数据有： - 总磁盘容量 - 可用磁盘容量 - 承载的 Region 数量 - 数据写入速度 - 发送/接受的 Snapshot 数量(Replica 之间可能会通过 Snapshot 同步数据) - 是否过载 - 标签信息 - 标签是具备层级关系的一系列 Tag
 
-![整体架构](<../../.gitbook/assets/image (1) (1) (1).png>)
+![整体架构](<../../.gitbook/assets/image (1) (1).png>)
 
 每个 TiKV 实例的架构如下**图**所示：
 
