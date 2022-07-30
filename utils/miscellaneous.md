@@ -908,47 +908,11 @@ struct SubClass: Base {
 }
 ```
 
-`SubClass::foo` 可能并不是程序员尝试重载虚函数，只是恰好加入了一个具有相同名字的函数。另一个可能的情形是，当基类的虚函数被删除后，子类拥有旧的函数就不再重载该虚拟函数并摇身一变成为了一个普通的类方法，这将造成灾难性的后果。
 
-C++11 引入了 `override` 和 `final` 这两个关键字来防止上述情形的发生。
 
-**override**
 
-当重载虚函数时，引入 `override` 关键字将显式的告知编译器进行重载
 
-编译器将检查基函数是否存在这样的虚函数，否则将无法通过编译：
 
-```cpp
-struct Base {
-    virtual void foo(int);
-};
-struct SubClass: Base {
-    virtual void foo(int) override; // 合法
-    virtual void foo(float) override; // 非法, 父类没有此虚函数
-};
-```
-
-**final**
-
-`final` 则是为了防止类**被继续继承**以及**终止虚函数继续重载**引入的。
-
-```cpp
-struct Base {
-    virtual void foo() final;
-};
-
-struct SubClass1 final: Base {
-}; // 合法
-
-struct SubClass2 : SubClass1 {
-}; // 非法, SubClass1 已 final
-
-struct SubClass3: Base {
-    void foo(); // 非法, foo 已 final
-};
-```
-
-* \###
 
 
 
