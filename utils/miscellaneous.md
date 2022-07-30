@@ -102,7 +102,7 @@ int main() {
 
 #### 自定义字面量
 
-C++11 引进了自定义字面量的能力，通过重载双引号后缀运算符实现：
+C++11 引进了自定义字面量的能力，通过**重载双引号后缀运算符**实现：
 
 字符串字面量自定义必须设置如下的**参数列表**
 
@@ -781,23 +781,100 @@ int main() {
 }
 ```
 
+#### 非类型模板参数推导
 
+前面我们主要提及的是模板参数的一种形式：类型模板参数。
 
+```cpp
+template <typename T, typename U>
+auto add(T t, U u) {
+    return t+u;
+}
+```
 
+其中模板的参数 `T` 和 `U` 为具体的类型。&#x20;
 
+但还有一种常见模板参数形式可以让**不同字面量成为模板参数**，即非类型模板参数：
 
+```cpp
+template<typename T, int BufSize>
+class buffer_t {
+public:
+    T& alloc();
+    void free(T& item);
+private:
+    T data[BufSize];
+}
+buffer_t<int, 100> buf;
+```
 
+在这种模板参数形式下，我们可以将 `100` 作为模板的参数进行传递。&#x20;
 
+在 **C++11** 引入了类型推导这一特性后，我们会很自然的问，既然此处的模板参数 以具体的字面量进行传递，能否让编译器辅助我们进行类型推导， 通过使用占位符 `auto` 从而不再需要明确指明类型？&#x20;
 
+幸运的是，**C++17** 引入了这一特性，我们的确可以 `auto` 关键字，让编译器辅助完成具体类型的推导， 例如：
 
+```cpp
+template <auto value> 
+void foo() {
+    std::cout << value << std::endl;
+    return;
+}
 
+int main() {
+    foo<10>();  // value 被推导为 int 类型
+}
+```
 
+### 面向对象
 
+#### 委托构造
 
+C++11 引入了委托构造的概念，这使得可以**在同一个类中一个构造函数调用另一个构造函数**，从而达到简化代码的目的：
 
+```cpp
+class Base {
+public:
+    int value1;
+    int value2;
+    Base() {
+        value1 = 1;
+    }
+    Base(int value) : Base() { // 委托 Base() 构造函数
+        value2 = value;
+    }
+};
+```
 
+#### 继承构造
 
+传统 C++ 中，构造函数如果需要继承是需要将参数一一传递的，这将导致效率低下。C++11 利用关键字 `using` 引入了继承构造函数的概念：
 
+```cpp
+class Base {
+public:
+    int value1;
+    int value2;
+    Base() {
+        value1 = 1;
+    }
+    Base(int value) : Base() {
+        value2 = value;
+    }
+};
+class SubClass : public Base {
+public:
+    using Base::Base;
+};
+
+int main() {
+    ...
+    SubBase s(3);
+    ...
+}
+```
+
+#### 显式
 
 
 
