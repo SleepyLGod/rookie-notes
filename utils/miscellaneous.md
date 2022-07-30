@@ -908,17 +908,95 @@ struct SubClass: Base {
 }
 ```
 
+`SubClass::foo` 可能并不是程序员尝试重载虚函数，只是恰好加入了一个具有相同名字的函数。另一个可能的情形是，当基类的虚函数被删除后，子类拥有旧的函数就不再重载该虚拟函数并摇身一变成为了一个普通的类方法，这将造成灾难性的后果。
 
+C++11 引入了 `override` 和 `final` 这两个关键字来防止上述情形的发生。
 
+**override**
 
+当重载虚函数时，引入 `override` 关键字将显式的告知编译器进行重载
 
+编译器将检查基函数是否存在这样的虚函数，否则将无法通过编译：
 
+```cpp
+struct Base {
+    virtual void foo(int);
+};
+struct SubClass: Base {
+    virtual void foo(int) override; // 合法
+    virtual void foo(float) override; // 非法, 父类没有此虚函数
+};
+```
 
+**final**
 
+`final` 则是为了防止类**被继续继承**以及**终止虚函数继续重载**引入的。
 
+```cpp
+struct Base {
+    virtual void foo() final;
+};
 
+struct SubClass1 final: Base {
+}; // 合法
 
+struct SubClass2 : SubClass1 {
+}; // 非法, SubClass1 已 final
 
+struct SubClass3: Base {
+    void foo(); // 非法, foo 已 final
+};
+```
+
+#### 强类型枚举
+
+传统 C++中，枚举类型并非类型安全，
+
+枚举类型会被视作整数，则会让两种完全不同的枚举类型可以进行直接的比较（虽然编译器给出了检查，但并非所有），**甚至同一个命名空间中的不同枚举类型的枚举值名字不能相同**，这通常不是我们希望看到的结果。
+
+C++11 引入了枚举类（enumeration class），并使用 `enum class` 的语法进行声明：
+
+```cpp
+enum class new_enum : unsigned int {
+    value1,
+    value2,
+    value3 = 100,
+    value4 = 100
+};
+```
+
+这样定义的枚举实现了类型安全:
+
+首先他不能够被隐式的转换为整数，同时也不能够将其与整数数字进行比较， 更不可能对不同的枚举类型的枚举值进行比较。
+
+但相同枚举值之间如果指定的值相同，那么可以进行比较：
+
+```cpp
+if (new_enum::value3 == new_enum::value4) {
+    ...
+}
+```
+
+在这个语法中，枚举类型后面使用了**冒号及类型关键字**来指定枚举中枚举值的类型`unsigned int`，这使得我们能够为枚举赋值（未指定时将默认使用 `int`）。
+
+而我们希望获得枚举值的值时，将必须显式的进行类型转换，不过我们可以通过重载 `<<` 这个算符来进行输出，可以收藏下面这个代码段：
+
+```cpp
+#include <iostream>
+template<typename T>
+std::ostream& operator<<(
+    typename std::enable_if<std::is_enum<T>::value, std::ostream>::type& stream, 
+    const T& e
+) {
+    return stream << static_cast<typename std::underlying_type<T>::type>(e);
+}
+```
+
+这时，下面的代码将能够被编译：
+
+```cpp
+std::cout << new_enum::value3 << std::endl
+```
 
 
 
