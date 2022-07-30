@@ -432,3 +432,68 @@ C++11 引入了 `auto` 和 `decltype` 这两个关键字实现了类型推导，
 
 #### auto
 
+`auto` 在很早以前就已经进入了 C++，但是他始终作为一个存储类型的指示符存在，与 `register` 并存。在传统 C++ 中，如果一个变量没有声明为 `register` 变量，将自动被视为一个 `auto` 变量。而随着 `register` 被弃用（在 C++17 中作为保留关键字，以后使用，目前不具备实际意义），对 `auto` 的语义变更也就非常自然了。
+
+使用 `auto` 进行类型推导的一个最为常见而且显著的例子就是迭代器。你应该在前面的小节里看到了传统 C++ 中冗长的迭代写法：
+
+```cpp
+// 在 C++11 之前
+// 由于 cbegin() 将返回 vector<int>::const_iterator
+// 所以 itr 也应该是 vector<int>::const_iterator 类型
+for(vector<int>::const_iterator it = vec.cbegin(); itr != vec.cend(); ++it)
+```
+
+而有了 `auto` 之后可以：
+
+```cpp
+class MagicFoo {
+public:
+    std::vector<int> vec;
+    MagicFoo(std::initializer_list<int> list) {
+        // 从 C++11 起, 使用 auto 关键字进行类型推导
+        for (auto it = list.begin(); it != list.end(); ++it) {
+            vec.push_back(*it);
+        }
+    }
+};
+int main() {
+    MagicFoo magicFoo = {1, 2, 3, 4, 5};
+    std::cout << "magicFoo: ";
+    for (auto it = magicFoo.vec.begin(); it != magicFoo.vec.end(); ++it) {
+        std::cout << *it << ", ";
+    }
+    std::cout << std::endl;
+    return 0;
+}
+```
+
+一些其他的常见用法：
+
+```cpp
+auto i = 5;              // i 被推导为 int
+auto arr = new auto(10); // arr 被推导为 int *
+```
+
+从 **C++ 20** 起，`auto` 甚至能用于函数传参，考虑下面的例子：
+
+```cpp
+int add(auto x, auto y) {
+    return x+y;
+}
+
+auto i = 5; // 被推导为 int
+auto j = 6; // 被推导为 int
+std::cout << add(i, j) << std::endl;
+
+```
+
+**注意**：`auto` 还不能用于推导数组类型：
+
+```cpp
+auto auto_arr2[10] = {arr}; // 错误, 无法推导数组元素类型
+```
+
+&#x20;
+
+
+
