@@ -493,7 +493,323 @@ std::cout << add(i, j) << std::endl;
 auto auto_arr2[10] = {arr}; // 错误, 无法推导数组元素类型
 ```
 
-&#x20;
+#### decltype(auto)
+
+`decltype(auto)` 是 C++14 开始提供的一个略微复杂的用法。
+
+简单来说，`decltype(auto)` 主要用于对转发函数或封装的返回类型进行推导，它使我们无需显式的指定 `decltype` 的参数表达式。考虑看下面的例子，当我们需要对下面两个函数进行封装时：
+
+```cpp
+std::string  lookup1();
+std::string& lookup2();
+```
+
+在 C++11 中，封装实现是如下形式：
+
+```cpp
+std::string look_up_a_string_1() {
+    return lookup1();
+}
+std::string& look_up_a_string_2() {
+    return lookup2();
+}
+```
+
+而有了 `decltype(auto)`，我们可以让编译器完成这一件烦人的参数转发：
+
+```cpp
+decltype(auto) look_up_a_string_1() {
+    return lookup1();
+}
+decltype(auto) look_up_a_string_2() {
+    return lookup2();
+}
+```
+
+### 控制流
+
+#### if constexpr
+
+&#x20;C++11 引入了 `constexpr` 关键字，它将表达式或函数编译为常量结果。一个很自然的想法是，如果我们把这一特性引入到条件判断中去，让代码在编译时就完成分支判断，岂不是能让程序效率更高？
+
+**C++17** 将 `constexpr` 这个关键字引入到 `if` 语句中，**允许在代码中声明常量表达式的判断条件**，考虑下面的代码：
+
+```cpp
+template<typename T>
+auto print_type_info(const T& t) {
+    if constexpr (std::is_integral<T>::value) {
+        return t + 1;
+    } else {
+         return t + 0.01;
+    }
+}
+int main() {
+    std::cout << print_type_info(5) << std::endl;
+    std::cout << print_type_info(3.14) << std::endl;
+}
+
+// 在编译时，实际代码就会表现为如下：
+/*
+int print_type_info(const int& t) {
+    return t + 1;
+}
+double print_type_info(const double& t) {
+    return t + 0.001;
+}
+int main() {
+    std::cout << print_type_info(5) << std::endl;
+    std::cout << print_type_info(3.14) << std::endl;
+}
+*/
+```
+
+#### 区间for迭代
+
+**C++11** 引入了基于范围的迭代写法
+
+```cpp
+int main() {
+    std::vector<int> vec = {1, 2, 3, 4};
+    if (auto itr = std::find(vec.begin(), vec.end(), 3); itr != vec.end()) {
+        *itr = 4;
+    }
+    for (auto element : vec)
+        std::cout << element << std::endl; // read only
+    for (auto &element : vec) {
+        element += 1;                      // writeable
+    }    
+}
+```
+
+### template
+
+#### 外部模板
+
+传统 C++ 中，模板只有在使用时才会被编译器实例化。
+
+换句话说，只要在每个编译单元（文件）中编译的代码中遇到了被完整定义的模板，都会实例化。这就产生了重复实例化而导致的编译时间的增加。并且，我们没有办法通知编译器不要触发模板的实例化。
+
+为此，**C++11** 引入了外部模板，扩充了原来的强制编译器在特定位置实例化模板的语法，使我们能够显式的通知编译器**何时进行模板的实例化**：
+
+```cpp
+template class std::vector<bool>; // 强行实例化
+extern template class std::vector<double>; // 不在该当前编译文件中实例化模板 
+```
+
+#### 尖括号 ">"
+
+传统 C++ 的编译器中，`>>`一律被当做右移运算符来进行处理。但实际上我们很容易就写出了嵌套模板的代码：`std::vector<std::vector<int>> matrix;` 在传统C++中不能编译
+
+C++11 开始，连续的右尖括号将变得合法，并且能够顺利通过编译。甚至于像下面这种写法都能够通过编译：
+
+```cpp
+template<bool T>
+class MType {
+    bool m = T;
+}
+int main() {
+ ...
+ std::vector<MType(1>2)>> m; // 合法, 但不建议写出这样的代码
+```
+
+#### 类型别名模板
+
+仔细体会这句话：**模板是用来产生类型的。**
+
+在传统 C++ 中，`typedef` 可以为类型定义一个新的名称，但是却没有办法为模板定义一个新的名称。因为，模板不是类型。例如：
+
+```cpp
+template<typename T, typename U>
+class MagicType {
+public:
+    T dark;
+    U magic;
+};
+
+// 不合法
+template<typename T>
+typedef MagicType<std::vector<T>, std::string> FakeDarkMagic;
+```
+
+**C++11** 使用 `using` 引入了下面这种形式的写法，并且同时支持对传统 `typedef` 相同的功效：
+
+通常我们使用 `typedef` 定义别名的语法是：`typedef 原名称 新名称;`，但是对函数指针等别名的定义语法却不相同，这通常给直接阅读造成了一定程度的困难。
+
+```cpp
+template<typename T, typename U>
+class MagicType {
+public:
+    T dark;
+    U magic;
+};
+
+// 1st
+typedef int (*process)(void *);
+using NewProcess = int(*)(void *);
+
+// 2nd
+template<typename T>
+using TrueMagic = MagicType<std::vector<T>, std::string>;
+int main() {
+    TrueMagic<bool> you;
+}    
+```
+
+#### 变长参数模板
+
+在 C++11 之前，无论是类模板还是函数模板，都只能按其指定的样子， 接受一组固定数量的模板参数；
+
+而 C++11 加入了新的表示方法， 允许任意个数、任意类别的模板参数，同时也不需要在定义时将参数的个数固定。
+
+```cpp
+template<typename... Ts> class Magic;
+```
+
+模板类 Magic 的对象，能够接受不受限制个数的 `typename` 作为模板的形式参数，例如下面的定义：
+
+```cpp
+class Magic<int, 
+            std::vector<int>, 
+            std::map<std::string, std::vector<int>>> darkMagic;
+```
+
+既然是任意形式，所以个数为 `0` 的模板参数也是可以的：`class Magic<> nothing;`。
+
+如果不希望产生的模板参数个数为 `0`，可以手动的定义至少一个模板参数：
+
+```cpp
+template<typename Require, typename... Args> class Magic2;
+```
+
+变长参数模板也能被直接调整到到模板函数上。
+
+传统 C 中的 `printf` 函数， 虽然也能达成不定个数的形参的调用，但其并非类别安全。 而 C++11 除了能定义类别安全的变长参数函数外， 还可以使类似 `printf` 的函数能自然地处理非自带类别的对象。 除了在模板参数中能使用 `...` 表示不定长模板参数外， **函数参数**也使用同样的表示法代表不定长参数， 这也就为我们简单编写变长参数函数提供了便捷的手段，例如：
+
+```cpp
+template<typename... Args> 
+void printf(const std::string &str, Arg... args);
+```
+
+那么我们定义了变长的模板参数，如何对参数进行解包呢？
+
+首先，我们可以使用 `sizeof...` 来计算参数的个数，：
+
+```cpp
+template<typename... Args>
+void magic(Args... args) {
+    std::cout << sizeof...(args) << std::endl;
+}
+```
+
+我们可以传递任意个参数给 `magic` 函数：
+
+其次，对参数进行解包，到目前为止还没有一种简单的方法能够处理参数包，但有两种经典的处理手法：
+
+**1. 递归模板函数**
+
+递归是非常容易想到的一种手段，也是最经典的处理方法。这种方法不断**递归地向函数传递模板参数**，进而达到递归遍历所有模板参数的目的：
+
+```cpp
+template<typename T0>
+void printf0(T0 value) { // 单参数——递归最后一步
+    std::cout << value << std::endl;
+}
+template<typename T, typename... Ts>
+void printf0(T value, Ts... args) { // 多参数——递归开始
+    std::cout << value << std::endl;
+    printf0(args...);
+}
+int main() {
+    printf0(1, 2, "123", 1.1);
+    return 0;
+}
+```
+
+**2. 变参模板展开**
+
+你应该感受到了这很繁琐，在 C++17 中增加了变参模板展开的支持，于是你可以在一个函数中完成 `printf` 的编写：
+
+```cpp
+template<typename T0, typename... Ts>
+void printf1(T0 t0, Ts... t) {
+    std::cout << t0 << std::endl;
+    if constexpr (sizeof...(t) > 0) {
+        printf1(t...);
+    }
+}
+```
+
+事实上，有时候我们虽然使用了变参模板，却不一定需要对参数做逐个遍历，
+
+我们可以利用 **`std::bind`** 及完美转发等特性实现对函数和参数的绑定，从而达到成功调用的目的。
+
+**3. 初始化列表展开**
+
+递归模板函数是一种标准的做法，但缺点显而易见的在于必须定义一个终止递归的函数。
+
+这里介绍一种使用初始化列表展开的黑魔法：
+
+```cpp
+template<typename T, typename... Ts>
+auto printf2(T value, Ts... args) {
+    std::cout << value << std::endl;
+    (void) std::initializer_list<T> { ( [&args] {
+        std::cout << args << std::endl;
+    }(), value)...};
+}
+```
+
+在这个代码中，额外使用了 C++11 中提供的初始化列表以及 Lambda 表达式的特性（下一节中将提到）。
+
+通过初始化列表，`(lambda 表达式, value)...` 将会被展开。
+
+由于逗号表达式的出现，首先会执行前面的 lambda 表达式，完成参数的输出。&#x20;
+
+为了避免编译器警告，我们可以将 `std::initializer_list` 显式的转为 `void`。
+
+#### 折叠表达式
+
+**C++ 17** 中将变长参数这种特性进一步带给了表达式，考虑下面这个例子：
+
+```cpp
+template<typename ... T>
+auto sum(T ... t) {
+    return (t + ...);
+}
+int main() {
+    std::cout << sum(1, 2, 3, 4, 5, 6, 7, 8, 9, 10) << std::endl;
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
