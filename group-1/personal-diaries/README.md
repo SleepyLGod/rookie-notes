@@ -22,5 +22,7 @@ coverY: 0
 [2022-yu-yu-ri-ji-san.md](2022-yu-yu-ri-ji-san.md "mention")
 
 [2022-yu-yu-ri-ji-si.md](2022-yu-yu-ri-ji-si.md "mention")
+
+[2022-yu-yu-ri-ji-wu.md](2022-yu-yu-ri-ji-wu.md "mention")
 {% endtab %}
 {% endtabs %}
