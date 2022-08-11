@@ -9,7 +9,7 @@
   * [😇 MetaData](key-value-storage/metadata.md)
   * [😇 CAP therom](key-value-storage/cap-therom.md)
   * [😇 LSM Tree](key-value-storage/lsm-tree.md)
-  * [😍 BigTable](key-value-storage/BigTable.md)
+  * [😍 Google BigTable](key-value-storage/BigTable.md)
   * [😍 Google File System](key-value-storage/gfs.md)
   * [😍 Google MapReduce](key-value-storage/mapreduce.md)
   * [🧐 Bloom Filter](key-value-storage/bloom-filter.md)

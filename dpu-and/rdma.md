@@ -118,11 +118,16 @@ Access:  send、receive、read、write、atomic操作
 
 #### 3.2 RDMA基本概念
 
-RDMA有两种基本操作。
+RDMA有两种基本操作：
 
-Memory verbs:  包括RDMA read、write和atomic操作。这些操作**指定远程地址进行操作并且绕过接收者的CPU**。\
-Messaging verbs:  包括RDMA send、receive操作。这些动作**涉及响应者的CPU，发送的数据被写入由响应者的CPU先前发布的接受所指定的地址**。\
-RDMA传输分为可靠和不可靠的，并且可以连接和不连接的（数据报）。凭借可靠的传输，NIC使用确认来保证消息的按序传送。不可靠的传输不提供这样的保证。然而，像InfiniBand这样的现代RDMA实现使用了一个无损链路层，它可以防止使用链路层流量控制的基于拥塞的损失\[1]，以及使用链路层重传的基于位错误的损失\[8]。因此，不可靠的传输很少会丢弃数据包。
+* Memory verbs:  包括RDMA read、write和atomic操作。这些操作**指定远程地址进行操作并且绕过接收者的CPU**。
+* Messaging verbs:  包括RDMA send、receive操作。这些动作**涉及响应者的CPU，发送的数据被写入由响应者的CPU先前发布的接受所指定的地址**。
+
+RDMA传输分为可靠和不可靠的，并且可以连接和不连接的（数据报）。
+
+凭借可靠的传输，NIC使用确认来保证消息的按序传送。不可靠的传输不提供这样的保证。
+
+然而，像InfiniBand这样的现代RDMA实现使用了一个无损链路层，它可以防止使用链路层流量控制的基于拥塞的损失\[1]，以及使用链路层重传的基于位错误的损失\[8]。因此，不可靠的传输很少会丢弃数据包。
 
 **目前的RDMA硬件提供一种数据报传输：不可靠的数据报（UD），并且不支持memory verbs。**
 
@@ -130,17 +135,21 @@ RDMA传输分为可靠和不可靠的，并且可以连接和不连接的（数�
 
 #### 3.3 RDMA三种不同的硬件实现
 
-目前RDMA有三种不同的硬件实现。分别是InfiniBand、iWarp（internet Wide Area RDMA Protocol）、RoCE(RDMA over Converged Ethernet)。
+目前RDMA有三种不同的**硬件实现**。分别是`InfiniBand`、`iWarp（internet Wide Area RDMA Protocol）`、`RoCE(RDMA over Converged Ethernet)`。
 
 ![](https://tjcug.github.io/blog/images/pasted-64.png)
 
-目前，大致有三类RDMA网络，分别是Infiniband、RoCE、iWARP。
+目前，大致有三类RDMA**网络**，分别是`Infiniband`、`RoCE`、`iWARP`。
 
-其中，Infiniband是一种专为RDMA设计的网络，从**硬件级别**保证可靠传输 ， 而RoCE 和 iWARP都是基于以太网的RDMA技术，支持相应的verbs接口，如图1所示。从图中不难发现，RoCE协议存在RoCEv1和RoCEv2两个版本，主要区别RoCEv1是基于以太网链路层实现的RDMA协议(交换机需要支持PFC等流控技术，在物理层保证可靠传输)，而RoCEv2是以太网TCP/IP协议中UDP层实现。从性能上，很明显Infiniband网络最好，但网卡和交换机是价格也很高，然而RoCEv2和iWARP仅需使用特殊的网卡就可以了，价格也相对便宜很多。
+其中，`Infiniband`是一种专为RDMA设计的网络，从**硬件级别**保证可靠传输 ；`Infiniband` 支持RDMA的新一代网络协议。 由于这是一种新的网络技术，因此需要支持该技术的NIC和交换机。
 
-Infiniband，支持RDMA的新一代网络协议。 由于这是一种新的网络技术，因此需要支持该技术的NIC和交换机。\
-RoCE，一个允许在以太网上执行RDMA的网络协议。 其较低的网络标头是以太网标头，其较高的网络标头（包括数据）是InfiniBand标头。 这支持在标准以太网基础设施（交换机）上使用RDMA。 只有网卡应该是特殊的，支持RoCE。\
-iWARP，一个允许在TCP上执行RDMA的网络协议。 IB和RoCE中存在的功能在iWARP中不受支持。 这支持在标准以太网基础设施（交换机）上使用RDMA。 只有网卡应该是特殊的，并且支持iWARP（如果使用CPU卸载），否则所有iWARP堆栈都可以在SW中实现，并且丧失了大部分RDMA性能优势。
+而`RoCE`和 `iWARP`都是基于以太网的RDMA技术，支持相应的verbs接口，如上图所示。
+
+`RoCE`，一个允许在以太网上执行RDMA的网络协议。 其较低的网络标头是以太网标头，其较高的网络标头（包括数据）是InfiniBand标头。 这支持在标准以太网基础设施（交换机）上使用RDMA。 只有网卡应该是特殊的，支持RoCE。从图中不难发现，`RoCE`协议存在`RoCEv1`和`RoCEv2`**两个版本**，主要区别`RoCEv1`是基于以太网**链路层**实现的RDMA协议(交换机需要支持PFC等流控技术，在物理层保证可靠传输)，而`RoCEv2`是以太网TCP/IP协议中UDP层实现。
+
+`iWARP`，一个允许在TCP上执行RDMA的网络协议。 IB和RoCE中存在的功能在iWARP中不受支持。 这支持在标准以太网基础设施（交换机）上使用RDMA。 只有网卡应该是特殊的，并且支持iWARP（如果使用CPU卸载），否则所有iWARP堆栈都可以在SW中实现，并且丧失了大部分RDMA性能优势。
+
+从性能上，很明显`Infiniband`网络最好，但网卡和交换机是价格也很高，然而`RoCEv2`和`iWARP`仅需使用特殊的网卡就可以了，价格也相对便宜很多。
 
 ![](https://tjcug.github.io/blog/images/pasted-65.png)
 
@@ -150,11 +159,13 @@ iWARP，一个允许在TCP上执行RDMA的网络协议。 IB和RoCE中存在的�
 
 ![](https://tjcug.github.io/blog/images/pasted-67.png)
 
-传统上的RDMA技术设计内核封装多层网络协议并且涉及内核数据传输。RDMA通过专有的RDMA网卡RNIC，绕过内核直接从用户空间访问RDMA enabled NIC网卡。RDMA提供一个专有的verbs interface而不是传统的TCP/IP Socket interface。要使用RDMA首先要建立从RDMA到应用程序内存的数据路径 ，可以通过RDMA专有的verbs interface接口来建立这些数据路径，一旦数据路径建立后，就可以直接访问用户空间buffer。
+传统上的RDMA技术设计内核封装多层网络协议并且涉及内核数据传输。RDMA通过专有的RDMA网卡**RNIC**，绕过内核直接从用户空间访问RDMA enabled NIC网卡。RDMA提供一个专有的verbs interface而不是传统的TCP/IP Socket interface。
+
+要使用RDMA**首先要建立从RDMA到应用程序内存的数据路径** ，可以通过RDMA专有的verbs interface接口来建立这些数据路径，一旦数据路径建立后，就可以直接访问用户空间buffer。
 
 #### 3.5 RDMA整体系统架构图
 
-![](https://tjcug.github.io/blog/images/pasted-68.png)
+![RDMA整体框架架构图](https://tjcug.github.io/blog/images/pasted-68.png)
 
 上诉介绍的是RDMA整体框架架构图。从图中可以看出，RDMA在应用程序用户空间，提供了一系列verbs interface接口操作RDMA硬件。RDMA绕过内核直接从用户空间访问RDMA 网卡(RNIC)。RNIC网卡中包括Cached Page Table Entry，页表就是用来将虚拟页面映射到相应的物理页面。
 
@@ -162,26 +173,42 @@ iWARP，一个允许在TCP上执行RDMA的网络协议。 IB和RoCE中存在的�
 
 RDMA 的工作过程如下:
 
-1\) 当一个应用执行RDMA 读或写请求时，不执行任何数据复制.在不需要任何内核内存参与的条件下，RDMA 请求从运行在用户空间中的应用中发送到本地NIC( 网卡)。
+1.  当一个应用执行RDMA 读或写请求时，不执行任何数据复制。
 
-2\) NIC 读取缓冲的内容，并通过网络传送到远程NIC。
+    在不需要任何内核内存参与的条件下，RDMA 请求从运行在用户空间中的应用中发送到**本地NIC**( 网卡)。
+2. NIC 读取缓冲的内容，并通过网络传送到**远程NIC**。
+3.  在网络上传输的RDMA 信息**包含**目标虚拟地址、内存钥匙和数据本身。
 
-3\) 在网络上传输的RDMA 信息包含目标虚拟地址、内存钥匙和数据本身.请求既可以完全在用户空间中处理(通过轮询用户级完成排列) ，又或者在应用一直睡眠到请求完成时的情况下通过系统中断处理.RDMA 操作使应用可以从一个远程应用的内存中读数据或向这个内存写数据。
+    请求既可以完全在用户空间中处理(通过轮询用户级完成排列) ，又或者在应用一直睡眠到请求完成时的情况下通过系统中断处理。
 
-4\) 目标NIC 确认内存钥匙，直接将数据写人应用缓存中.用于操作的远程虚拟内存地址包含在RDMA 信息中。
+    RDMA 操作使应用可以从一个远程应用的内存中读数据或向这个内存写数据。
+4.  目标NIC 确认内存钥匙，直接将数据写人应用缓存中。
+
+    用于操作的远程虚拟内存地址包含在RDMA 信息中。
 
 #### 3.7 RDMA操作细节
 
-RDMA提供了基于消息队列的点对点通信，每个应用都可以直接获取自己的消息，无需操作系统和协议栈的介入。\
-消息服务建立在通信双方本端和远端应用之间创建的Channel-IO连接之上。当应用需要通信时，就会创建一条Channel连接，每条Channel的首尾端点是两对Queue Pairs（QP）。每对QP由Send Queue（SQ）和Receive Queue（RQ）构成，这些队列中管理着各种类型的消息。QP会被映射到应用的虚拟地址空间，使得应用直接通过它访问RNIC网卡。除了QP描述的两种基本队列之外，RDMA还提供一种队列Complete Queue（CQ），CQ用来知会用户WQ上的消息已经被处理完。
+RDMA提供了**基于消息队列的点对点通信**，每个应用都可以直接获取自己的消息，无需操作系统和协议栈的介入。
 
-RDMA提供了一套软件传输接口，方便用户创建传输请求Work Request(WR），WR中描述了应用希望传输到Channel对端的消息内容，WR通知QP中的某个队列Work Queue(WQ)。在WQ中，用户的WR被转化为Work Queue Element（WQE）的格式，等待RNIC的异步调度解析，并从WQE指向的Buffer中拿到真正的消息发送到Channel对端。
+消息服务建立在通信双方本端和远端应用之间创建的**Channel-IO**连接之上。
+
+当应用需要通信时，就会创建一条Channel连接，每条Channel的首尾端点是两对**Queue Pairs**（**QP**）。每对QP由Send Queue（**SQ**）和Receive Queue（**RQ**）构成，这些队列中管理着各种类型的消息。
+
+QP会被映射到应用的虚拟地址空间，使得应用直接通过它访问RNIC网卡。
+
+除了QP描述的两种基本队列之外，RDMA还提供一种队列Complete Queue（**CQ**），CQ用来知会用户**WQ**上的消息已经被处理完。
+
+RDMA提供了一套软件传输接口，方便用户创建传输请求Work Request(**WR**），WR中描述了应用希望传输到Channel对端的消息内容，WR通知QP中的某个队列Work Queue(**WQ)**。
+
+在WQ中，用户的WR被转化为Work Queue Element（**WQE**）的格式，等待RNIC的异步调度解析，并从WQE指向的Buffer中拿到真正的消息发送到Channel对端。
 
 ![](https://tjcug.github.io/blog/images/pasted-69.png)
 
-**3.7.1 RDAM单边操作 (RDMA READ)**
+READ和WRITE是单边操作，只需要本端明确信息的**源和目的地址**，远端应用不必感知此次通信，数据的读或写都通过RDMA在RNIC与应用Buffer之间完成，再由远端RNIC封装成消息返回到本端。
 
-READ和WRITE是单边操作，只需要本端明确信息的源和目的地址，远端应用不必感知此次通信，数据的读或写都通过RDMA在RNIC与应用Buffer之间完成，再由远端RNIC封装成消息返回到本端。
+单边操作传输方式是RDMA与传统网络传输的最大不同，只需提供直接访问远程的虚拟地址，无须远程应用的参与其中，这种方式适用于批量数据传输。
+
+**3.7.1 RDAM单边操作 (RDMA READ)**
 
 对于单边操作，以存储网络环境下的存储为例，数据的流程如下：
 
@@ -190,8 +217,6 @@ READ和WRITE是单边操作，只需要本端明确信息的源和目的地址�
 3. B把数据地址VB，key封装到专用的报文传送到A，这相当于B把数据buffer的操作权交给了A。同时B在它的WQ中注册进一个WR，以用于接收数据传输的A返回的状态。
 4. A在收到B的送过来的数据VB和R\_key后，RNIC会把它们连同自身存储地址VA到封装RDMA READ请求，将这个消息请求发送给B，这个过程A、B两端不需要任何软件参与，就可以将B的数据存储到B的VA虚拟地址。
 5. B在存储完成后，会向A返回整个数据传输的状态信息。
-
-单边操作传输方式是RDMA与传统网络传输的最大不同，只需提供直接访问远程的虚拟地址，无须远程应用的参与其中，这种方式适用于批量数据传输。
 
 **3.7.2 RDMA 单边操作 (RDMA WRITE)**
 
