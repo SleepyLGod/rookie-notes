@@ -1,3 +1,8 @@
+---
+description: >-
+  参考文档：https://docs.nvidia.com/networking/display/RDMAAwareProgrammingv17/RDMA+Aware+Networks+Programming+User+Manual
+---
+
 # 😍 RDMA
 
 RDMA(RemoteDirect Memory Access)技术全称**远程直接内存访问**，就是为了解决网络传输中服务器端数据处理的延迟而产生的。它将数据直接从一台计算机的内存传输到另一台计算机，无需双方操作系统的介入。这允许高吞吐、低延迟的网络通信，尤其适合在大规模并行计算机集群中使用。
@@ -135,17 +140,17 @@ RDMA传输分为可靠和不可靠的，并且可以连接和不连接的（数�
 
 #### 3.3 RDMA三种不同的硬件实现
 
-目前RDMA有三种不同的**硬件实现**。分别是`InfiniBand`、`iWarp（internet Wide Area RDMA Protocol）`、`RoCE(RDMA over Converged Ethernet)`。
+目前RDMA有三种不同的**硬件实现**。分别是 `InfiniBand`、`iWarp(internet Wide Area RDMA Protocol)`、`RoCE(RDMA over Converged Ethernet)`。
 
 ![](https://tjcug.github.io/blog/images/pasted-64.png)
 
-目前，大致有三类RDMA**网络**，分别是`Infiniband`、`RoCE`、`iWARP`。
+目前，大致有三类RDMA**网络**，分别是 `Infiniband`、`RoCE`、`iWARP`。
 
-其中，`Infiniband`是一种专为RDMA设计的网络，从**硬件级别**保证可靠传输 ；`Infiniband` 支持RDMA的新一代网络协议。 由于这是一种新的网络技术，因此需要支持该技术的NIC和交换机。
+其中，`Infiniband` 是一种专为RDMA设计的网络，从**硬件级别**保证可靠传输 ；`Infiniband` 支持RDMA的新一代网络协议。 由于这是一种新的网络技术，因此需要支持该技术的NIC和交换机。
 
 而`RoCE`和 `iWARP`都是基于以太网的RDMA技术，支持相应的verbs接口，如上图所示。
 
-`RoCE`，一个允许在以太网上执行RDMA的网络协议。 其较低的网络标头是以太网标头，其较高的网络标头（包括数据）是InfiniBand标头。 这支持在标准以太网基础设施（交换机）上使用RDMA。 只有网卡应该是特殊的，支持RoCE。从图中不难发现，`RoCE`协议存在`RoCEv1`和`RoCEv2`**两个版本**，主要区别`RoCEv1`是基于以太网**链路层**实现的RDMA协议(交换机需要支持PFC等流控技术，在物理层保证可靠传输)，而`RoCEv2`是以太网TCP/IP协议中UDP层实现。
+<mark style="color:blue;background-color:blue;">**`RoCE`**</mark>，一个允许在以太网上执行RDMA的网络协议。 其较低的网络标头是以太网标头，其较高的网络标头（包括数据）是InfiniBand标头。 这支持在标准以太网基础设施（交换机）上使用RDMA。 只有网卡应该是特殊的，支持RoCE。从图中不难发现，`RoCE`协议存在 `RoCEv1` 和 `RoCEv2` **两个版本**，主要区别`RoCEv1`是基于以太网**链路层**实现的RDMA协议(交换机需要支持PFC等流控技术，在物理层保证可靠传输)，而`RoCEv2`是以太网TCP/IP协议中UDP层实现。
 
 `iWARP`，一个允许在TCP上执行RDMA的网络协议。 IB和RoCE中存在的功能在iWARP中不受支持。 这支持在标准以太网基础设施（交换机）上使用RDMA。 只有网卡应该是特殊的，并且支持iWARP（如果使用CPU卸载），否则所有iWARP堆栈都可以在SW中实现，并且丧失了大部分RDMA性能优势。
 
@@ -167,7 +172,11 @@ RDMA传输分为可靠和不可靠的，并且可以连接和不连接的（数�
 
 ![RDMA整体框架架构图](https://tjcug.github.io/blog/images/pasted-68.png)
 
-上诉介绍的是RDMA整体框架架构图。从图中可以看出，RDMA在应用程序用户空间，提供了一系列verbs interface接口操作RDMA硬件。RDMA绕过内核直接从用户空间访问RDMA 网卡(RNIC)。RNIC网卡中包括Cached Page Table Entry，页表就是用来将虚拟页面映射到相应的物理页面。
+从图中可以看出，RDMA在应用程序用户空间，提供了一系列verbs interface接口操作RDMA硬件。
+
+RDMA绕过内核直接从用户空间访问RDMA 网卡(RNIC)。
+
+RNIC网卡中包括Cached Page Table Entry，页表就是用来将虚拟页面映射到相应的物理页面。
 
 #### 3.6 RDMA技术详解
 
@@ -238,3 +247,4 @@ READ和WRITE是单边操作，只需要本端明确信息的**源和目的地址
 8. A的RNIC异步调度轮到A的WQE，解析到这是一个SEND消息，从Buffer中直接向B发出数据。数据流到达B的RNIC后，B的WQE被消耗，并把数据直接存储到WQE指向的存储位置。
 9. AB通信完成后，A的CQ中会产生一个完成消息CQE表示发送完成。与此同时，B的CQ中也会产生一个完成消息表示接收完成。每个WQ中WQE的处理完成都会产生一个CQE。\
    双边操作与传统网络的底层Buffer Pool类似，收发双方的参与过程并无差别，区别在零拷贝、Kernel Bypass，实际上对于RDMA，这是一种复杂的消息传输模式，多用于传输短的控制消息。
+
