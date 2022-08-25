@@ -1,3 +1,7 @@
+---
+description: rdma学习
+---
+
 # 😍 RDMA
 
 RDMA(RemoteDirect Memory Access)技术全称**远程直接内存访问**，就是为了解决网络传输中服务器端数据处理的延迟而产生的。它将数据直接从一台计算机的内存传输到另一台计算机，无需双方操作系统的介入。这允许高吞吐、低延迟的网络通信，尤其适合在大规模并行计算机集群中使用。
@@ -102,8 +106,8 @@ RDMA通过网络把资料直接传入计算机的**存储区**，将数据从一
 
 RDMA主要有以下三个特性：
 
-1. Low-Latency&#x20;
-2. Low CPU overhead&#x20;
+1. Low-Latency
+2. Low CPU overhead
 3. high bandwidth
 
 #### 3.1 RDMA 简介
@@ -114,13 +118,13 @@ Direct：没有内核的参与，**有关发送传输的所有内容都卸载到
 
 Memory：在用户空间虚拟内存与RNIC网卡**直接**进行数据传输不涉及到系统内核，没有额外的数据移动和复制
 
-Access:  send、receive、read、write、atomic操作
+Access: send、receive、read、write、atomic操作
 
 #### 3.2 RDMA基本概念与术语
 
-##### **3.2.1 基本术语**
+**3.2.1 基本术语**
 
-① **Fabric**
+<mark style="color:purple;">①</mark> **Fabric**
 
 所谓Fabric，就是支持RDMA的局域网(LAN)。
 
@@ -128,74 +132,101 @@ Access:  send、receive、read、write、atomic操作
 A local-area RDMA network is usually referred to as a fabric.
 ```
 
-② **CA(Channel Adapter)：**
+<mark style="color:purple;">②</mark> **CA(Channel Adapter)：**
 
-CA是Channel Adapter(通道适配器)的缩写。那么，CA就是将系统连接到Fabric的硬件组件。&#x20;
+CA是Channel Adapter(通道适配器)的缩写。那么，CA就是将系统连接到Fabric的硬件组件。
 
 在IBTA中，一个CA就是IB子网中的一个终端结点(End Node)。
 
-分为两种类型，一种是HCA, 另一种叫做TCA, 它们合称为xCA。
+分为两种类型，一种是`HCA`，另一种叫做`TCA`，它们合称为`xCA`。
 
-其中， `HCA(Host Channel Adapter)`是支持"verbs"接口的CA, T`CA(Target Channel Adapter)`可以理解为"weak CA", 不需要像HCA一样支持很多功能。
+其中， `HCA(Host Channel Adapter)`是支持"verbs"接口的CA，`TCA(Target Channel Adapter)`可以理解为"weak CA"，不需要像HCA一样支持很多功能。
 
-而在IEEE/IETF中，CA的概念被实体化为`RNIC（RDMA Network Interface Card）`, iWARP就把一个CA称之为一个RNIC。
+而在IEEE/IETF中，CA的概念被实体化为`RNIC（RDMA Network Interface Card）`， iWARP就把一个CA称之为一个RNIC。
 
-**简言之，在IBTA阵营中，CA即HCA或TCA； 而在iWARP阵营中，CA就是RNIC。 总之，无论是HCA、 TCA还是RNIC，它们都是CA, 它们的基本功能本质上都是生产或消费数据包(packet)。**
+**简言之，在IBTA阵营中，CA即`HCA`或`TCA`； 而在iWARP阵营中，CA就是`RNIC`。 总之，无论是`HCA`、 `TCA`还是`RNIC`，它们都是CA， 它们的基本功能本质上都是生产或消费数据包(packet)。**
 
 ```
 A channel adapter is the hardware component that connects a system to the fabric.
 ```
 
-③ **Verbs**：
+<mark style="color:purple;">③</mark> **Verbs**：
 
-在RDMA的持续演进中，有一个组织叫做OpenFabric Alliance所做的贡献可谓功不可没。 Verbs这个词不好翻译，大致可以理解为访问RDMA硬件的“一组标准动作”。 每一个Verb可以理解为一个Function。
+在RDMA的持续演进中，有一个组织叫做 OpenFabric Alliance 所做的贡献可谓功不可没。 Verbs这个词不好翻译，大致可以理解为访问RDMA硬件的“一组标准动作”。 每一个Verb可以理解为一个Function。
 
-#####  **3.2.2 核心概念**
+**3.2.2 核心概念**
 
-① **Memory Registration(MR) | 内存注册**
+<mark style="color:purple;">①</mark> **Memory Registration(MR) | 内存注册**
 
-RDMA 就是用来对内存进行数据传输。那么怎样才能对内存进行传输，很简单，注册。 因为RDMA硬件对用来做数据传输的内存是有特殊要求的。
+RDMA 就是用来对内存进行数据传输。那么怎样才能对内存进行传输？
 
-- 在数据传输过程中，应用程序不能修改数据所在的内存。
-- 操作系统不能对数据所在的内存进行page out操作 -- 物理地址和虚拟地址的映射必须是固定不变的。
+很简单，**注册**。&#x20;
 
-注意无论是DMA或者RDMA都要求物理地址连续，这是由DMA引擎所决定的。 那么怎么进行内存注册呢？
+因为RDMA硬件对用来做数据传输的内存是有特殊要求的。
 
-- 创建两个key (local和remote)指向需要操作的内存区域
-- 注册的keys是数据传输请求的一部分
+* 在数据传输过程中，应用程序不能修改数据所在的**内存**。
+* 操作系统不能对数据所在的**内存**进行`page out`操作 -- 物理地址和虚拟地址的映射必须是固定不变的。
 
-注册一个Memory Region之后，这个时候这个Memory Region也就有了它自己的属性：
+注意无论是DMA或者RDMA都要求**物理地址连续**，这是由DMA引擎所决定的。 那么怎么进行内存注册呢？
 
-- context : RDMA操作上下文
-- addr : MR被注册的Buffer地址
-- length : MR被注册的Buffer长度
-- lkey：MR被注册的本地key
-- rkey：MR被注册的远程key
+* 创建两个 **`key`** ( `local` 和 `remote` )指向需要操作的内存区域 `Memory Region`
+* 注册的 `key`s 是数据传输请求的一部分
 
-对Memrory Registration：Memory Registration只是RDMA中对内存保护的一种措施，只有将要操作的内存注册到RDMA Memory Region中，这快操作的内存就交给RDMA 保护域来操作了。这个时候我们就可以对这快内存进行操作，至于操作的起始地址、操作Buffer的长度，可以根据程序的具体需求进行操作。我们只要保证接受方的Buffer 接受的长度大于等于发送的Buffer长度。
+注册一个`Memory Region`之后，这个时候这个`Memory Region`也就有了它自己的属性：
 
-② **Queues | 队列**
+* `context` : RDMA操作上下文
+* `addr` : MR被注册的Buffer地址
+* `length` : MR被注册的Buffer长度
+* `lkey`：MR被注册的本地key
+* `rkey`：MR被注册的远程key
 
-RDMA一共支持三种队列，发送队列(SQ)和接收队列(RQ)，完成队列(CQ)。其中，SQ和RQ通常成对创建，被称为Queue Pairs(QP)。
+对`Memrory Registration`：
+
+`Memory Registration`只是RDMA中对内存保护的一种措施，只有将要操作的内存注册到RDMA `Memory Region`中，这快操作的内存就交给RDMA 保护域来操作了。
+
+这个时候我们就可以对这快内存进行操作，至于操作的起始地址、操作Buffer的长度，可以根据程序的具体需求进行操作。我们只要保证接受方的Buffer 接受的长度**大于等于**发送的Buffer长度。
+
+<mark style="color:purple;">②</mark> **Queues | 队列**
+
+RDMA提供了**基于消息队列的点对点通信**，每个应用都可以直接获取自己的消息，无需操作系统和协议栈的介入。
+
+RDMA一共支持三种队列，这些队列中管理着各种类型的消息。
+
+三种队列分别是：发送队列(Send Queue 即 **SQ**)、接收队列(Receive Queue 即 **RQ**) 和 完成队列(Complete Queue 即 **CQ**)。其中，SQ 和 RQ 通常成对创建，被称为Queue Pairs(**QP**)，即：
+
+1. 每一个应用程序可以有很多QP和CQ
+2. 每一个QP包括一个SQ和RQ
+3. 每一个CQ可以跟多个SQ或者RQ相关联。
+
+消息服务建立在通信双方本端和远端应用之间创建的**Channel-IO**连接之上。当应用需要通信时，就会创建一条Channel连接，每条Channel的首尾端点是两个 QP。QP会被映射到应用的虚拟地址空间，使得应用直接通过它访问RNIC网卡。
 
 RDMA是基于消息的传输协议，数据传输都是异步操作。 RDMA操作其实很简单，可以理解为：
 
-1. Host提交工作请求(WR)到工作队列(WQ): 工作队列包括发送队列(SQ)和接收队列(RQ)。工作队列的每一个元素叫做WQE, 也就是WR。
-2. Host从完成队列(CQ）中获取工作完成(WC): 完成队列里的每一个叫做CQE, 也就是WC。
-3. 具有RDMA引擎的硬件(hardware)就是一个队列元素处理器。 RDMA硬件不断地从工作队列(WQ)中去取工作请求(WR)来执行，执行完了就给完成队列(CQ)中放置工作完成(WC)。从生产者-消费者的角度理解就是：
-4. Host生产WR, 把WR放到WQ中去
-5. RDMA硬件消费WR
-6. RDMA硬件生产WC, 把WC放到CQ中去
-7. Host消费WC
+1.  Host提交工作请求(Work Request 即 **WR**)到工作队列(Work Queue 即 **WQ**): WR中描述了应用希望传输到Channel对端的消息内容，WR通知QP中的某个工作队列WQ（即WQ可为SQ或者RQ）。
+
+    工作队列的每一个元素叫做 Work Queue Element 即 **WQE**, 也就是WR在WQ中被转化的格式。
+
+    WQE等待RNIC的异步调度解析，并从WQE指向的Buffer中拿到真正的消息发送到Channel对端。
+2. Host从完成队列(CQ)中获取工作完成(WC): 完成队列CQ用来知会用户WQ上的消息已经被处理完，CQ里的每一个元素叫做 Complete Queue Element 即 **CQE**, 也就是WC。
+3.  具有RDMA引擎的硬件(hardware)就是一个队列元素处理器。 RDMA硬件不断地从工作队列(WQ)中去取工作请求(WR)来执行，执行完了就给完成队列(CQ)中放置工作完成(WC)。
+
+    从**生产者-消费者**的角度理解就是：
+
+    1. Host生产WR, 把WR放到WQ中去
+    2. RDMA硬件消费WR
+    3. RDMA硬件生产WC, 把WC放到CQ中去
+    4. Host消费WC
 
 ![img](https://s2.loli.net/2022/08/25/RvNoKOmFsAif4J6.jpg)
+
+<figure><img src="../.gitbook/assets/image.png" alt=""><figcaption></figcaption></figure>
 
 #### **3.2.3 其他**
 
 RDMA有两种基本操作：
 
-* `Memory verbs`:  包括RDMA read、write 和 atomic 操作。这些操作**指定远程地址进行操作并且绕过接收者的CPU**。
-* `Messaging verbs`:  包括RDMA send、receive操作。这些动作**涉及响应者的CPU，发送的数据被写入由响应者的CPU先前发布的接受所指定的地址**。
+* `Memory verbs`: 包括RDMA read、write 和 atomic 操作。这些操作**指定远程地址进行操作并且绕过接收者的CPU**。
+* `Messaging verbs`: 包括RDMA send、receive操作。这些动作**涉及响应者的CPU，发送的数据被写入由响应者的CPU先前发布的接受所指定的地址**。
 
 RDMA传输分为可靠和不可靠的，并且可以连接和不连接的（数据报）。
 
@@ -207,25 +238,27 @@ RDMA传输分为可靠和不可靠的，并且可以连接和不连接的（数�
 
 ![](https://tjcug.github.io/blog/images/pasted-63.png)
 
-细说数据传输：
+细说**数据传输**：
 
-1 RDMA Send | RDMA发送(/接收)操作 （Send/Recv）
+<mark style="color:purple;">①</mark> **RDMA Send | RDMA发送(/接收)操作 （Send/Recv）**
 
-跟TCP/IP的send/recv是类似的，不同的是RDMA是基于消息的数据传输协议（而不是基于字节流的传输协议），所有数据包的组装都在RDMA硬件上完成的，也就是说OSI模型中的下面4层(传输层，网络层，数据链路层，物理层)都在RDMA硬件上完成。
+跟TCP/IP的send/recv是类似的，不同的是RDMA是**基于消息的数据传输协议**（而不是基于字节流的传输协议），所有数据包的组装都在RDMA硬件上完成的，也就是说OSI模型中的**下面4层**(传输层，网络层，数据链路层，物理层)都在RDMA硬件上完成。
 
-2 RDMA Read | RDMA读操作 (Pull)
+<mark style="color:purple;">②</mark> **RDMA Read | RDMA读操作 (Pull)**
 
 RDMA读操作本质上就是Pull操作, 把远程系统内存里的数据拉回到本地系统的内存里。
 
-3 RDMA Write | RDMA写操作 (Push)
+<mark style="color:purple;">③</mark> **RDMA Write | RDMA写操作 (Push)**
 
 RDMA写操作本质上就是Push操作，把本地系统内存里的数据推送到远程系统的内存里。
 
-4 RDMA Write with Immediate Data | 支持立即数的RDMA写操作
+<mark style="color:purple;">④</mark> **RDMA Write with Immediate Data | 支持立即数的RDMA写操作**
 
-支持立即数的RDMA写操作本质上就是给远程系统Push(推送)带外(OOB)数据, 这跟TCP里的带外数据是类似的。
+支持立即数的RDMA写操作本质上就是给远程系统Push带外(OOB)数据, 这跟TCP里的带外数据是类似的。
 
-可选地，immediate 4字节值可以与数据缓冲器一起发送。 该值作为接收通知的一部分呈现给接收者，并且不包含在数据缓冲器中。
+可选地，immediate 4字节值可以与数据缓冲器一起发送。&#x20;
+
+该值作为接收通知的一部分呈现给接收者，并且不包含在数据缓冲器中。
 
 #### 3.3 RDMA三种不同的硬件实现
 
@@ -286,40 +319,20 @@ RDMA 的工作过程如下:
 
 #### 3.7 RDMA操作细节
 
-RDMA提供了**基于消息队列的点对点通信**，每个应用都可以直接获取自己的消息，无需操作系统和协议栈的介入。
-
-消息服务建立在通信双方本端和远端应用之间创建的**Channel-IO**连接之上。
-
-当应用需要通信时，就会创建一条Channel连接，每条Channel的首尾端点是两对**Queue Pairs**（**QP**）。每对QP由Send Queue（**SQ**）和Receive Queue（**RQ**）构成，这些队列中管理着各种类型的消息。
-
-QP会被映射到应用的虚拟地址空间，使得应用直接通过它访问RNIC网卡。
-
-除了QP描述的两种基本队列之外，RDMA还提供一种队列Complete Queue（**CQ**），CQ用来知会用户**WQ**上的消息已经被处理完。
-
-RDMA提供了一套软件传输接口，方便用户创建传输请求Work Request(**WR**），WR中描述了应用希望传输到Channel对端的消息内容，WR通知QP中的某个队列Work Queue(**WQ)**。
-
-在WQ中，用户的WR被转化为Work Queue Element（**WQE**）的格式，等待RNIC的异步调度解析，并从WQE指向的Buffer中拿到真正的消息发送到Channel对端。
-
-RDMA是一种host-offload, host-bypass技术，允许应用程序(包括存储)在它们的内存空间之间直接做数据传输。具有RDMA引擎的以太网卡(RNIC)--而不是host--负责管理源和目标之间的可靠连接。使用RNIC的应用程序之间使用专注的QP和CQ进行通讯：
-
-1. 每一个应用程序可以有很多QP和CQ
-2. 每一个QP包括一个SQ和RQ
-3. 每一个CQ可以跟多个SQ或者RQ相关联
-
-![](https://tjcug.github.io/blog/images/pasted-69.png)
+**单边操作**传输方式是RDMA与传统网络传输的最大不同，只需提供直接访问远程的虚拟地址，无须远程应用的参与其中，这种方式适用于批量数据传输。
 
 READ和WRITE是单边操作，只需要本端明确信息的**源和目的地址**，远端应用不必感知此次通信，数据的读或写都通过RDMA在RNIC与应用Buffer之间完成，再由远端RNIC封装成消息返回到本端。
 
-单边操作传输方式是RDMA与传统网络传输的最大不同，只需提供直接访问远程的虚拟地址，无须远程应用的参与其中，这种方式适用于批量数据传输。
+**双边操作**与传统网络的底层Buffer Pool类似，收发双方的参与过程并无差别，区别在零拷贝、Kernel Bypass，实际上对于RDMA，这是一种复杂的消息传输模式，多用于传输短的控制消息。
 
 **3.7.1 RDAM单边操作 (RDMA READ)**
 
 对于单边操作，以存储网络环境下的存储为例，数据的流程如下：
 
 1. 首先A、B建立连接，QP已经创建并且初始化。
-2. 数据被存档在B的buffer地址VB，注意VB应该提前注册到B的RNIC (并且它是一个Memory Region) ，并拿到返回的local key，相当于RDMA操作这块buffer的权限。
-3. B把数据地址VB，key封装到专用的报文传送到A，这相当于B把数据buffer的操作权交给了A。同时B在它的WQ中注册进一个WR，以用于接收数据传输的A返回的状态。
-4. A在收到B的送过来的数据VB和R\_key后，RNIC会把它们连同自身存储地址VA到封装RDMA READ请求，将这个消息请求发送给B，这个过程A、B两端不需要任何软件参与，就可以将B的数据存储到B的VA虚拟地址。
+2. 数据被存档在B的buffer地址`VB`，注意`VB`应该提前**注册**到B的RNIC (并且它是一个`Memory Region`) ，并拿到返回的`local key`，相当于RDMA操作这块buffer的权限。
+3. B把数据地址`VB`，`key`封装到专用的报文传送到A，这相当于B把数据buffer的操作权交给了A。同时B在它的WQ中注册进一个WR，以用于接收数据传输的A返回的状态。
+4. A在收到B的送过来的数据`VB`和`key`后，RNIC会把它们连同自身存储地址`VA`到封装`RDMA READ`请求，将这个消息请求发送给B，这个过程A、B两端不需要任何软件参与，就可以将B的数据存储到B的VA虚拟地址。
 5. B在存储完成后，会向A返回整个数据传输的状态信息。
 
 **3.7.2 RDMA 单边操作 (RDMA WRITE)**
@@ -327,20 +340,19 @@ READ和WRITE是单边操作，只需要本端明确信息的**源和目的地址
 对于单边操作，以存储网络环境下的存储为例，数据的流程如下：
 
 1. 首先A、B建立连接，QP已经创建并且初始化。
-2. 数据remote目标存储buffer地址VB，注意VB应该提前注册到B的RNIC(并且它是一个Memory Region)，并拿到返回的local key，相当于RDMA操作这块buffer的权限。
-3. B把数据地址VB，key封装到专用的报文传送到A，这相当于B把数据buffer的操作权交给了A。同时B在它的WQ中注册进一个WR，以用于接收数据传输的A返回的状态。
-4. A在收到B的送过来的数据VB和R\_key后，RNIC会把它们连同自身发送地址VA到封装RDMA WRITE请求，这个过程A、B两端不需要任何软件参与，就可以将A的数据发送到B的VB虚拟地址。
-5. A在发送数据完成后，会向B返回整个数据传输的状态信息。\
-   单边操作传输方式是RDMA与传统网络传输的最大不同，只需提供直接访问远程的虚拟地址，无须远程应用的参与其中，这种方式适用于批量数据传输。
+2. 数据remote目标存储buffer地址`VB`，注意`VB`应该提前注册到B的RNIC(并且它是一个`Memory Region`)，并拿到返回的`local key`，相当于RDMA操作这块buffer的权限。
+3. B把数据地址`VB`，`key`封装到专用的报文传送到A，这相当于B把数据buffer的操作权交给了A。同时B在它的WQ中注册进一个WR，以用于接收数据传输的A返回的状态。
+4. A在收到B的送过来的数据`VB`和`key`后，RNIC会把它们连同自身发送地址`VA`到封装`RDMA WRITE`请求，这个过程A、B两端不需要任何软件参与，就可以将A的数据发送到B的VB虚拟地址。
+5. A在发送数据完成后，会向B返回整个数据传输的状态信息。
 
 **3.7.3 RDMA 双边操作 (RDMA SEND/RECEIVE)**
 
-RDMA中SEND/RECEIVE是双边操作，即必须要远端的应用感知参与才能完成收发。在实际中，SEND/RECEIVE多用于连接控制类报文，而数据报文多是通过READ/WRITE来完成的。\
+RDMA中SEND/RECEIVE是双边操作，即必须要远端的应用感知参与才能完成收发。
+
+在实际中，SEND/RECEIVE多用于连接**控制类报文**，而**数据报文**多是通过READ/WRITE来完成的。\
 对于双边操作为例，主机A向主机B(下面简称A、B)发送数据的流程如下：
 
 1. 首先，A和B都要创建并初始化好各自的QP，CQ
 2. A和B分别向自己的WQ中注册WQE，对于A，WQ=SQ，WQE描述指向一个等到被发送的数据；对于B，WQ=RQ，WQE描述指向一块用于存储数据的Buffer。
 3. A的RNIC异步调度轮到A的WQE，解析到这是一个SEND消息，从Buffer中直接向B发出数据。数据流到达B的RNIC后，B的WQE被消耗，并把数据直接存储到WQE指向的存储位置。
-4. AB通信完成后，A的CQ中会产生一个完成消息CQE表示发送完成。与此同时，B的CQ中也会产生一个完成消息表示接收完成。每个WQ中WQE的处理完成都会产生一个CQE。\
-   双边操作与传统网络的底层Buffer Pool类似，收发双方的参与过程并无差别，区别在零拷贝、Kernel Bypass，实际上对于RDMA，这是一种复杂的消息传输模式，多用于传输短的控制消息。
-
+4. AB通信完成后，A的CQ中会产生一个完成消息CQE表示发送完成。与此同时，B的CQ中也会产生一个完成消息表示接收完成。每个WQ中WQE的处理完成都会产生一个CQE。
