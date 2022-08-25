@@ -118,15 +118,19 @@ Access:  send、receive、read、write、atomic操作
 
 #### 3.2 RDMA基本概念与术语
 
-#### **3.2.1 基本术语**
+##### **3.2.1 基本术语**
 
-**Fabric：**所谓Fabric，就是支持RDMA的局域网(LAN)。
+① **Fabric**
+
+所谓Fabric，就是支持RDMA的局域网(LAN)。
 
 ```
 A local-area RDMA network is usually referred to as a fabric.
 ```
 
-**CA(Channel Adapter)：**CA是Channel Adapter(通道适配器)的缩写。那么，CA就是将系统连接到Fabric的硬件组件。&#x20;
+② **CA(Channel Adapter)：**
+
+CA是Channel Adapter(通道适配器)的缩写。那么，CA就是将系统连接到Fabric的硬件组件。&#x20;
 
 在IBTA中，一个CA就是IB子网中的一个终端结点(End Node)。
 
@@ -142,28 +146,86 @@ A local-area RDMA network is usually referred to as a fabric.
 A channel adapter is the hardware component that connects a system to the fabric.
 ```
 
-**Verbs**：在RDMA的持续演进中，有一个组织叫做OpenFabric Alliance所做的贡献可谓功不可没。 Verbs这个词不好翻译，大致可以理解为访问RDMA硬件的“一组标准动作”。 每一个Verb可以理解为一个Function。
+③ **Verbs**：
 
-#### **3.2.2 核心概念**
+在RDMA的持续演进中，有一个组织叫做OpenFabric Alliance所做的贡献可谓功不可没。 Verbs这个词不好翻译，大致可以理解为访问RDMA硬件的“一组标准动作”。 每一个Verb可以理解为一个Function。
 
-****
+#####  **3.2.2 核心概念**
+
+① **Memory Registration(MR) | 内存注册**
+
+RDMA 就是用来对内存进行数据传输。那么怎样才能对内存进行传输，很简单，注册。 因为RDMA硬件对用来做数据传输的内存是有特殊要求的。
+
+- 在数据传输过程中，应用程序不能修改数据所在的内存。
+- 操作系统不能对数据所在的内存进行page out操作 -- 物理地址和虚拟地址的映射必须是固定不变的。
+
+注意无论是DMA或者RDMA都要求物理地址连续，这是由DMA引擎所决定的。 那么怎么进行内存注册呢？
+
+- 创建两个key (local和remote)指向需要操作的内存区域
+- 注册的keys是数据传输请求的一部分
+
+注册一个Memory Region之后，这个时候这个Memory Region也就有了它自己的属性：
+
+- context : RDMA操作上下文
+- addr : MR被注册的Buffer地址
+- length : MR被注册的Buffer长度
+- lkey：MR被注册的本地key
+- rkey：MR被注册的远程key
+
+对Memrory Registration：Memory Registration只是RDMA中对内存保护的一种措施，只有将要操作的内存注册到RDMA Memory Region中，这快操作的内存就交给RDMA 保护域来操作了。这个时候我们就可以对这快内存进行操作，至于操作的起始地址、操作Buffer的长度，可以根据程序的具体需求进行操作。我们只要保证接受方的Buffer 接受的长度大于等于发送的Buffer长度。
+
+② **Queues | 队列**
+
+RDMA一共支持三种队列，发送队列(SQ)和接收队列(RQ)，完成队列(CQ)。其中，SQ和RQ通常成对创建，被称为Queue Pairs(QP)。
+
+RDMA是基于消息的传输协议，数据传输都是异步操作。 RDMA操作其实很简单，可以理解为：
+
+1. Host提交工作请求(WR)到工作队列(WQ): 工作队列包括发送队列(SQ)和接收队列(RQ)。工作队列的每一个元素叫做WQE, 也就是WR。
+2. Host从完成队列(CQ）中获取工作完成(WC): 完成队列里的每一个叫做CQE, 也就是WC。
+3. 具有RDMA引擎的硬件(hardware)就是一个队列元素处理器。 RDMA硬件不断地从工作队列(WQ)中去取工作请求(WR)来执行，执行完了就给完成队列(CQ)中放置工作完成(WC)。从生产者-消费者的角度理解就是：
+4. Host生产WR, 把WR放到WQ中去
+5. RDMA硬件消费WR
+6. RDMA硬件生产WC, 把WC放到CQ中去
+7. Host消费WC
+
+![img](https://s2.loli.net/2022/08/25/RvNoKOmFsAif4J6.jpg)
 
 #### **3.2.3 其他**
 
 RDMA有两种基本操作：
 
-* Memory verbs:  包括RDMA read、write和atomic操作。这些操作**指定远程地址进行操作并且绕过接收者的CPU**。
-* Messaging verbs:  包括RDMA send、receive操作。这些动作**涉及响应者的CPU，发送的数据被写入由响应者的CPU先前发布的接受所指定的地址**。
+* `Memory verbs`:  包括RDMA read、write 和 atomic 操作。这些操作**指定远程地址进行操作并且绕过接收者的CPU**。
+* `Messaging verbs`:  包括RDMA send、receive操作。这些动作**涉及响应者的CPU，发送的数据被写入由响应者的CPU先前发布的接受所指定的地址**。
 
 RDMA传输分为可靠和不可靠的，并且可以连接和不连接的（数据报）。
 
 凭借可靠的传输，NIC使用确认来保证消息的按序传送。不可靠的传输不提供这样的保证。
 
-然而，像InfiniBand这样的现代RDMA实现使用了一个无损链路层，它可以防止使用链路层流量控制的基于拥塞的损失\[1]，以及使用链路层重传的基于位错误的损失\[8]。因此，不可靠的传输很少会丢弃数据包。
+然而，像InfiniBand这样的现代RDMA实现使用了一个无损链路层，它可以防止使用链路层流量控制的基于拥塞的损失，以及使用链路层重传的基于位错误的损失。因此，不可靠的传输很少会丢弃数据包。
 
 **目前的RDMA硬件提供一种数据报传输：不可靠的数据报（UD），并且不支持memory verbs。**
 
 ![](https://tjcug.github.io/blog/images/pasted-63.png)
+
+细说数据传输：
+
+1 RDMA Send | RDMA发送(/接收)操作 （Send/Recv）
+
+跟TCP/IP的send/recv是类似的，不同的是RDMA是基于消息的数据传输协议（而不是基于字节流的传输协议），所有数据包的组装都在RDMA硬件上完成的，也就是说OSI模型中的下面4层(传输层，网络层，数据链路层，物理层)都在RDMA硬件上完成。
+
+2 RDMA Read | RDMA读操作 (Pull)
+
+RDMA读操作本质上就是Pull操作, 把远程系统内存里的数据拉回到本地系统的内存里。
+
+3 RDMA Write | RDMA写操作 (Push)
+
+RDMA写操作本质上就是Push操作，把本地系统内存里的数据推送到远程系统的内存里。
+
+4 RDMA Write with Immediate Data | 支持立即数的RDMA写操作
+
+支持立即数的RDMA写操作本质上就是给远程系统Push(推送)带外(OOB)数据, 这跟TCP里的带外数据是类似的。
+
+可选地，immediate 4字节值可以与数据缓冲器一起发送。 该值作为接收通知的一部分呈现给接收者，并且不包含在数据缓冲器中。
 
 #### 3.3 RDMA三种不同的硬件实现
 
