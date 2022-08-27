@@ -2,7 +2,7 @@
 description: RDMA 入门介绍
 ---
 
-# 😍 RDMA
+# 😍 Import
 
 RDMA(RemoteDirect Memory Access)技术全称**远程直接内存访问**，就是为了解决网络传输中服务器端数据处理的延迟而产生的。它将数据直接从一台计算机的内存传输到另一台计算机，无需双方操作系统的介入。这允许高吞吐、低延迟的网络通信，尤其适合在大规模并行计算机集群中使用。
 
@@ -219,7 +219,7 @@ RDMA是基于消息的传输协议，数据传输都是异步操作。 RDMA操�
 
 ![img](https://s2.loli.net/2022/08/25/RvNoKOmFsAif4J6.jpg)
 
-<figure><img src="../.gitbook/assets/image.png" alt=""><figcaption></figcaption></figure>
+<figure><img src="../../.gitbook/assets/image (2).png" alt=""><figcaption></figcaption></figure>
 
 #### **3.2.3 其他**
 

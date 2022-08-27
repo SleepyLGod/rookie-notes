@@ -2,7 +2,7 @@
 description: 参考原文：https://medium.com/uv-labs/uniswap-testing-1d88ca523bf0
 ---
 
-# ⛏ 对接 Uniswap V2 兑换代币
+# 😭 对接 Uniswap V2 兑换代币
 
 > [**Uniswap**](https://learnblockchain.cn/tags/Uniswap)
 

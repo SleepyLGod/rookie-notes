@@ -2,7 +2,7 @@
 
 先放一个官方文档中的总架构图：
 
-![基于 RocksDB 的分布式 KV 数据库架构](<../../.gitbook/assets/image (2) (2).png>)
+![基于 RocksDB 的分布式 KV 数据库架构](<../../.gitbook/assets/image (2) (2) (1).png>)
 
 一些基本名词：
 
