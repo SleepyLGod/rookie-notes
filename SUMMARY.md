@@ -1,11 +1,11 @@
 # Table of contents
 
-* [😁 🦸♂Hi there 👋](README.md)
-* [🦸♂ 🦸♂  Block Chain](<README (1).md>)
-  * [😈 Uniswap-v2 合约概览](block-chain/uniswapv2-contracts-guide.md)
+* [😁 Hi there 👋](README.md)
+* [🦸♂ Block Chain](<README (1).md>)
+  * [😡 Uniswap-v2 合约概览](block-chain/uniswapv2-contracts-guide.md)
   * [😭 对接 Uniswap V2 兑换代币](block-chain/how-to-swap.md)
-  * [😱 bignumer.js中常见运算](readme/bignumer.js-zhong-chang-jian-yun-suan.md)
-* [🦸♂ 🦸♂  Key-value Storage](key-value-storage/README.md)
+  * [🤓 bignumer.js中常见运算](readme/bignumer.js-zhong-chang-jian-yun-suan.md)
+* [🦸♂ Key-value Storage](key-value-storage/README.md)
   * [😇 MetaData](key-value-storage/metadata.md)
   * [😇 CAP therom](key-value-storage/cap-therom.md)
   * [😇 LSM Tree](key-value-storage/lsm-tree.md)
@@ -24,7 +24,7 @@
     * [😚 Optimization](key-value-storage/rocksdb/optimization.md)
   * [🤩 TiKV](key-value-storage/tikv/README.md)
     * [🥳 General](key-value-storage/tikv/general.md)
-* [🦸 🦸♂ DPU &](dpu-and.md)
+* [🦸 DPU Plus](dpu-and.md)
   * [😄 General](dpu-and/general.md)
   * [😁 Meson](dpu-and/meson.md)
   * [😁 SSD](dpu-and/ssd.md)
@@ -43,7 +43,7 @@
     * [😆 Shared Receive Queue](dpu-and/rdma/shared-receive-queue.md)
     * [😆 Verbs](dpu-and/rdma/verbs.md)
     * [🥲 用户态与内核态交互](dpu-and/rdma/yong-hu-tai-yu-nei-he-tai-jiao-hu.md)
-* [🦸♂ 🦸♂  Utils](utils/README.md)
+* [🦸♂ Utils](utils/README.md)
   * [😅 typename or class?](utils/typename-or-class.md)
   * [😁 RALL](utils/rall.md)
   * [🥲 Smart Pointers](utils/smart-pointers.md)
@@ -56,7 +56,7 @@
 
 ## Group 1
 
-* [🫂 🦸♂Personal diaries](group-1/personal-diaries/README.md)
+* [🫂 Personal diaries](group-1/personal-diaries/README.md)
   * [😑 2021中秋杂感](group-1/personal-diaries/2021-zhong-qiu-za-gan.md)
   * [😖 2022玉玉日记（一）](group-1/personal-diaries/2022-yu-yu-ri-ji-yi.md)
   * [😚 2022玉玉日记（二）](group-1/personal-diaries/2022-yu-yu-ri-ji-er.md)
