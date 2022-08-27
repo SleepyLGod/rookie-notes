@@ -1,5 +1,5 @@
 ---
-description: rdma学习
+description: RDMA 入门介绍
 ---
 
 # 😍 RDMA

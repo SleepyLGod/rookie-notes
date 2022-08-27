@@ -73,7 +73,7 @@ description: 组成架构与原理介绍
 
       ClockCache 还不稳定，不建议使用
 
-![查询操作](<../../.gitbook/assets/image (1).png>)
+![查询操作](<../../.gitbook/assets/image (1) (2).png>)
 
 #### **Write Buffer Manager**:
 
