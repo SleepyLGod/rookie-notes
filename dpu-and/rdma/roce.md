@@ -74,5 +74,5 @@ Soft-RoCE就是把本来应该卸载到硬件的封包和解析工作，又拿�
 
 下面这张图取自[**IBTA对于Soft-RoCE的介绍文章**](https://www.roceinitiative.org/wp-content/uploads/2016/11/SoftRoCE\_Paper\_FINAL.pdf)，左边是需要硬件的普通RoCE，右边是Soft-RoCE。可以看出普通RoCE是把协议栈卸载到RoCE NIC网卡实现的，而Soft-RoCE则是在软件协议栈中实现的。
 
-<figure><img src="../../.gitbook/assets/image.png" alt=""><figcaption><p>Soft-RoCE implements the packet processing otherwise managed by the RoCE NIC.</p></figcaption></figure>
+<figure><img src="../../.gitbook/assets/image (9).png" alt=""><figcaption><p>Soft-RoCE implements the packet processing otherwise managed by the RoCE NIC.</p></figcaption></figure>
 
