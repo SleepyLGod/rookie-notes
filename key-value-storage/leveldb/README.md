@@ -4,8 +4,6 @@ description: Some note about the famous LevelDB.
 
 # 🤩 LevelDB
 
-****
-
 ### **LevelDB 整体架构**
 
 ![LevelDB 整体架构](https://pic2.zhimg.com/v2-796529d39d931069e82629e73eefa8d1\_b.jpg)
