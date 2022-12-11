@@ -165,7 +165,7 @@ void LRUReplacer::Unpin(frame_id_t frame_id) {
 
 其实大抵可以如下图
 
-<figure><img src="../../../.gitbook/assets/image (3).png" alt=""><figcaption></figcaption></figure>
+<figure><img src="../../../.gitbook/assets/image (8).png" alt=""><figcaption></figcaption></figure>
 
 考虑这样一种情况。一个块被放入缓冲区，进程从缓冲区内存中读取块的内容。但是，当这个块被读取的时候，如果一个并发进程将这个块驱逐出来，并用一个不同的块替换它，读取旧块内容的进程(reader)将看到不正确的数据;如果块被驱逐时正在写入它，那么写入者最终会破坏替换块的内容。
 
@@ -183,7 +183,7 @@ void LRUReplacer::Unpin(frame_id_t frame_id) {
 
 这里用了hash表来实现`page_table`来映射`page_id`和`frame_i`
 
-<figure><img src="../../../.gitbook/assets/image (8).png" alt=""><figcaption></figcaption></figure>
+<figure><img src="../../../.gitbook/assets/image (12).png" alt=""><figcaption></figcaption></figure>
 
 #### 2. 实现[#](https://www.cnblogs.com/JayL-zxl/p/14311883.html#2-%E5%AE%9E%E7%8E%B0) <a href="#2-shi-xian" id="2-shi-xian"></a>
 
@@ -586,7 +586,7 @@ DiskManager::DiskManager(const std::string &db_file)
  ./test/buffer_pool_manager_tes
 ```
 
-<figure><img src="../../../.gitbook/assets/image (7).png" alt=""><figcaption></figcaption></figure>
+<figure><img src="../../../.gitbook/assets/image (10).png" alt=""><figcaption></figcaption></figure>
 
 **4.2 cmu官网测试**[**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#42-cmu%E5%AE%98%E7%BD%91%E6%B5%8B%E8%AF%95)
 
