@@ -13,6 +13,8 @@
       * [😌 Pre: B & B+](databases/cmu-15-445/b+-tree-index/pre-b-and-b+.md)
       * [🤣 Pre:  B+Tree](databases/cmu-15-445/b+-tree-index/pre-b+tree.md)
       * [😂 Expand](databases/cmu-15-445/b+-tree-index/expand.md)
+      * [😂 Expand2: Delete](databases/cmu-15-445/b+-tree-index/expand2-delete.md)
+      * [😂 Expand3: Index\_Iterator](databases/cmu-15-445/b+-tree-index/expand3-index\_iterator.md)
     * [😉 Query Execution](databases/cmu-15-445/query-execution.md)
     * [😉 Concurrency Control](databases/cmu-15-445/concurrency-control.md)
   * [😆 CMU 15-645](databases/cmu-15-645.md)
