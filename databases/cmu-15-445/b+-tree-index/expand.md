@@ -23,10 +23,10 @@
 * B+ Tree Internal Page
 * B+ Tree Leaf Page
 
-#### 1. B+ Tree Parent Page[#](https://www.cnblogs.com/JayL-zxl/p/14324297.html#1-b-tree-parent-page) <a href="#1-b-tree-parent-page" id="1-b-tree-parent-page"></a>
+#### <mark style="color:purple;">1.</mark>  B+ Tree Parent Page <a href="#1-b-tree-parent-page" id="1-b-tree-parent-page"></a>
 
 这是内部页和叶页都继承的父类，它只包含两个子类共享的信息。父页面被划分为如下表所示的几个字段。\
-\*_B+Tree Parent Page Content_
+`*`_`B+Tree Parent Page Content`_
 
 | Variable Name      | Size | Description                             |
 | ------------------ | ---- | --------------------------------------- |
@@ -37,13 +37,20 @@
 | parent\_page\_id\_ | 4    | Parent Page Id                          |
 | page\_id\_         | 4    | Self Page Id                            |
 
-您必须在指定的文件中实现您的父页。您只能修改头文件(`src/include/storage/page/b_plus_tree_page.h`) 和其对应的源文件 (`src/storage/page/b_plus_tree_page.cpp`).
+必须在指定的文件中实现父页。只能修改头文件(`src/include/storage/page/b_plus_tree_page.h`) 和其对应的源文件 (`src/storage/page/b_plus_tree_page.cpp`).
 
 这里都是一些简单的set、get就不写出来了
 
-#### 2. B+TREE INTERNAL PAGE[#](https://www.cnblogs.com/JayL-zxl/p/14324297.html#2-btree-internal-page) <a href="#2-btree-internal-page" id="2-btree-internal-page"></a>
+* `IsRootPage` 函数根据 `parent_id_` 是否是 `INVALID_PAGE_ID` 返回 `true` 或者 `false`
+* `GetMinSize()`：需要区分 **1**）根结点且为叶子结点  **2**）根结点  **3**）其他
 
-内部页不存储任何实际数据，而是存储有序的m个键条目和m + 1个指针（也称为page\_id）。 由于指针的数量不等于键的数量，因此将第一个键设置为无效，并且查找方法应始终从第二个键开始。 任何时候，每个内部页面至少有一半已满。 在删除期间，可以将两个半满页面合并为合法页面，或者可以将其重新分配以避免合并，而在插入期间，可以将一个完整页面分为两部分。
+#### <mark style="color:purple;">2.</mark> B+TREE INTERNAL PAGE <a href="#2-btree-internal-page" id="2-btree-internal-page"></a>
+
+内部页不存储任何实际数据，而是存储有序的m个键条目和m + 1个指针（也称为page\_id）。&#x20;
+
+由于指针的数量不等于键的数量，因此将第一个键设置为无效，并且查找方法应始终从第二个键开始。&#x20;
+
+任何时候，每个内部页面至少有一半已满。 在删除期间，可以将两个半满页面合并为合法页面，或者可以将其重新分配以避免合并，而在插入期间，可以将一个完整页面分为两部分。
 
 你只能修改头文件(`src/include/storage/page/b_plus_tree_internal_page.h`) 和对应的源文件(`src/page/b_plus_tree_internal_page.cpp`).
 
