@@ -100,18 +100,20 @@ INDEXITERATOR_TYPE &INDEXITERATOR_TYPE::operator++() {
 
 {% code overflow="wrap" %}
 ```cpp
-const MappingType &INDEXITERATOR_TYPE::operator*() { return curr_page->GetItem(curr_index); }
+const MappingType &INDEXITERATOR_TYPE::operator*() { 
+    return curr_page->GetItem(curr_index); 
+}
 ```
 {% endcode %}
 
-## 5. 并发机制的实现[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#5-%E5%B9%B6%E5%8F%91%E6%9C%BA%E5%88%B6%E7%9A%84%E5%AE%9E%E7%8E%B0)[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#5-%E5%B9%B6%E5%8F%91%E6%9C%BA%E5%88%B6%E7%9A%84%E5%AE%9E%E7%8E%B0)
+## 5. 并发机制的实现
 
-### 0. 首先复习一下读写🔒机制[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#0-%E9%A6%96%E5%85%88%E5%A4%8D%E4%B9%A0%E4%B8%80%E4%B8%8B%E8%AF%BB%E5%86%99%E6%9C%BA%E5%88%B6)[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#0-%E9%A6%96%E5%85%88%E5%A4%8D%E4%B9%A0%E4%B8%80%E4%B8%8B%E8%AF%BB%E5%86%99%E6%9C%BA%E5%88%B6)
+### 0. 首先复习一下读写🔒机制&#x20;
 
 1. 读操作是可以多个进程之间共享latch的而写操作则必须互斥
 2. 加入`MaxReader`数就是为了防止等待的⌛️写进程饥饿
 
-### **首先来看如果没有🔒机制多线程会发生什么问题**[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#%E9%A6%96%E5%85%88%E6%9D%A5%E7%9C%8B%E5%A6%82%E6%9E%9C%E6%B2%A1%E6%9C%89%E6%9C%BA%E5%88%B6%E5%A4%9A%E7%BA%BF%E7%A8%8B%E4%BC%9A%E5%8F%91%E7%94%9F%E4%BB%80%E4%B9%88%E9%97%AE%E9%A2%98)
+### **首先来看如果没有🔒机制多线程会发生什么问题**
 
 1. 线程T1想要删除44。
 2. 线程T2 想要查找41
@@ -128,9 +130,9 @@ const MappingType &INDEXITERATOR_TYPE::operator*() { return curr_page->GetItem(c
 
 ![image-20210126184901306](https://raw.githubusercontent.com/SleepyLGod/images/dev/markdown/2282357-20210126201708545-1250779663.png)
 
-### **由此我们需要读写🔒的存在**[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#%E7%94%B1%E6%AD%A4%E6%88%91%E4%BB%AC%E9%9C%80%E8%A6%81%E8%AF%BB%E5%86%99%E7%9A%84%E5%AD%98%E5%9C%A8)
+### **由此我们需要读写🔒的存在**
 
-1. #### 对于find操作[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#%E5%AF%B9%E4%BA%8Efind%E6%93%8D%E4%BD%9C)
+1. #### 对于find操作
 
 > 由于我们是只读操作，所以我们到下一个结点的时候就可以释放上一个结点的Latch
 
@@ -138,7 +140,7 @@ const MappingType &INDEXITERATOR_TYPE::operator*() { return curr_page->GetItem(c
 
 剩下的操作都是一样的
 
-### 对于`delete`则不一样[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#%E5%AF%B9%E4%BA%8Edelete%E5%88%99%E4%B8%8D%E4%B8%80%E6%A0%B7)
+### 对于`delete`则不一样
 
 > 因为我们需要写操作
 
