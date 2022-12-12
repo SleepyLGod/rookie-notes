@@ -10,6 +10,7 @@
     * [😉 Buffer Pool](databases/cmu-15-445/buffer-pool/README.md)
       * [😄 Expand](databases/cmu-15-445/buffer-pool/page-1.md)
     * [😉 B+ Tree Index](databases/cmu-15-445/b+-tree-index/README.md)
+      * [😌 Pre: B & B+](databases/cmu-15-445/b+-tree-index/pre-b-and-b+.md)
       * [🤣 Pre:  B+Tree](databases/cmu-15-445/b+-tree-index/pre-b+tree.md)
       * [😂 Expand](databases/cmu-15-445/b+-tree-index/expand.md)
     * [😉 Query Execution](databases/cmu-15-445/query-execution.md)

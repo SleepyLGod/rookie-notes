@@ -123,7 +123,7 @@ class BPlusTree{
 
 首先附上书上的b+树插入算法
 
-<figure><img src="../../../.gitbook/assets/image (7).png" alt=""><figcaption></figcaption></figure>
+<figure><img src="../../../.gitbook/assets/image (17).png" alt=""><figcaption></figcaption></figure>
 
 **对上面几种情况的分析**
 
@@ -355,7 +355,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recipient) {
 
 这个函数的实现先看一下书上给出的算法
 
-<figure><img src="../../../.gitbook/assets/image (3).png" alt=""><figcaption></figcaption></figure>
+<figure><img src="../../../.gitbook/assets/image (18).png" alt=""><figcaption></figcaption></figure>
 
 1. 如果`old_node`就是根节点，那么就要创建一个新的节点R当作根节点。然后取`key`的值当作根节点的值。修改`old_node`和`new_node`的父指针。以及根节点的孩子指针
 
@@ -409,12 +409,12 @@ else {
 
 好了第一部分的测试就通过了
 
-<figure><img src="../../../.gitbook/assets/image.png" alt=""><figcaption></figcaption></figure>
+<figure><img src="../../../.gitbook/assets/image (7).png" alt=""><figcaption></figcaption></figure>
 
 附上一个pass的截图完成第一部分✅\
 如果我们插入1、2、3、4、5那么我们用程序得到的结果如下：
 
-<figure><img src="../../../.gitbook/assets/image (9).png" alt=""><figcaption></figcaption></figure>
+<figure><img src="../../../.gitbook/assets/image (20).png" alt=""><figcaption></figcaption></figure>
 
 可以发现是完全正确的 🌟
 

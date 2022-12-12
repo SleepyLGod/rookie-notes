@@ -219,7 +219,7 @@ RDMA是基于消息的传输协议，数据传输都是异步操作。 RDMA操�
 
 ![img](https://s2.loli.net/2022/08/25/RvNoKOmFsAif4J6.jpg)
 
-<figure><img src="../../.gitbook/assets/image (2).png" alt=""><figcaption></figcaption></figure>
+<figure><img src="../../.gitbook/assets/image (2) (2).png" alt=""><figcaption></figcaption></figure>
 
 #### **3.2.3 其他**
 

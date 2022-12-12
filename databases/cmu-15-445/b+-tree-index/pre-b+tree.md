@@ -27,11 +27,11 @@ B+树由叶子节点和内部节点组成，和其它树结构差不多，但是
 
 假设叶子结点最多能容纳个n个(KEY, RID)对，那么该叶子节点任何时候都不能少于n/2向上取整个(KEY, RID)对。假设(KEY, RID)对个数为x，那么x必须满足：
 
-```
+```markdown
 ceil(n/2) <= x <= n
 ```
 
-ceil表示向上取整，博客园不支持LaTeX o(╯□╰)o。\
+ceil 表示向上取整。\
 KEY是search key，RID是该KEY对应的记录的位置。(KEY, RID)对按照KEY的増序进行排列。\
 HEADER的结构如下：
 
@@ -41,7 +41,7 @@ HEADER的结构如下：
  * ---------------------------------------------------------------------------------------
 ```
 
-ParentPageId指向父节点。
+`ParentPageId` 指向父节点。
 
 #### 内部节点 <a href="#nei-bu-jie-dian" id="nei-bu-jie-dian"></a>
 
@@ -60,7 +60,7 @@ ceil(n/2) <= x <= n
 KEY表示search key，PAGE\_ID指的是子节点的ID。\
 (KEY, PAGE\_ID)对按照KEY的増序进行排列。\
 第一个KEY是无效的。\
-假设PAGE\_ID(i)对应的子树中的KEY用SUB\_KEY表示，那么SUBKEY都满足：KEY(i) <= SUB\_KEY < KEY(i+1)。\
+假设PAGE\_ID(i)对应的子树中的KEY用SUB\_KEY表示，那么SUBKEY都满足：`KEY(i) <= SUB_KEY < KEY(i+1)`。\
 
 
 <figure><img src="https://blog-1253119293.cos.ap-beijing.myqcloud.com/cmu-15445/lab2/lab2_1_page_node.PNG" alt=""><figcaption></figcaption></figure>
@@ -68,14 +68,16 @@ KEY表示search key，PAGE\_ID指的是子节点的ID。\
 ### 查找操作 <a href="#cha-zhao-cao-zuo" id="cha-zhao-cao-zuo"></a>
 
 课本p489给出了find的伪代码。总结来说就是先找到KEY应该出现的叶子节点，然后在该叶子节点中，查找KEY对应的RID。\
-如下图：\
-\
-假如我们希望查找的KEY为38，第一步在根节点A查找38应该出现在哪个子节点中，根据之前的性质，38应该出现在以B为根的子树中，继续查找节点B，以此类推，最终38应该出现在H的叶子节点中。最后我们在H中查找38。\
-所以对于内部节点，我们需要一个Lookup(const KeyType \&key,const KeyComparator \&comparator)方法，查找key应该出现在哪个子节点对应的子树中。
+如下图：
 
 <figure><img src="https://blog-1253119293.cos.ap-beijing.myqcloud.com/cmu-15445/lab2/lab2_2_find.PNG" alt=""><figcaption></figcaption></figure>
 
-```php
+\
+假如我们希望查找的KEY为38，第一步在根节点A查找38应该出现在哪个子节点中，根据之前的性质，38应该出现在以B为根的子树中，继续查找节点B，以此类推，最终38应该出现在H的叶子节点中。最后我们在H中查找38。\
+所以对于内部节点，我们需要一个`Lookup(const KeyType &key, const KeyComparator &comparator)`方法，查找key应该出现在哪个子节点对应的子树中。
+
+{% code overflow="wrap" lineNumbers="true" %}
+```cpp
 INDEX_TEMPLATE_ARGUMENTS
 ValueType
 B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
@@ -113,6 +115,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     }
 }
 ```
+{% endcode %}
 
 因为KEY是已排序的，所以可以先二分查找第一个大于或等于KEY的下标targetIndex，如果targetIndex对应的KEY就是我们要找的KEY，那么targetIndex对应的value就是下一步要搜索的节点，否则targetIndex-1对应的value是下一步应该搜索的节点。
 
@@ -127,7 +130,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     如上图准备插入(7, 'g')，但是插入前p1叶子结点已经满了，那么先插入，然后将插入后的节点，分裂出新的节点p3，将p1原来一半的元素挪到p3，然后将(6, p3)插入到父节点p2中，其中6是新创建的节点p3第一个key。\
     同样的，如果我们在父节点p2中插入了(6, p3)导致了p2超过最大限制，p2也需要分裂，以此类推，这个过程可能产生新的根节点。
 
-    <figure><img src="https://blog-1253119293.cos.ap-beijing.myqcloud.com/cmu-15445/lab2/lab2_3_insert.png" alt=""><figcaption></figcaption></figure>
+    <figure><img src="https://blog-1253119293.cos.ap-beijing.myqcloud.com/cmu-15445/lab2/lab2_3_insert.png" alt=""><figcaption><p>img.png</p></figcaption></figure>
 
 ### 删除操作 <a href="#shan-chu-cao-zuo" id="shan-chu-cao-zuo"></a>
 
