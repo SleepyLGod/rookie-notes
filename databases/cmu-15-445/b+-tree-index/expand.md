@@ -1,10 +1,6 @@
----
-description: Project 2
----
-
 # 😂 Expand
 
-### 1. 实验介绍 <a href="#1-shi-yan-jie-shao" id="1-shi-yan-jie-shao"></a>
+### 1. 实验介绍[#](https://www.cnblogs.com/JayL-zxl/p/14324297.html#1-%E5%AE%9E%E9%AA%8C%E4%BB%8B%E7%BB%8D) <a href="#1-shi-yan-jie-shao" id="1-shi-yan-jie-shao"></a>
 
 > 第一个打分点---实现b+树的基本结构、插入、搜索操作
 >
@@ -27,10 +23,10 @@ description: Project 2
 * B+ Tree Internal Page
 * B+ Tree Leaf Page
 
-#### <mark style="color:purple;">1.</mark>  B+ Tree Parent Page <a href="#1-b-tree-parent-page" id="1-b-tree-parent-page"></a>
+#### 1. B+ Tree Parent Page[#](https://www.cnblogs.com/JayL-zxl/p/14324297.html#1-b-tree-parent-page) <a href="#1-b-tree-parent-page" id="1-b-tree-parent-page"></a>
 
 这是内部页和叶页都继承的父类，它只包含两个子类共享的信息。父页面被划分为如下表所示的几个字段。\
-`*`_`B+Tree Parent Page Content`_
+\*_B+Tree Parent Page Content_
 
 | Variable Name      | Size | Description                             |
 | ------------------ | ---- | --------------------------------------- |
@@ -41,20 +37,13 @@ description: Project 2
 | parent\_page\_id\_ | 4    | Parent Page Id                          |
 | page\_id\_         | 4    | Self Page Id                            |
 
-必须在指定的文件中实现父页。只能修改头文件(`src/include/storage/page/b_plus_tree_page.h`) 和其对应的源文件 (`src/storage/page/b_plus_tree_page.cpp`).
+您必须在指定的文件中实现您的父页。您只能修改头文件(`src/include/storage/page/b_plus_tree_page.h`) 和其对应的源文件 (`src/storage/page/b_plus_tree_page.cpp`).
 
 这里都是一些简单的set、get就不写出来了
 
-* `IsRootPage` 函数根据 `parent_id_` 是否是 `INVALID_PAGE_ID` 返回 `true` 或者 `false`
-* `GetMinSize()`：需要区分 **1**）根结点且为叶子结点  **2**）根结点  **3**）其他
+#### 2. B+TREE INTERNAL PAGE[#](https://www.cnblogs.com/JayL-zxl/p/14324297.html#2-btree-internal-page) <a href="#2-btree-internal-page" id="2-btree-internal-page"></a>
 
-#### <mark style="color:purple;">2.</mark> B+TREE INTERNAL PAGE <a href="#2-btree-internal-page" id="2-btree-internal-page"></a>
-
-内部页不存储任何实际数据，而是存储有序的m个键条目和m + 1个指针（也称为page\_id）。&#x20;
-
-由于指针的数量不等于键的数量，因此将第一个键设置为无效，并且查找方法应始终从第二个键开始。&#x20;
-
-任何时候，每个内部页面至少有一半已满。 在删除期间，可以将两个半满页面合并为合法页面，或者可以将其重新分配以避免合并，而在插入期间，可以将一个完整页面分为两部分。
+内部页不存储任何实际数据，而是存储有序的m个键条目和m + 1个指针（也称为page\_id）。 由于指针的数量不等于键的数量，因此将第一个键设置为无效，并且查找方法应始终从第二个键开始。 任何时候，每个内部页面至少有一半已满。 在删除期间，可以将两个半满页面合并为合法页面，或者可以将其重新分配以避免合并，而在插入期间，可以将一个完整页面分为两部分。
 
 你只能修改头文件(`src/include/storage/page/b_plus_tree_internal_page.h`) 和对应的源文件(`src/page/b_plus_tree_internal_page.cpp`).
 
@@ -68,19 +57,13 @@ description: Project 2
 ```
 {% endcode %}
 
-#### <mark style="color:purple;">3.</mark>  B+TREE LEAF PAGE <a href="#3-btree-leaf-page" id="3-btree-leaf-page"></a>
+#### 3. B+TREE LEAF PAGE[#](https://www.cnblogs.com/JayL-zxl/p/14324297.html#3-btree-leaf-page) <a href="#3-btree-leaf-page" id="3-btree-leaf-page"></a>
 
-叶子页存储有序的m个键条目(key)和m个值条目(value)。&#x20;
+叶子页存储有序的m个键条目(key)和m个值条目(value)。 在您的实现中，值只能是用于定位实际元组存储位置的64位`record_id`，请参阅`src / include / common / rid.h`中定义的`RID`类。 叶子页与内部页在键/值对的数量上具有相同的限制，并且应该遵循相同的合并，重新分配和拆分操作。您必须在指定的文件中实现内部页。 仅允许您修改头文件`（src / include / storage / page / b_plus_tree_leaf_page.h`）及其相应的源文件`（src / storage / page / b_plus_tree_leaf_page.cpp`）。
 
-实现中，值只能是用于定位实际元组存储位置的64位`record_id`，请参阅`src / include / common / rid.h`中定义的`RID`类。&#x20;
+**‼️重要的KeyIndex函数**[**#**](https://www.cnblogs.com/JayL-zxl/p/14324297.html#%EF%B8%8F%E9%87%8D%E8%A6%81%E7%9A%84keyindex%E5%87%BD%E6%95%B0)
 
-叶子页与内部页在键/值对的数量上具有相同的限制，并且应该遵循相同的合并，重新分配和拆分操作。
-
-必须在指定的文件中实现内部页。 仅允许修改头文件`（src / include / storage / page / b_plus_tree_leaf_page.h`）及其相应的源文件`（src / storage / page / b_plus_tree_leaf_page.cpp`）。
-
-<mark style="color:red;">**‼️**</mark>** 重要的KeyIndex函数**
-
-这个函数可以返回第一个>=当前key值的编号。这个在插入的时候经常会用到，这样就可以让代码重复利用，在`LevelDB`中也有类似的操作。
+这个函数可以返回第一个>=当前key值的编号。这个在插入的时候经常会用到，这样就可以让代码重复利用,在`LevelDB`中也有类似的操作。
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```cpp
@@ -106,19 +89,15 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyComparator
 ```
 {% endcode %}
 
-重要提示：尽管叶子页和内部页包含相同类型的键，但它们可能具有不同类型的值，因此叶子页和内部页的最大大小可能不同。
+重要提示：尽管叶子页和内部页包含相同类型的键，但它们可能具有不同类型的值，因此叶子页和内部页的最大大小可能不同。每个`B + Tree`叶子/内部页面对应从缓冲池获取的存储页面的内容（即data\_部分）。 因此，每次尝试读取或写入叶子/内部页面时，都需要首先使用其唯一的page\_id从缓冲池中提取页面，然后将其重新解释为叶子或内部页面，并在写入或删除后执行`unpin`操作。
 
-每个`B + Tree`叶子/内部页面对应从缓冲池获取的存储页面的内容（即data\_部分）。 因此，每次尝试读取或写入叶子/内部页面时，都需要首先使用其唯一的`page_id`从缓冲池中提取页面，然后将其重新解释为叶子或内部页面，并在写入或删除后执行`unpin`操作。
-
-### Task 2.A - B+TREE DATA STRUCTURE (INSERTION & POINT SEARCH) <a href="#task-2a---btree-data-structure-insertion--point-search" id="task-2a---btree-data-structure-insertion--point-search"></a>
+### Task 2.A - B+TREE DATA STRUCTURE (INSERTION & POINT SEARCH)[#](https://www.cnblogs.com/JayL-zxl/p/14324297.html#task-2a---btree-data-structure-insertion--point-search) <a href="#task-2a---btree-data-structure-insertion--point-search" id="task-2a---btree-data-structure-insertion--point-search"></a>
 
 > 其实就是实现`b_plus_tree.cpp/InsertIntoLeaf`函数所涉及到的相关函数。
 
-这里 B +树索引只能支持唯一键。 也就是说，当您尝试将具有重复键的键值对插入索引时，它应该返回`false`。
+您的B +树索引只能支持唯一键。 也就是说，当您尝试将具有重复键的键值对插入索引时，它应该返回`false`
 
-对于`checkpoint1`，仅需要B + Tree索引支持插入（`Insert`）和点搜索（`GetValue`）。 我们不需要实现删除操作。&#x20;
-
-插入后如果当前键/值对的数量等于`max_size`，则应该正确执行分割。 由于任何写操作都可能导致B + Tree索引中的`root_page_id`发生更改，因此要更新（`src / include / storage / page / header_page.h`）中的`root_page_id`，以确保索引在磁盘上具有持久性 。 在`BPlusTree`类中，我们已经为您实现了一个名为`UpdateRootPageId`的函数。 您需要做的就是在B + Tree索引的`root_page_id`更改时调用此函数。
+对于`checkpoint1`，仅需要B + Tree索引支持插入（`Insert`）和点搜索（GetValue）。 您不需要实现删除操作。 插入后如果当前键/值对的数量等于`max_size`，则应该正确执行分割。 由于任何写操作都可能导致B + Tree索引中的`root_page_id`发生更改，因此您有责任更新（`src / include / storage / page / header_page.h`）中的`root_page_id`，以确保索引在磁盘上具有持久性 。 在`BPlusTree`类中，我们已经为您实现了一个名为`UpdateRootPageId`的函数。 您需要做的就是在B + Tree索引的`root_page_id`更改时调用此函数。
 
 您的B + Tree实现必须隐藏key/value等的详细信息，建议使用如下结构：
 
@@ -148,13 +127,13 @@ class BPlusTree{
 
 **对上面几种情况的分析**
 
-#### **1. 如果当前为空树则创建一个叶子结点并且也是根节点** <a href="#1-ru-guo-dang-qian-wei-kong-shu-ze-chuang-jian-yi-ge-ye-zi-jie-dian-bing-qie-ye-shi-gen-jie-dian" id="1-ru-guo-dang-qian-wei-kong-shu-ze-chuang-jian-yi-ge-ye-zi-jie-dian-bing-qie-ye-shi-gen-jie-dian"></a>
+#### **1. 如果当前为空树则创建一个叶子结点并且也是根节点**[#](https://www.cnblogs.com/JayL-zxl/p/14324297.html#1-%E5%A6%82%E6%9E%9C%E5%BD%93%E5%89%8D%E4%B8%BA%E7%A9%BA%E6%A0%91%E5%88%99%E5%88%9B%E5%BB%BA%E4%B8%80%E4%B8%AA%E5%8F%B6%E5%AD%90%E7%BB%93%E7%82%B9%E5%B9%B6%E4%B8%94%E4%B9%9F%E6%98%AF%E6%A0%B9%E8%8A%82%E7%82%B9) <a href="#1-ru-guo-dang-qian-wei-kong-shu-ze-chuang-jian-yi-ge-ye-zi-jie-dian-bing-qie-ye-shi-gen-jie-dian" id="1-ru-guo-dang-qian-wei-kong-shu-ze-chuang-jian-yi-ge-ye-zi-jie-dian-bing-qie-ye-shi-gen-jie-dian"></a>
 
 * 这里是`leaf`结点所以这里需要用到`leaf page`内的函数
 * 注意这里需要用lab1实现的buffer池管理器来获得page。 这里记得创建完新的结点之后要unpin
 * 进行插入的时候用二分插入来进行优化
 
-**1. 创建新结点**
+**1. 创建新结点**[**#**](https://www.cnblogs.com/JayL-zxl/p/14324297.html#1-%E5%88%9B%E5%BB%BA%E6%96%B0%E7%BB%93%E7%82%B9)
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```cpp
@@ -206,7 +185,7 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &valu
 ```
 {% endcode %}
 
-#### 2. **否则寻找到插入元素应该在的叶子结点**，并插入(不分裂) <a href="#2-fou-ze-xun-zhao-dao-cha-ru-yuan-su-ying-gai-zai-de-ye-zi-jie-dian-bing-cha-ru-bu-fen-lie" id="2-fou-ze-xun-zhao-dao-cha-ru-yuan-su-ying-gai-zai-de-ye-zi-jie-dian-bing-cha-ru-bu-fen-lie"></a>
+#### 2. **否则寻找到插入元素应该在的叶子结点**，并插入(不分裂)[#](https://www.cnblogs.com/JayL-zxl/p/14324297.html#2-%E5%90%A6%E5%88%99%E5%AF%BB%E6%89%BE%E5%88%B0%E6%8F%92%E5%85%A5%E5%85%83%E7%B4%A0%E5%BA%94%E8%AF%A5%E5%9C%A8%E7%9A%84%E5%8F%B6%E5%AD%90%E7%BB%93%E7%82%B9%E5%B9%B6%E6%8F%92%E5%85%A5%E4%B8%8D%E5%88%86%E8%A3%82) <a href="#2-fou-ze-xun-zhao-dao-cha-ru-yuan-su-ying-gai-zai-de-ye-zi-jie-dian-bing-cha-ru-bu-fen-lie" id="2-fou-ze-xun-zhao-dao-cha-ru-yuan-su-ying-gai-zai-de-ye-zi-jie-dian-bing-cha-ru-bu-fen-lie"></a>
 
 1. 首先找到叶子结点
 2. 如果叶子结点内的元素个数小于最大值则直接插入
@@ -215,7 +194,7 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &valu
 
 如果叶子结点内的关键字小于m-1,则直接插入到叶子结点
 
-**1. LookUp函数实现**
+**1. LookUp函数实现**[**#**](https://www.cnblogs.com/JayL-zxl/p/14324297.html#1-lookup%E5%87%BD%E6%95%B0%E5%AE%9E%E7%8E%B0)
 
 > Lookup函数用来寻找包含输入"key"的children pointer(其实就是page\_id)
 
@@ -269,7 +248,7 @@ Page *BPLUSTREE_TYPE::FindLeafPage(const KeyType &key, bool leftMost) {
 ```
 {% endcode %}
 
-**3. 无分裂直接插入**
+**3. 无分裂直接插入**[**#**](https://www.cnblogs.com/JayL-zxl/p/14324297.html#3-%E6%97%A0%E5%88%86%E8%A3%82%E7%9B%B4%E6%8E%A5%E6%8F%92%E5%85%A5)
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```cpp
@@ -296,7 +275,7 @@ bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value, 
 ```
 {% endcode %}
 
-#### **3. 分裂的情况** <a href="#3-fen-lie-de-qing-kuang" id="3-fen-lie-de-qing-kuang"></a>
+#### **3. 分裂的情况**[#](https://www.cnblogs.com/JayL-zxl/p/14324297.html#3-%E5%88%86%E8%A3%82%E7%9A%84%E6%83%85%E5%86%B5) <a href="#3-fen-lie-de-qing-kuang" id="3-fen-lie-de-qing-kuang"></a>
 
 `InsertLeaf主函数`接上文。
 
@@ -317,7 +296,7 @@ bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value, 
 ```
 {% endcode %}
 
-**1. 调用`split`函数对叶子结点进行分割**
+**1. 调用`split`函数对叶子结点进行分割**[**#**](https://www.cnblogs.com/JayL-zxl/p/14324297.html#1-%E8%B0%83%E7%94%A8split%E5%87%BD%E6%95%B0%E5%AF%B9%E5%8F%B6%E5%AD%90%E7%BB%93%E7%82%B9%E8%BF%9B%E8%A1%8C%E5%88%86%E5%89%B2)
 
 1. split的时候会产生一个含有m-m/2个关键字的新结点。注意把两个叶子结点连接起来。
 2. 这里注意split函数要区分叶子结点和内部结点。因为叶子结点需要更新双向链表
@@ -372,7 +351,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recipient) {
 ```
 {% endcode %}
 
-**2. `InsertIntoParent`函数实现**
+**2. `InsertIntoParent`函数实现**[**#**](https://www.cnblogs.com/JayL-zxl/p/14324297.html#2-insertintoparent%E5%87%BD%E6%95%B0%E5%AE%9E%E7%8E%B0)
 
 这个函数的实现先看一下书上给出的算法
 
@@ -439,32 +418,33 @@ else {
 
 可以发现是完全正确的 🌟
 
-### 3. ⚠️一些细节 <a href="#3-yi-xie-xi-jie" id="3-yi-xie-xi-jie"></a>
+### 3. ⚠️一些细节[#](https://www.cnblogs.com/JayL-zxl/p/14324297.html#3-%EF%B8%8F%E4%B8%80%E4%BA%9B%E7%BB%86%E8%8A%82) <a href="#3-yi-xie-xi-jie" id="3-yi-xie-xi-jie"></a>
 
-#### 1. 关于内部结点和叶子结点的区别 <a href="#1-guan-yu-nei-bu-jie-dian-he-ye-zi-jie-dian-de-qu-bie" id="1-guan-yu-nei-bu-jie-dian-he-ye-zi-jie-dian-de-qu-bie"></a>
+#### 1. 关于内部结点和叶子结点的区别[#](https://www.cnblogs.com/JayL-zxl/p/14324297.html#1-%E5%85%B3%E4%BA%8E%E5%86%85%E9%83%A8%E7%BB%93%E7%82%B9%E5%92%8C%E5%8F%B6%E5%AD%90%E7%BB%93%E7%82%B9%E7%9A%84%E5%8C%BA%E5%88%AB) <a href="#1-guan-yu-nei-bu-jie-dian-he-ye-zi-jie-dian-de-qu-bie" id="1-guan-yu-nei-bu-jie-dian-he-ye-zi-jie-dian-de-qu-bie"></a>
 
-**1.1 大小不一样**
+**1.1 大小不一样**[**#**](https://www.cnblogs.com/JayL-zxl/p/14324297.html#11-%E5%A4%A7%E5%B0%8F%E4%B8%8D%E4%B8%80%E6%A0%B7)
 
-* 内部结点的最大结点个数是比叶子结点多一
-* 例如m = 3, 那么内部结点的个数就可以是3。而叶子结点则最多是2，但是内部结点的array\[0]实际上就是个存地址的。它的key在我们的Draw结果图中都不显示。
+> 内部结点的最大结点个数是比叶子结点多一
+>
+> 例如m = 3, 那么内部结点的个数就可以是3。而叶子结点则最多是2，但是内部结点的array\[0]实际上就是个存地址的。它的key在我们的Draw结果图中都不显示。
 
-**1.2 在`Split`的时候有区别**
+**1.2 在`Split`的时候有区别**[**#**](https://www.cnblogs.com/JayL-zxl/p/14324297.html#12-%E5%9C%A8split%E7%9A%84%E6%97%B6%E5%80%99%E6%9C%89%E5%8C%BA%E5%88%AB)
 
 * 在叶子结点split的时候需要进行双向链表的维护
 * 而在内部结点则不需要
 * 共有操作都是获得一个新页--> 类型转换 ---> MoveHalfTo
 
-#### 2. upin的pin的注意事项 <a href="#2upin-de-pin-de-zhu-yi-shi-xiang" id="2upin-de-pin-de-zhu-yi-shi-xiang"></a>
+#### 2. upin的pin的注意事项[#](https://www.cnblogs.com/JayL-zxl/p/14324297.html#2-upin%E7%9A%84pin%E7%9A%84%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9) <a href="#2upin-de-pin-de-zhu-yi-shi-xiang" id="2upin-de-pin-de-zhu-yi-shi-xiang"></a>
 
 * 当你利用`FetchPage`拿到一个page的时候他就是pined
 * 当你使用完之后记得要`unpin`这很重要
 
-#### 3. debug的一些小技巧 <a href="#3debug-de-yi-xie-xiao-ji-qiao" id="3debug-de-yi-xie-xiao-ji-qiao"></a>
+#### 3. debug的一些小技巧[#](https://www.cnblogs.com/JayL-zxl/p/14324297.html#3-debug%E7%9A%84%E4%B8%80%E4%BA%9B%E5%B0%8F%E6%8A%80%E5%B7%A7) <a href="#3debug-de-yi-xie-xiao-ji-qiao" id="3debug-de-yi-xie-xiao-ji-qiao"></a>
 
 * 利用[可视化网站](https://www.cs.usfca.edu/\~galles/visualization/BPlusTree.html)和代码中给的`b_plus_print_test`这个测试，把输入图打印成`xxx.dot`然后复制里面的内容在http://dreampuf.github.io/GraphvizOnline/显示进行对比。
 * 对于`Mac`系统利用Clion可以直接对测试文件debug。还是非常爽的。其中`lldb`的利用非常重要。
 
-#### 4. maxSize的含义 <a href="#4maxsize-de-han-yi" id="4maxsize-de-han-yi"></a>
+#### 4. maxSize的含义[#](https://www.cnblogs.com/JayL-zxl/p/14324297.html#4-maxsize%E7%9A%84%E5%90%AB%E4%B9%89) <a href="#4maxsize-de-han-yi" id="4maxsize-de-han-yi"></a>
 
 这里要注意在进行B+树初始化时候给的
 

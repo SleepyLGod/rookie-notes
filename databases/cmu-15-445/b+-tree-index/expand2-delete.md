@@ -58,17 +58,13 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveAndDeleteRecord(const KeyType &key, const 
 
 之后就是对于删除的处理，主要有两个一个是合并，一个就是redistribute。具体流程见下
 
-***
-
 ### **2.2 Coalesce实现流程**
 
 叶子结点内关键字个数小于最小值向下执行。调用删除的核心函数`CoalesceAndRedistribute`
 
-***
-
 **下面是CoalesceAndRedistribute的逻辑**
 
-#### 1.如果当前结点是根节点则调用`AdjustRoot(node)`[#](https://www.cnblogs.com/JayL-zxl/p/14329951.html#1%E5%A6%82%E6%9E%9C%E5%BD%93%E5%89%8D%E7%BB%93%E7%82%B9%E6%98%AF%E6%A0%B9%E8%8A%82%E7%82%B9%E5%88%99%E8%B0%83%E7%94%A8adjustrootnode)
+#### 1.如果当前结点是根节点则调用`AdjustRoot(node)`
 
 > 这里的提示给了其实这个函数就针对两种情况
 >
@@ -203,9 +199,8 @@ bool BPLUSTREE_TYPE::IsCoalesce(N *nodeL, N *nodeR) {
 ```cpp
 INDEX_TEMPLATE_ARGUMENTS
 template <typename N>
-bool BPLUSTREE_TYPE::Coalesce(N **neighbor_node, N **node,
-                              BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> **parent, int index,
-                              Transaction *transaction) {
+bool BPLUSTREE_TYPE::Coalesce(N **neighbor_node, N **node, BPlusTreeInternalPage<KeyType, 
+                              page_id_t, KeyComparator> **parent, int index, Transaction *transaction) {
   // Assume that *neighbor_node is the left sibling of *node
 
   // Move entries from node to neighbor_node
@@ -260,15 +255,9 @@ recipient->array_[recipient->GetSize()].first = middle_key;
 
 ![img](https://raw.githubusercontent.com/SleepyLGod/images/dev/markdown/2282357-20210928222415485-1180061675.png)
 
-***
-
 ![img](https://raw.githubusercontent.com/SleepyLGod/images/dev/markdown/2282357-20210928222424947-555321315.png)
 
-***
-
 ![img](https://raw.githubusercontent.com/SleepyLGod/images/dev/markdown/2282357-20210928222432879-1318082133.png)
-
-***
 
 ![img](https://raw.githubusercontent.com/SleepyLGod/images/dev/markdown/2282357-20210928222439373-98329057.png)
 
@@ -279,7 +268,7 @@ recipient->array_[recipient->GetSize()].first = middle_key;
 > 3. 内部结点左边借
 > 4. 内部结点右边借
 
-#### 1. 对于叶子结点向左边借的情况[#](https://www.cnblogs.com/JayL-zxl/p/14329951.html#1-%E5%AF%B9%E4%BA%8E%E5%8F%B6%E5%AD%90%E7%BB%93%E7%82%B9%E5%90%91%E5%B7%A6%E8%BE%B9%E5%80%9F%E7%9A%84%E6%83%85%E5%86%B5)
+#### 1. 对于叶子结点向左边借的情况
 
 好了删除算法已经实现了。首先我们可以通过test函数
 

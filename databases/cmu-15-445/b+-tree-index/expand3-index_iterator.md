@@ -6,22 +6,26 @@
 
 其中idx表示当前page中的第几个tuple
 
-```
+{% code lineNumbers="true" %}
+```cpp
 INDEXITERATOR_TYPE::IndexIterator(LeafPage *leftmost_leaf, int idx, BufferPoolManager *buffer_pool_manager)
     : curr_page(leftmost_leaf), curr_index(idx), bpm(buffer_pool_manager) {}
 ```
+{% endcode %}
 
 ### 1. 首先我们来看begin函数的实现[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#1-%E9%A6%96%E5%85%88%E6%88%91%E4%BB%AC%E6%9D%A5%E7%9C%8Bbegin%E5%87%BD%E6%95%B0%E7%9A%84%E5%AE%9E%E7%8E%B0)[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#1-%E9%A6%96%E5%85%88%E6%88%91%E4%BB%AC%E6%9D%A5%E7%9C%8Bbegin%E5%87%BD%E6%95%B0%E7%9A%84%E5%AE%9E%E7%8E%B0)
 
 1. 利用key值找到叶子结点
 2. 然后获取当前key值的index就是begin的位置
 
-```
+{% code lineNumbers="true" %}
+```cpp
 Page *page = FindLeafPage(KeyType{}, true);  // leftmost_leaf pinned
   LeafPage *leftmost_leaf = reinterpret_cast<LeafPage *>(page->GetData());
   buffer_pool_manager_->UnpinPage(leftmost_leaf->GetPageId(), false);
   return INDEXITERATOR_TYPE(leftmost_leaf, 0, buffer_pool_manager_);
 ```
+{% endcode %}
 
 ### 2. end函数的实现[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#2-end%E5%87%BD%E6%95%B0%E7%9A%84%E5%AE%9E%E7%8E%B0)[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#2-end%E5%87%BD%E6%95%B0%E7%9A%84%E5%AE%9E%E7%8E%B0)
 
@@ -31,7 +35,8 @@ Page *page = FindLeafPage(KeyType{}, true);  // leftmost_leaf pinned
 
 `end`函数
 
-```
+{% code lineNumbers="true" %}
+```cpp
 // find the right most page
   Page *page = FindLeafPage(KeyType{}, true);  // page pinned
   LeafPage *leaf = reinterpret_cast<LeafPage *>(page->GetData());
@@ -46,12 +51,14 @@ Page *page = FindLeafPage(KeyType{}, true);  // leftmost_leaf pinned
 
   return INDEXITERATOR_TYPE(leaf, leaf->GetSize(), buffer_pool_manager_);
 ```
+{% endcode %}
 
 `==和 !=`函数
 
 这里注意在！= 那里不能写成itr != \*this
 
-```
+{% code lineNumbers="true" %}
+```cpp
 INDEX_TEMPLATE_ARGUMENTS
 bool INDEXITERATOR_TYPE::operator==(const IndexIterator &itr) const {
   return itr.curr_page == curr_page && itr.curr_index == curr_index;
@@ -60,14 +67,16 @@ bool INDEXITERATOR_TYPE::operator==(const IndexIterator &itr) const {
 INDEX_TEMPLATE_ARGUMENTS
 bool INDEXITERATOR_TYPE::operator!=(const IndexIterator &itr) const { return !(itr == *this); }
 ```
+{% endcode %}
 
-### 3. 重载++和\*(解引用符号)[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#3-%E9%87%8D%E8%BD%BD%E5%92%8C%E8%A7%A3%E5%BC%95%E7%94%A8%E7%AC%A6%E5%8F%B7)[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#3-%E9%87%8D%E8%BD%BD%E5%92%8C%E8%A7%A3%E5%BC%95%E7%94%A8%E7%AC%A6%E5%8F%B7)
+### 3. 重载++和\*(解引用符号)
 
 1. 重载++
 
 > 简单的index++然后设置nextPageId即可
 
-```
+{% code lineNumbers="true" %}
+```cpp
 INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE &INDEXITERATOR_TYPE::operator++() {
   curr_index++;
@@ -83,14 +92,17 @@ INDEXITERATOR_TYPE &INDEXITERATOR_TYPE::operator++() {
   return *this;
 }
 ```
+{% endcode %}
 
 1. 重载\*
 
 > return array\[index]即可
 
-```
+{% code overflow="wrap" %}
+```cpp
 const MappingType &INDEXITERATOR_TYPE::operator*() { return curr_page->GetItem(curr_index); }
 ```
+{% endcode %}
 
 ## 5. 并发机制的实现[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#5-%E5%B9%B6%E5%8F%91%E6%9C%BA%E5%88%B6%E7%9A%84%E5%AE%9E%E7%8E%B0)[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#5-%E5%B9%B6%E5%8F%91%E6%9C%BA%E5%88%B6%E7%9A%84%E5%AE%9E%E7%8E%B0)
 
@@ -138,7 +150,7 @@ const MappingType &INDEXITERATOR_TYPE::operator*() { return curr_page->GetItem(c
 
 ![image-20210126190229333](https://raw.githubusercontent.com/SleepyLGod/images/dev/markdown/2282357-20210126201823967-455255873.png)
 
-### 对于`Insert`操作[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#%E5%AF%B9%E4%BA%8Einsert%E6%93%8D%E4%BD%9C)
+### 对于`Insert`操作
 
 这里我们就可以安全的释放掉A的锁。因为B中还有空位，我们插入是不会对A造成影响的
 
@@ -152,7 +164,7 @@ const MappingType &INDEXITERATOR_TYPE::operator*() { return curr_page->GetItem(c
 
 ![img](https://raw.githubusercontent.com/SleepyLGod/images/dev/markdown/2282357-20210126202003618-880373652.png)
 
-### **这里要引入乐观🔒**[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#%E8%BF%99%E9%87%8C%E8%A6%81%E5%BC%95%E5%85%A5%E4%B9%90%E8%A7%82)
+### **这里要引入乐观🔒**
 
 > 乐观的假设大部分操作是不需要进行合并和分裂的。因此在我们向下的时候都是读Latch而不是写Latch。只有在叶子结点才是write Latch
 
@@ -165,7 +177,7 @@ const MappingType &INDEXITERATOR_TYPE::operator*() { return curr_page->GetItem(c
 
 ![image-20210126192548748](https://raw.githubusercontent.com/SleepyLGod/images/dev/markdown/2282357-20210126202108649-568164667.png)
 
-### **B-Link Tree简介**[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#b-link-tree%E7%AE%80%E4%BB%8B)
+### **B-Link Tree简介**
 
 > 延迟更新父结点
 
@@ -202,14 +214,15 @@ const MappingType &INDEXITERATOR_TYPE::operator*() { return curr_page->GetItem(c
 
 ![img](https://raw.githubusercontent.com/SleepyLGod/images/dev/markdown/754297-20160131225332443-857830570.jpg)
 
-## 6. 辅助函数分析[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#6-%E8%BE%85%E5%8A%A9%E5%87%BD%E6%95%B0%E5%88%86%E6%9E%90)
+## 6. 辅助函数分析
 
-### 1. 辅助函数`UnlockUnpinPages`的实现[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#1-%E8%BE%85%E5%8A%A9%E5%87%BD%E6%95%B0unlockunpinpages%E7%9A%84%E5%AE%9E%E7%8E%B0)[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#1-%E8%BE%85%E5%8A%A9%E5%87%BD%E6%95%B0unlockunpinpages%E7%9A%84%E5%AE%9E%E7%8E%B0)
+### 1. 辅助函数`UnlockUnpinPages`的实现
 
 1. 如果是读操作则释放read锁
 2. 否则释放write锁
 
-```
+{% code lineNumbers="true" %}
+```cpp
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::
 UnlockUnpinPages(Operation op, Transaction *transaction) {
@@ -238,10 +251,12 @@ UnlockUnpinPages(Operation op, Transaction *transaction) {
   node_mutex_.unlock();
   }
 ```
+{% endcode %}
 
 四个自带的解锁和上锁操作
 
-```
+{% code lineNumbers="true" %}
+```cpp
 /** Acquire the page write latch. */
 inline void WLatch() { rwlatch_.WLock(); }
 
@@ -254,6 +269,7 @@ inline void RLatch() { rwlatch_.RLock(); }
 /** Release the page read latch. */
 inline void RUnlatch() { rwlatch_.RUnlock(); }
 ```
+{% endcode %}
 
 这里的rwlatch是自己实现的读写锁类下面来探究一下这个类
 
@@ -266,7 +282,8 @@ inline void RUnlatch() { rwlatch_.RUnlock(); }
     3. 如果之前已经有了现在的操作就需要等(这个线程处于阻塞状态)
     4. 当前如果有其他线程执行读操作。则仍需要阻塞(别人读的时候你不能写)
 
-    ```
+    {% code lineNumbers="true" %}
+    ```cpp
     void WLock() {
       std::unique_lock<mutex_t> latch(mutex_);
       while (writer_entered_) {
@@ -278,18 +295,21 @@ inline void RUnlatch() { rwlatch_.RUnlock(); }
       }
     }
     ```
+    {% endcode %}
 2.  `WunLock`函数
 
     1. 写标记置为false
     2. 然后通知所有的线程
 
-    ```
+    {% code lineNumbers="true" %}
+    ```cpp
     void WUnlock() {
       std::lock_guard<mutex_t> guard(mutex_);
       writer_entered_ = false;
       reader_.notify_all();
     }
     ```
+    {% endcode %}
 3.  `RLock`函数
 
     1. 如果当前有人在写或者已经有最多的人读了则阻塞
@@ -297,7 +317,8 @@ inline void RUnlatch() { rwlatch_.RUnlock(); }
 
     因为是允许多个线程一起读这样并不会出错
 
-    ```
+    {% code lineNumbers="true" %}
+    ```cpp
     void RLock() {
       std::unique_lock<mutex_t> latch(mutex_);
       while (writer_entered_ || reader_count_ == MAX_READERS) {
@@ -306,13 +327,15 @@ inline void RUnlatch() { rwlatch_.RUnlock(); }
       reader_count_++;
     }
     ```
+    {% endcode %}
 4.  `RUnLatch`函数
 
     1. 计数--
     2. 如果当前有人在写并且无人读的话需要通知所有其他线程
     3. 如果在计数--之前达到了最大读数，释放这个锁之后需要通知其他线程，现在又可以读了。
 
-    ```
+    {% code lineNumbers="true" %}
+    ```cpp
     void RUnlock() {
       std::lock_guard<mutex_t> guard(mutex_);
       reader_count_--;
@@ -327,12 +350,13 @@ inline void RUnlatch() { rwlatch_.RUnlock(); }
       }
     }
     ```
+    {% endcode %}
 
-## 7. 并发索引实现[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#7-%E5%B9%B6%E5%8F%91%E7%B4%A2%E5%BC%95%E5%AE%9E%E7%8E%B0)
+## 7. 并发索引实现
 
-### 1. FindLeafPageRW的实现[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#1-findleafpagerw%E7%9A%84%E5%AE%9E%E7%8E%B0)
+### 1. FindLeafPageRW的实现
 
-#### 1. 1 整体思路[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#1-1-%E6%95%B4%E4%BD%93%E6%80%9D%E8%B7%AF)
+#### 1. 1 整体思路
 
 对于并发控制的实现，采用最简单的latch crabing方法实现，也就是上面讲的那种方法， 这种方法需要在找叶子结点的时候，从根节点到叶子结点的过程需要逐步加锁，然后检测是否能够释放。由于我们的插入和删除操作都需要先找到叶子结点，所以之前使用的无锁版本的`FindLeafPage`函数在并发条件下就并不适用了。因此这里需要实现一个**逐步加锁 + 逐步释放**的新函数
 
@@ -340,7 +364,8 @@ inline void RUnlatch() { rwlatch_.RUnlock(); }
 2. 如果是读操作，那则直接加锁，然后对上一层释放锁
 3. 如果是写操作，释放锁之前则要判断一下是否安全。
 
-```
+{% code lineNumbers="true" %}
+```cpp
 INDEX_TEMPLATE_ARGUMENTS
 Page *BPLUSTREE_TYPE::FindLeafPageRW(const KeyType &key, bool left_most, enum OpType op, Transaction *transaction) {
   Page *page = buffer_pool_manager_->FetchPage(root_page_id_);  // now root page is pin
@@ -367,6 +392,7 @@ Page *BPLUSTREE_TYPE::FindLeafPageRW(const KeyType &key, bool left_most, enum Op
   return page;
 }
 ```
+{% endcode %}
 
 #### 1.2 判断是否安全的函数[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#12-%E5%88%A4%E6%96%AD%E6%98%AF%E5%90%A6%E5%AE%89%E5%85%A8%E7%9A%84%E5%87%BD%E6%95%B0)
 
@@ -374,7 +400,8 @@ Page *BPLUSTREE_TYPE::FindLeafPageRW(const KeyType &key, bool left_most, enum Op
 2. 如果是删除状态。则只要当前node的size - 1 之后不会重分配或者合并，则为安全
 3. 对于根节点需要进行特殊判断，如果这个根节点是叶子结点则为安全（这种情况随便删）。否则根节点的大小必须大于2(因为如果等于2 ，减去1之后还是1。则是一个没有有效key值的结点，不安全)
 
-```
+{% code lineNumbers="true" %}
+```cpp
 INDEX_TEMPLATE_ARGUMENTS
 template <typename N>
 bool BPLUSTREE_TYPE::IsSafe(N *node, enum OpType op) {
@@ -397,6 +424,7 @@ bool BPLUSTREE_TYPE::IsSafe(N *node, enum OpType op) {
   return node->GetSize() > minSize(node);
 }
 ```
+{% endcode %}
 
 #### 1.3 把释放锁和unpin操作合并[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#13-%E6%8A%8A%E9%87%8A%E6%94%BE%E9%94%81%E5%92%8Cunpin%E6%93%8D%E4%BD%9C%E5%90%88%E5%B9%B6)
 
@@ -404,7 +432,8 @@ bool BPLUSTREE_TYPE::IsSafe(N *node, enum OpType op) {
 
 > transaction->GetPageSet(); 就是之前访问过的page集合
 
-```
+{% code lineNumbers="true" %}
+```cpp
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::UnlatchAndUnpin(enum OpType op,Transaction *transaction) const {
   if (transaction == nullptr) {
@@ -427,18 +456,19 @@ void BPLUSTREE_TYPE::UnlatchAndUnpin(enum OpType op,Transaction *transaction) co
   pages->clear();
 }
 ```
+{% endcode %}
 
-### 2. 支持并发的读写操作[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#2-%E6%94%AF%E6%8C%81%E5%B9%B6%E5%8F%91%E7%9A%84%E8%AF%BB%E5%86%99%E6%93%8D%E4%BD%9C)
+### 2. 支持并发的读写操作
 
 > 其实只需要之前博客1、2的非并发版本上做一些小小的改动
 
-#### 2.1 支持并发读[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#21-%E6%94%AF%E6%8C%81%E5%B9%B6%E5%8F%91%E8%AF%BB)
+#### 2.1 支持并发读
 
-#### 2.2 支持并发写[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#22-%E6%94%AF%E6%8C%81%E5%B9%B6%E5%8F%91%E5%86%99)
+#### 2.2 支持并发写
 
 > 这里要支持插入和删除两种写操作
 
-#### 1. 插入[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#1-%E6%8F%92%E5%85%A5)
+#### 1. 插入&#x20;
 
 1.  根据实验提示，首先需要获取对于根节点的锁。我个人认为是为了防止下面这种情况发生
 
@@ -456,7 +486,7 @@ void BPLUSTREE_TYPE::UnlatchAndUnpin(enum OpType op,Transaction *transaction) co
 
 完整代码就不贴了，在之前的insert上改一下就行了
 
-#### 2. 删除[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#2-%E5%88%A0%E9%99%A4)
+#### 2. 删除
 
 1. 对于删除首先要在remove上做和insert一样的处理
 2. 在核心函数`CoalesceOrRedistribute`中对兄弟结点做修改之前，先加写锁结束之后释放写锁就ok
