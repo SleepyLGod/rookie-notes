@@ -4,16 +4,17 @@ coverY: 0
 layout: editorial
 ---
 
-# 😁 🦸♂Hi there 👋
+# 😁 Hi there 👋
 
 ⚡ **This is a book containing my notes while studying, and some of my ideas.**
 
 **😎 About me:**
 
-* 🎓 Undergraduate study. @HUST China
-* 🔭 Research includes databases, distributed, blockchain and k-v storage, etc.
-* 🏆 Used to participate in some contests. **Won** the 1st prize🥇 of [the 17th **"Challenge Cup"** National College Student Curricular Academic Science and Technology Works Competition](http://mse.hust.edu.cn/info/1180/11133.htm).
-* 👑 Founder of [JumboArbitrage](https://github.com/JumboArbitrage) and [HUST-FOCUS](https://github.com/HUST-FOCUS).
-* ⚖️ Currently working on open-source software. Previously completed labs including cmu-15-445, mit6.824, and tinykv, etc.
-* 📫 Reach me at [2441164168lhd@gmail.com](mailto:2441164168lhd@gmail.com).
-* <img src="https://github.githubassets.com/images/icons/emoji/octocat.png" alt=":octocat:" data-size="line"> Github addrress: [https://github.com/SleepyLGod](https://github.com/SleepyLGod).
+* 🎓 Undergraduate study. @HUST China  @UCB USA
+* 🔭 Research includes blockchain, web3, databases, distributed, k-v storage, etc.
+* 🏆 Used to participate in some contests. [**Won the first prize🥇**](http://mse.hust.edu.cn/info/1180/11133.htm) of the 17th **"Challenge Cup"** National College Student Curricular Academic Science and Technology Works Competition.
+* 👑 Founder of [**JumboArbitrage**](https://github.com/JumboArbitrage) and [**HUST-FOCUS**](https://github.com/HUST-FOCUS).
+* 🌈 Currently working on some fantastic ideas.
+* ✨ **Fun fact**: [**A repo received some stars**](https://github.com/SleepyLGod/qwidget-demo) including several interesting Qt components when I'm a freshman at HUST.
+* 📫 Reach me at [**haodong.lu.me@gmail.com**](mailto:haodong.lu.me@gmail.com)
+* <img src="https://github.githubassets.com/images/icons/emoji/octocat.png" alt=":octocat:" data-size="line"> Github addrress: [SleepyLGod](https://github.com/SleepyLGod).

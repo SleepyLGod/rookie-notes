@@ -17,7 +17,6 @@
       * [😂 Expand3: Index\_Iterator](databases/cmu-15-445/b+-tree-index/expand3-index\_iterator.md)
     * [😉 Query Execution](databases/cmu-15-445/query-execution.md)
     * [😉 Concurrency Control](databases/cmu-15-445/concurrency-control.md)
-  * [😆 CMU 15-645](databases/cmu-15-645.md)
   * [😅 CMU 15-721](databases/cmu-15-721/README.md)
     * [😇 02 inmemory](databases/cmu-15-721/02-inmemory.md)
     * [😇 03 mvcc1](databases/cmu-15-721/03-mvcc1.md)
