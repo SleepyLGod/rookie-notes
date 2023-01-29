@@ -16,5 +16,6 @@ layout: editorial
 * 👑 Founder of [**JumboArbitrage**](https://github.com/JumboArbitrage) and [**HUST-FOCUS**](https://github.com/HUST-FOCUS).
 * 🌈 Currently working on some fantastic ideas.
 * ✨ **Fun fact**: [**A repo received some stars**](https://github.com/SleepyLGod/qwidget-demo) including several interesting Qt components when I'm a freshman at HUST.
-* 📫 Reach me at [**haodong.lu.me@gmail.com**](mailto:haodong.lu.me@gmail.com)
+* 📫 Reach me at [**haodong.lu.me@gmail.com**](mailto:haodong.lu.me@gmail.com)**.**
 * <img src="https://github.githubassets.com/images/icons/emoji/octocat.png" alt=":octocat:" data-size="line"> Github addrress: [SleepyLGod](https://github.com/SleepyLGod).
+* 🏠 Homepage at [**Sleepylgod.github.io**](https://sleepylgod.github.io/).
