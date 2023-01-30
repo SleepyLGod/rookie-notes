@@ -7,7 +7,11 @@ layout: editorial
 
 # 😁 Hi there 👋
 
-⚡ **This is a book containing my notes and some of my ideas.**
+{% hint style="success" %}
+⚡  **This is a book containing my notes and some of my ideas.**
+
+🙈  **Please note that I have indicated the source of the reprinted and modified articles. If it makes you uncomfortable, please get in touch with me quickly to delete it, sorry.**
+{% endhint %}
 
 **😎 About me:**
 
