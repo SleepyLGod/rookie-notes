@@ -25,4 +25,8 @@ coverY: 0
 
 [2022-yu-yu-ri-ji-wu.md](2022-yu-yu-ri-ji-wu.md "mention")
 {% endtab %}
+
+{% tab title="2023" %}
+[2023-liu-xue-ri-ji-yi.md](2023-liu-xue-ri-ji-yi.md "mention")
+{% endtab %}
 {% endtabs %}
