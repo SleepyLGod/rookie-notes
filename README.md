@@ -14,8 +14,8 @@ _🙈  **Please note that I have indicated the source of the reprinted and modif
 
 {% tabs %}
 {% tab title="😎 About Me" %}
-* 🎓 Undergraduate study. @HUST China  @UCB USA
-* 🔭 Research includes blockchain, web3, databases, distributed, k-v storage, etc.
+* 🎓 MPhil study. @CUHK HKSAR
+* 🔭 Research includes LLMSys, MLSys, DBMS, Distributed, K-V Storage, etc.
 * 🏆 Used to participate in some contests. [**Won the first prize🥇**](http://mse.hust.edu.cn/info/1180/11133.htm) of the 17th **"Challenge Cup"** National College Student Curricular Academic Science and Technology Works Competition.
 * 👑 Founder of [**JumboArbitrage**](https://github.com/JumboArbitrage) and [**HUST-FOCUS**](https://github.com/HUST-FOCUS).
 * 🌈 Currently working on some fantastic ideas.
