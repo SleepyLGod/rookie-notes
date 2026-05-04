@@ -103,8 +103,9 @@ bool LockManager::Unlock(Transaction *txn, const RID &#x26;rid) {
 
 ### TASK #3 - CONCURRENT QUERY EXECUTION
 
-* 对于 SeqScan：如果隔离级别是 `READ_UNCOMMITTED`，则不需要加锁；如果隔离级别是 `READ_COMMITTED` 和 `REPEATABLE_READ`，则访问某个 RID 时需要对它加 `S-Lock`
+* 对于 SeqScan：如果隔离级别是 `READ_UNCOMMITTED`，则不需要加锁；如果隔离级别是 `READ_COMMITTED` 和 `REPEATABLE_READ`，则访问某个 RID 时需要对它加 `S-Lock`。区别在释放时机：`READ_COMMITTED` 通常读完当前 tuple 后即可释放 `S-Lock`；`REPEATABLE_READ` 需要持有读锁直到事务结束，避免同一事务内重复读发生变化。
 * 对于 Delete 和 Update：如果当前 RID 拥有 `S-Lock`，则需要将 `S-Lock` 升级为 `X-Lock`，否则对这个 RID 加 `X-Lock`
+* 对于 Unlock：释放锁是否让事务进入 shrinking 状态，需要和隔离级别配套理解。`REPEATABLE_READ` 下释放锁后不能再获取新锁；`READ_COMMITTED` 下读锁可以较早释放，但写锁仍应持有到事务结束。
 
 ***
 

@@ -139,11 +139,11 @@ uint256[] memory amountsExpected = IUniswapV2Router(UNISWAP_V2_ROUTER).getAmount
 );
 ```
 
-最后，我们调用Uniswap Router的函数**swapExactTokensforTokens**，并传入参数。
+最后，我们调用 Uniswap Router 的函数 **swapExactTokensForTokens**，并传入参数。这个函数的第一个参数是精确输入金额 `amountIn`，第二个参数才是最小可接受输出金额 `amountOutMin`；不要把预估输出数组里的值误当成输入语义。
 
 ```solidity
 uint256[] memory amountsReceived = IUniswapV2Router(UNISWAP_V2_ROUTER).swapExactTokensForTokens(
-            amountsExpected[0],
+            _amountIn,
             (amountsExpected[1]*990)/1000, // 接受 1% 的滑点
             path,
             _to,

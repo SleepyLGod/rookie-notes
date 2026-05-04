@@ -1,6 +1,6 @@
-# 🤓 bignumer.js中常见运算
+# bignumber.js 中常见加减乘除运算
 
-
+链上金额、token decimals、wei 等场景不要先用 JavaScript `number` 表示再传给 BigNumber。`number` 本身已经可能发生二进制浮点精度损失，BigNumber 只能精确保存传入后的值。实际项目中优先使用字符串、整数最小单位，或从合约/SDK 返回的整数类型构造 BigNumber。
 
 ```html
 <!DOCTYPE html>
@@ -130,4 +130,4 @@
 </html>
 ```
 
-![](https://s2.loli.net/2022/07/24/UMR2nT81swWHCoS.png)
+![](https://img2020.cnblogs.com/blog/464394/202104/464394-20210429181728383-2021171392.png)

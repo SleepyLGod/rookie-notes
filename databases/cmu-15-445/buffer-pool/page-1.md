@@ -105,14 +105,13 @@ void LRUReplacer::Pin(frame_id_t frame_id) {
 ```cpp
 void LRUReplacer::Unpin(frame_id_t frame_id) {
   // 加入lru list中
-  latch.lock();
+  std::lock_guard<std::mutex> guard(latch);
   if (lruMap.count(frame_id) != 0) {
-    latch.unlock();
     return;
   }
   // if list size >= capacity
   // while {delete front}
-  while (Size() >= capacity) {
+  while (lru_list.size() >= capacity) {
      frame_id_t need_del = lru_list.front();
       lru_list.pop_front();
       lruMap.erase(need_del);
@@ -120,7 +119,6 @@ void LRUReplacer::Unpin(frame_id_t frame_id) {
   // insert
   lru_list.push_front(frame_id);
   lruMap[frame_id] = lru_list.begin();
-  latch.unlock();
 }
 
 ```

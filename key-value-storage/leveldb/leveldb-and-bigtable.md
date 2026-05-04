@@ -238,7 +238,7 @@ virtual Status Sync() {
 }
 ```
 
-因为向日志中写新记录都是顺序写的，所以它写入的速度非常快，当在内存中写入完成时，也会直接将缓冲区的这部分的内容 `fflush` 到磁盘上，实现对记录的持久化，用于之后的错误恢复等操作。
+因为向日志中写新记录都是顺序写的，所以写入速度通常比较快。需要注意的是，LevelDB 的持久化语义取决于 `WriteOptions.sync`：默认 `sync=false` 时，写入会进入日志文件路径，但不保证每次写都执行 `fdatasync`，因此掉电或 OS 崩溃仍可能丢失最近写入；只有 `sync=true` 时，才会在写日志后调用日志文件的 `Sync()`，获得更强的落盘保证。也就是说，WAL 负责崩溃恢复的基础结构，但“每次写都同步落盘”不是默认行为。
 
 **记录的插入**
 
@@ -329,7 +329,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key, std::string* va
 
 ![LevelDB-Level0-Laye](https://img.draveness.me/2017-08-12-LevelDB-Level0-Layer.jpg-1000width)
 
-查找的顺序就是从低到高了，**LevelDB 首先会在 Level0 中查找对应的键**。但是，与其他层级不同，**Level0 中多个 SSTable 的键的范围有重合部分的**，在查找对应值的过程中，会依次查找 Level0 中固定的 4 个 SSTable。
+查找的顺序就是从低到高了，**LevelDB 首先会在 Level0 中查找对应的键**。但是，与其他层级不同，**Level0 中多个 SSTable 的键的范围可以重叠**，因此读路径会按从新到旧的顺序检查所有 key range 覆盖目标 key 的 L0 文件。经典 LevelDB 中的 4 是 L0 compaction trigger 的默认值，不是一次查询最多检查的 L0 文件数量；当 L0 文件积压时，实际检查数量可能超过 4。
 
 ![LevelDB-LevelN-Layers](https://img.draveness.me/2017-08-12-LevelDB-LevelN-Layers.jpg-1000width)
 

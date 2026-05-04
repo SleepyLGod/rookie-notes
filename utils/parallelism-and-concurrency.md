@@ -58,7 +58,7 @@ int main() {
 
 由于 C++ 保证了所有栈对象在生命周期结束时会被销毁，所以这样的代码也是异常安全的。 无论 `critical_section()` 正常返回、还是在中途抛出异常，都会引发堆栈回退，也就自动调用了 `unlock()`。
 
-而 **`std::unique_lock`** 则是相对于 `std::lock_guard` 出现的，`std::unique_lock` 更加灵活， `std::unique_lock` 的对象会以独占所有权（没有其他的 `unique_lock` 对象同时拥有某个 `mutex` 对象的所有权） 的方式管理 `mutex` 对象上的上锁和解锁的操作。所以在并发编程中，推荐使用 `std::unique_lock`。
+而 **`std::unique_lock`** 则是相对于 `std::lock_guard` 更灵活的锁管理工具， `std::unique_lock` 的对象会以独占所有权（没有其他的 `unique_lock` 对象同时拥有某个 `mutex` 对象的所有权） 的方式管理 `mutex` 对象上的上锁和解锁操作。简单作用域加锁优先使用 `std::lock_guard`；需要延迟加锁、手动 `unlock`、移动锁对象或配合条件变量时，再使用 `std::unique_lock`。
 
 `std::lock_guard` 不能显式的调用 `lock` 和 `unlock`， 而 `std::unique_lock` 可以在声明后的任意位置调用， 可以缩小锁的作用范围，提供更高的并发度。
 
@@ -101,7 +101,7 @@ int main() {
 
 ### Condition Variable
 
-条件变量 `std::condition_variable` 是为了解决死锁而生，当互斥操作不够用而引入的。 比如，线程可能需要等待某个条件为真才能继续执行， 而一个忙等待循环中可能会导致所有其他线程都无法进入临界区使得条件为真时，就会发生死锁。 所以，`condition_variable` 实例被创建出现主要就是用于唤醒等待线程从而避免死锁。 `std::condition_variable`的 `notify_one()` 用于唤醒一个线程； `notify_all()` 则是通知所有线程。下面是一个生产者和消费者模型的例子：
+条件变量 `std::condition_variable` 用于让线程在某个条件尚未满足时阻塞等待，并在其他线程修改状态后被唤醒。它的核心价值是避免忙等，并正确处理“等待条件变化”这种同步模式；它不是专门为“解决死锁”而生。`std::condition_variable` 的 `notify_one()` 用于唤醒一个等待线程；`notify_all()` 则是通知所有等待线程。下面是一个生产者和消费者模型的例子：
 
 ```cpp
 #include <queue>

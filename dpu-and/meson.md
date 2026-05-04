@@ -6,7 +6,7 @@ description: meson 入门介绍
 
 ### Install
 
-Meson是基于python3实现，至少需要python3.5才能运行，默认采用ninja作为后端。\
+Meson 是基于 Python 3 实现的构建系统。当前官方文档要求 Python 3.10 或更新版本；旧版发行版仓库中的 Meson 可能要求更低，但新项目应按当前官方要求准备环境。Meson 默认采用 Ninja 作为后端。\
 在Ubuntu下最简单的是通过pip3安装
 
 ```shell
@@ -74,7 +74,6 @@ meson install
 ### Referance
 
 [https://mesonbuild.com/Reference-manual.html](https://mesonbuild.com/Reference-manual.html)
-
 
 
 

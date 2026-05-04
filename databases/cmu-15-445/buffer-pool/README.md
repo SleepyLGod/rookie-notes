@@ -24,7 +24,8 @@ description: 'PROJECT #1 - BUFFER POOL'
 #### Victim
 
 * 当 `Size()` 为 0 时返回 `false`
-* 取 `lru` 的头部元素给 `frame_id`，删除头部元素，并且在 `mp` 中删除 `frame_id`
+* 本笔记约定：链表头部表示最近刚变为可替换的 frame，链表尾部表示最久未使用的 frame。
+* `Victim` 取 `lru` 的尾部元素给 `frame_id`，删除尾部元素，并且在 `mp` 中删除 `frame_id`。
 
 #### Pin
 
@@ -34,7 +35,7 @@ description: 'PROJECT #1 - BUFFER POOL'
 #### Unpin
 
 * 如果 `frame_id` 已经在 `mp` 中了，那么直接返回
-* 否则的话将 `frame_id` 添加到 `lru` 的末尾，然后在 `mp` 中保存这个 `frame_id` 和它的迭代器（`--lru.end()`）
+* 否则的话将 `frame_id` 添加到 `lru` 的头部，然后在 `mp` 中保存这个 `frame_id` 和它的迭代器（`lru.begin()`）
 
 ***
 

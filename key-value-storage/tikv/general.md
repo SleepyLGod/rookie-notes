@@ -107,6 +107,8 @@ TiKV 的交易模型提供：
 * 带锁的**快照隔离（Snapshot isolation）**`SELECT ... FOR UPDATE`，语义类似于SQL
 * 分布式事务中的外部一致性读写
 
-TiKV 支持分布式事务，用户（或者 TiDB）可以一次性写入多个 key-value 而不必关心这些 key-value 是否处于同一个数据切片 (Region) 上，TiKV 通过**两阶段提交**保证了这些读写请求的 ACID 约束，详见 [TiDB 乐观事务模型](https://docs.pingcap.com/zh/tidb/dev/optimistic-transaction)（TiKV 的事务采用乐观锁，事务的执行过程中，不会检测写写冲突，只有在提交过程中，才会做冲突检测，冲突的双方中比较早完成提交的会写入成功，另一方会尝试重新执行整个事务）。
+TiKV 支持分布式事务，用户（或者 TiDB）可以一次性写入多个 key-value 而不必关心这些 key-value 是否处于同一个数据切片 (Region) 上，TiKV 通过 prewrite/commit 两阶段提交保证跨 Region 写入的事务语义。
 
-当业务的写入冲突不严重的情况下，这种模型性能会很好，比如随机更新表中某一行的数据，并且表很大。但是如果业务的写入冲突严重，性能就会很差，举一个极端的例子，就是计数器，多个客户端同时修改少量行，导致冲突严重的，造成大量的无效重试。
+需要注意的是，TiKV 不能再简单概括为“只采用乐观锁”。TiKV 早期先实现了 optimistic transaction：事务执行期间在客户端本地累积读写集合，提交 prewrite 时才锁定写入 key 并检测冲突；如果冲突严重，会产生较多重试。后来 TiKV 也支持 pessimistic transaction，并且悲观事务已经成为默认路径：`SELECT ... FOR UPDATE` 这类 locking read 会先读取并锁定 key，写语句执行时也会先加锁，但真正写入仍延迟到 prewrite/commit 阶段。
+
+因此，理解 TiKV 事务时应区分 optimistic 2PC、pessimistic locking read/write，以及 MVCC 下的 Snapshot Isolation / Read Committed 等隔离语义。业务写冲突不严重时乐观模型成本较低；热点行、计数器这类高冲突场景则更依赖悲观锁、重试和热点治理策略。

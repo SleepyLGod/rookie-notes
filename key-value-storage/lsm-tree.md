@@ -97,17 +97,15 @@
 >
 > 读缓存名为`block cache`，对应`HBase`的同名组件
 
-**由于上述两种compaction策略都有各自的优缺点，所以:**
+RocksDB 支持多种 compaction style，其中默认、最常见的是 **leveled compaction**。在 leveled compaction 下，`L0` 比较特殊：它由 memtable flush 直接产生，文件 key range 可以重叠；`L1` 及以上则按 key range 切分，同一层内文件通常不重叠。
 
-**`RocksDB`在`L1`层及以上采用`leveled compaction`，而在`L0`层采用s`ize-tiered compaction`。**
-
-**当`L0`层的文件数目达到`level0_file_num_compaction_trigger`阈值时，就会触发`L0`层`SST`合并到`L1`**
+当 `L0` 层文件数达到 `level0_file_num_compaction_trigger` 阈值时，RocksDB 会触发 `L0 -> L1` compaction。因为 `L0` 文件通常互相重叠，这一步一般需要选择多个 `L0` 文件和 `L1` 中重叠范围一起合并。
 
 **>= L1**
 
 leveled compaction策略中每一层的数据量是有阈值的，那么在`RocksDB`中这个阈值该如何确定呢？需要分两种情况来讨论。
 
-*   **参数`levle_compaction_dynamic_level_bytes` = false**
+*   **参数 `level_compaction_dynamic_level_bytes` = false**
 
     > L1的阈值由参数`max_bytes_for_level_base`确定，单位为字节
     >
@@ -116,7 +114,7 @@ leveled compaction策略中每一层的数据量是有阈值的，那么在`Rock
     > **target\_size(Lk+1) = target\_size(Lk) \* max\_bytes\_for\_level\_multiplier \* max\_bytes\_for\_level\_multiplier\_addition\[k]**
     >
     > `max_bytes_for_level_multiplier`是固定的倍数因子`max_bytes_for_level_multiplier_additional[k]`是第k层对应的可变倍数因子
-*   **参数`levle_compaction_dynamic_level_bytes` = true**
+*   **参数 `level_compaction_dynamic_level_bytes` = true**
 
     > 最高一层的大小**不设阈值限制**，亦即target\_size(Ln)就是Ln层的实际大小
     >
@@ -130,11 +128,11 @@ leveled compaction策略中每一层的数据量是有阈值的，那么在`Rock
 
 ![](https://s2.loli.net/2022/07/24/LGnD7HNgYtyZU8M.webp)
 
-**= L0 (universal compaction)**
+**Universal compaction**
 
-`universal compaction`是`RocksDB`中`size-tiered compaction`的别名，专门用于`L0`层的`compaction`，因为`L0`层的`SST`的`key`区间是几乎肯定有重合的
+`universal compaction` 不是 leveled compaction 中专门用于 `L0` 的机制，而是 RocksDB 另一种 compaction style。它属于 tiered/size-tiered family，目标通常是降低写放大，但会用更高的读放大和空间放大作为代价。
 
-当`L0`层的文件数目达到`level0_file_num_compaction_trigger`阈值时，就会触发`L0`层SST合并到`L1`。`universal compaction`还会检查以下条件:
+使用 universal compaction 时，SST 文件被组织为按时间范围划分的 sorted runs，compaction 只在相邻时间范围的 runs 之间发生。它会检查以下条件：
 
 *   **空间放大比例**：
 
