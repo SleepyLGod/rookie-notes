@@ -73,7 +73,7 @@ description: 组成架构与原理介绍
 
       ClockCache 还不稳定，不建议使用
 
-![查询操作](<../../.gitbook/assets/image (1) (2).png>)
+![查询操作](<../../../.gitbook/assets/image (1) (2).png>)
 
 #### **Write Buffer Manager**:
 
@@ -143,7 +143,7 @@ description: 组成架构与原理介绍
 
 #### Column Family：
 
-![CF 列族](<../../.gitbook/assets/image (4) (2).png>)
+![CF 列族](<../../../.gitbook/assets/image (4) (2).png>)
 
 可以将数据的键值对按照不同的属性分配给不同的CF，可以让某些内存和SST文件中存的都是相同类型的数据，可以极大地增加读写的效率、提升数据压缩率；
 

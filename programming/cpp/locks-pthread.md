@@ -79,7 +79,7 @@ pthread_mutexattr_settype(&mtx_attr, PTHREAD_MUTEX_RECURSIVE);
 pthread_mutext_init(&mtx, &mutext_attr);
 ```
 
-然而对于**递归互斥量**或者说**可重入锁**的使用则需要克制。Stevens大神生前在《APUE》中说『使用好它是十分tricky的，仅当没有其他解决方案时才使用』\[[1\]](lock-pthread.md#ref\_1)。
+然而对于**递归互斥量**或者说**可重入锁**的使用则需要克制。Stevens大神生前在《APUE》中说『使用好它是十分tricky的，仅当没有其他解决方案时才使用』\[[1\]](locks-pthread.md#ref\_1)。
 
 可重入锁这个概念和称呼的走俏多半是Java语言的功劳。
 
@@ -119,7 +119,7 @@ pthread_mutex_destroy(&mtx);
 
 pthread\_cond\_wait函数会把条件变量和互斥量都传入。并且多线程调用的时候条件变量和互斥量一定要一一对应，不能一个条件变量在不同线程中wait的时候传入不同的互斥量。否则是未定义结果。
 
-关于是先解锁互斥量还是先进行条件变量的通知，是另外一个比较大的议题。有种论断说：先解锁互斥量再通知条件变量可以减少多余的上下文切换，进而提高效率。这种说法是基于一种实现假设：先通知条件变量，再解锁。可能让其他等待条件变量的线程被唤醒了，但是此时互斥量还没解锁，从而再次陷入休眠。然而对于另外一些实现，比如Linux系统，则通过等待变形（**wait morphing**）\[[2\]](lock-pthread.md#ref\_2)解决了这一问题。所以先通知再解锁也没用问题。
+关于是先解锁互斥量还是先进行条件变量的通知，是另外一个比较大的议题。有种论断说：先解锁互斥量再通知条件变量可以减少多余的上下文切换，进而提高效率。这种说法是基于一种实现假设：先通知条件变量，再解锁。可能让其他等待条件变量的线程被唤醒了，但是此时互斥量还没解锁，从而再次陷入休眠。然而对于另外一些实现，比如Linux系统，则通过等待变形（**wait morphing**）\[[2\]](locks-pthread.md#ref\_2)解决了这一问题。所以先通知再解锁也没用问题。
 
 **另外在使用条件变量的过程中有个稍微违反直觉的写法**：那就是使用while而不是if来做判断状态是否满足。这样做的原因有二：
 
@@ -235,7 +235,7 @@ pthread\_spin\_init函数的第二个参数名为pshared（int类型）。表示
 * **PTHREAD\_PROCESS\_PRIVATE：仅同进程下读线程可以使用该自旋锁**
 * **PTHREAD\_PROCESS\_SHARED：不同进程下的线程可以使用该自旋锁**
 
-\*\*在Linux上的glibc中这两个枚举值分别是0和1（Mac上不是）。所以通常也会看到直接传0的代码。你可能觉得不使用宏，直接用数字硬编码不是一个好习惯。的确，妥妥的Magic Number，但还有一个有趣的事实你需要了解：\*\*并不是所有实现都支持自旋锁设置两种pshared。比如\[[3\]](lock-pthread.md#ref\_3)：
+\*\*在Linux上的glibc中这两个枚举值分别是0和1（Mac上不是）。所以通常也会看到直接传0的代码。你可能觉得不使用宏，直接用数字硬编码不是一个好习惯。的确，妥妥的Magic Number，但还有一个有趣的事实你需要了解：\*\*并不是所有实现都支持自旋锁设置两种pshared。比如\[[3\]](locks-pthread.md#ref\_3)：
 
 ```c
 int pthread_spin_init (pthread_spinlock_t *lock, int pshared) {
@@ -255,8 +255,8 @@ int pthread_spin_init (pthread_spinlock_t *lock, int pshared) {
 
 ### **参考**
 
-1. [^](lock-pthread.md#ref\_1\_0)1 **https://en.wikipedia.org/wiki/Reentrant\_mutex#Practical\_use**
-2. [^](lock-pthread.md#ref\_2\_0)2 \[**https://books.google.com.hk/books?id=Ps2SH727eCIC\&pg=PA647\&lpg=PA647\&dq=linux+programming+interface+wait+morphing\&source=bl\&ots=kMKcz2zPC7\&sig=ACfU3U1ZSbxBegrQhuVkfNAMTRkY-YavvA\&hl=en\&sa=X\&redir\_esc=y\&hl=zh-CN\&sourceid=cndr#v=onepage\&q=linux%20programming%20interface%20wait%20morphing\&f=false**]\(https://books.google.com.hk/books?id=Ps2SH727eCIC\&pg=PA647\&lpg=PA647\&dq=linux+programming+interface+wait+morphing\&source=bl\&ots=kMKcz2zPC7\&sig=ACfU3U1ZSbxBegrQhuVkfNAMTRkY-YavvA\&hl=en\&sa=X\&redir\_esc=y\&hl=zh-CN\&sourceid=cndr#v=onepage\&q=linux programming interface wait morphing\&f=false)
-3. [^](lock-pthread.md#ref\_3\_0)3 **https://github.com/lattera/glibc/blob/895ef79e04a953cac1493863bcae29ad85657ee1/nptl/pthread\_spin\_init.c**
+1. [^](locks-pthread.md#ref\_1\_0)1 **https://en.wikipedia.org/wiki/Reentrant\_mutex#Practical\_use**
+2. [^](locks-pthread.md#ref\_2\_0)2 \[**https://books.google.com.hk/books?id=Ps2SH727eCIC\&pg=PA647\&lpg=PA647\&dq=linux+programming+interface+wait+morphing\&source=bl\&ots=kMKcz2zPC7\&sig=ACfU3U1ZSbxBegrQhuVkfNAMTRkY-YavvA\&hl=en\&sa=X\&redir\_esc=y\&hl=zh-CN\&sourceid=cndr#v=onepage\&q=linux%20programming%20interface%20wait%20morphing\&f=false**]\(https://books.google.com.hk/books?id=Ps2SH727eCIC\&pg=PA647\&lpg=PA647\&dq=linux+programming+interface+wait+morphing\&source=bl\&ots=kMKcz2zPC7\&sig=ACfU3U1ZSbxBegrQhuVkfNAMTRkY-YavvA\&hl=en\&sa=X\&redir\_esc=y\&hl=zh-CN\&sourceid=cndr#v=onepage\&q=linux programming interface wait morphing\&f=false)
+3. [^](locks-pthread.md#ref\_3\_0)3 **https://github.com/lattera/glibc/blob/895ef79e04a953cac1493863bcae29ad85657ee1/nptl/pthread\_spin\_init.c**
 
 ## **C++11**

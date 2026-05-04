@@ -19,7 +19,7 @@ struct node {
 
 在当中一般的节点上增加一个指针，指向后面两个的元素。这样我们遍历的速度可以提升一倍，最快就可以在![\[公式\]](https://www.zhihu.com/equation?tex=O%28n%2F2%29)的时间内遍历完整个链表了。
 
-![小优化](<../.gitbook/assets/image (4) (1).png>)
+![小优化](<../../.gitbook/assets/image (4) (1).png>)
 
 同理继续骚下去，如果我们继续增加节点上指针的个数，立个小目标，设置![\[公式\]](https://www.zhihu.com/equation?tex=%5Clog+n)个指针，完全可以在![\[公式\]](https://www.zhihu.com/equation?tex=%5Clog+n)的时间内完成元素的查找，这就是SkipList的精髓。
 
@@ -27,7 +27,7 @@ struct node {
 
 跳表又引入了新的骚操作：随机深度 -> 一个节点的指针数量是随机的
 
-![随机深度](<../.gitbook/assets/image (3) (2).png>)
+![随机深度](<../../.gitbook/assets/image (3) (2).png>)
 
 每个节点的第`i`个指针（这里就不是指向后第`i`个元素的了）指向的元素一定是离它最近的、指针数量大于等于`i`的元素（的第`i`个指针）。
 
@@ -81,7 +81,7 @@ Node类中的方法：
 
 来个wiki上的动图：
 
-![Inserting elements to skip list](../.gitbook/assets/Skip\_list\_add\_element-en.gif)
+![Inserting elements to skip list](../../.gitbook/assets/Skip\_list\_add\_element-en.gif)
 
 {% tabs %}
 {% tab title="P.S." %}
