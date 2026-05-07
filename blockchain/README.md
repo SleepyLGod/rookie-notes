@@ -8,7 +8,7 @@ coverY: 0
 
 建议阅读顺序：
 
-1. [Uniswap V2 合约概览](uniswap-v2/contracts-guide.md)：先理解 core/periphery、Pair、Factory、Router 和常见流程。
+1. [Uniswap V2 合约概览](uniswap-v2/README.md)：先理解 core/periphery、Pair、Factory、Router 和常见流程。
 2. [对接 Uniswap V2 兑换代币](uniswap-v2/how-to-swap.md)：再看 Hardhat fork 主网测试和 Router 调用。
 3. [bignumber.js 中常见运算](bignumber.md)：最后补齐链上金额计算的精度处理。
 
