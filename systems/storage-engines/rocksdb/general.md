@@ -1,152 +1,152 @@
 ---
-description: 组成架构与原理介绍
+description: Architecture and core mechanisms.
 ---
 
 # 😚 General
 
 ## **Basic**
 
-先放一个[**RocksDB官方博客**](http://rocksdb.org/blog/)
+Start with the [**official RocksDB blog**](http://rocksdb.org/blog/).
 
-首先放一个组成和操作流程的图：
+The following diagram shows the main components and the flow of read, write, and compaction operations:
 
-![RocksDB主要组成 & 读、写和压缩操作流程图解](https://s2.loli.net/2022/07/25/7gQGbrYaPyt2q3Z.png)
+![Main RocksDB components and read, write, and compaction flow](https://s2.loli.net/2022/07/25/7gQGbrYaPyt2q3Z.png)
 
-一些零星小点：
+Some scattered notes:
 
 #### **memtable**:
 
-* 为了保证数据的有序性，数据插入搜索的高效性`O(log n)`，MemTable基于`skipList`实现，还可以选择`HashLinkList`、`HashSkipList`、`Vector`用来加速某些查询：
+* To preserve key ordering and keep insertion and lookup efficient at `O(log n)`, the default MemTable is implemented with a `SkipList`. RocksDB can also use `HashLinkList`, `HashSkipList`, or `Vector` to accelerate certain query patterns:
   *   **`SkipList MemTable`**
 
-      为读写、随机访问和顺序扫描提供了总体良好的性能，还提供了其他 memtable 实现目前不支持的一些其他有用功能，例如**并发插入**和**带`Hit`插入**
+      Provides generally good performance for reads, writes, random access, and sequential scans. It also supports useful features that other MemTable implementations may not support, such as concurrent insertions and insertions with `Hint`.
   *   **`HashSkipList MemTable`**
 
-      `HashSkipList`将数据组织在哈希表中，每一个哈希桶都是一个有序的`SkipList`，key是原始key通过`Options.prefix_extractor`截取的前缀key。主要用于减少查询时的比较次数。
+      `HashSkipList` organizes data in a hash table, where each hash bucket is an ordered `SkipList`. The hash key is the prefix key extracted from the original key by `Options.prefix_extractor`. It is mainly used to reduce the number of comparisons during lookup.
 
-      一般与`PlainTable SST`格式配合使用将数据存储在 RAMFS 中。
+      It is usually used together with the `PlainTable SST` format when data is stored in RAMFS.
 
-      基于哈希的 memtables 的**最大限制是跨多个前缀进行扫描需要复制和排序，非常慢且内存成本高**。
-* WAL用于故障发生时的数据恢复，可选择关闭。
-* 每个SSTable除了包含数据块（DataBlock）外，还有一个**索引块（IndexBlock）用于二分查找**
-* 触发 Memtable **刷新落盘**的场景：
-  * 写入后 Memtable 大小超过`ColumnFamilyOptions::write_buffer_size`
-  * 所有列族的 Memtable 用量超过`DBOptions::db_write_buffer_size`或者 `write_buffer_manager`发出刷新信号。最大的 MemTable 将会 flushed
-  * WAL文件大小超过 `DBOptions::max_total_wal_size`
+      The major limitation of hash-based MemTables is that scanning across multiple prefixes requires copying and sorting, which is very slow and has high memory cost.
+* WAL is used for data recovery after failures and can be disabled.
+* In addition to data blocks, each SSTable contains an **index block used for binary search**.
+* Scenarios that trigger a MemTable **flush to disk**:
+  * The MemTable size exceeds `ColumnFamilyOptions::write_buffer_size` after a write.
+  * The total MemTable usage across all column families exceeds `DBOptions::db_write_buffer_size`, or `write_buffer_manager` sends a flush signal. In this case, the largest MemTable is flushed.
+  * The WAL file size exceeds `DBOptions::max_total_wal_size`.
 
 #### **Block Cache**:
 
-*   RocksDB 在**内存中缓存数据**以供读取的地方：
+*   RocksDB caches data in memory for reads:
 
-    最近，高频访问的数据存储在Block Cache中；
+    Recently and frequently accessed data is stored in Block Cache.
 
-    其次依次按照写入最新时间查找MemTable；
+    Next, RocksDB checks MemTables in reverse write-time order.
 
-    再其次按从磁盘中的Level 0依次往后查找到SST文件；
+    Then it searches SST files from Level 0 onward on disk.
 
-    根据查找的KEY 判断是否在SST的min\_key和max\_key中间；&#x20;
+    For a target key, RocksDB first checks whether it falls between an SST's `min_key` and `max_key`.&#x20;
 
-    布隆过滤器判断如果KEY不在，则查找下一个SST文件，如果数据在该SST文件，则二分法查找；
-* **一个Cache对象可以被同一个进程中的多个RocksDB实例共享**，用户可以控制整体的缓存容量。
-*   存储**未压缩的块**。
+    A Bloom filter then checks whether the key may exist in the SST. If the filter says the key is not present, RocksDB moves to the next SST file. If the key may be in that SST, RocksDB uses binary search to locate it.
+* **One Cache object can be shared by multiple RocksDB instances in the same process**, so users can control the overall cache capacity.
+*   Block Cache stores **uncompressed blocks**.
 
-    用户可以选择设置存储压缩块的二级块缓存。
+    Users can optionally configure a secondary block cache for compressed blocks.
 
-    读取将首先从未压缩的块缓存中获取数据块，然后是压缩的块缓存。
+    Reads first try to fetch the data block from the uncompressed block cache, then from the compressed block cache.
 
-    如果使用 `Direct-IO`，压缩块缓存可以替代 OS 页面缓存。
-* Block Cache有两种缓存实现，分别是 `LRUCache` 和 `ClockCache`。两种类型的缓存都使用**分片**以减轻锁争用。容量平均分配给每个分片，分片不共享容量。默认情况下，每个缓存最多会被分成 64 个分片，每个分片的容量不小于 512k 字节。
-  *   `LRUCache`： 默认的缓存实现。
+    When `Direct-IO` is used, the compressed block cache can replace the OS page cache.
+* RocksDB has two block-cache implementations: `LRUCache` and `ClockCache`. Both cache types use **sharding** to reduce lock contention. Capacity is evenly distributed across shards, and shards do not share capacity. By default, each cache can be split into at most 64 shards, and each shard has at least 512 KB of capacity.
+  *   `LRUCache`: the default cache implementation.
 
-      使用容量为8MB的基于LRU的缓存；
+      It uses an LRU-based cache with an 8 MB capacity.
 
-      缓存的每个分片都维护自己的**LRU列表**和自己的**哈希表**以供查找。**通过每个分片的互斥锁实现同步，查找与插入都需要对分片加锁**。
+      Each cache shard maintains its own **LRU list** and its own **hash table** for lookup. **Synchronization is implemented through a mutex per shard, so both lookup and insertion need to lock the shard**.
 
-      极少数情况下，在块上进行读或迭代的，并且固定的块总大小超过限制，缓存的大小可能会大于容量。
+      In rare cases, if blocks are being read or iterated and the total size of pinned blocks exceeds the limit, the cache size may exceed its configured capacity.
 
-      如果主机没有足够的内存，这可能会导致意外的 OOM 错误，从而导致数据库崩溃。
-  *   `ClockCache`： ClockCache 实现了**CLOCK 算法**。
+      If the host does not have enough memory, this can cause an unexpected OOM and crash the database.
+  *   `ClockCache`: ClockCache implements the **CLOCK algorithm**.
 
-      时钟缓存的每个分片都维护一个缓存条目的循环列表。
+      Each ClockCache shard maintains a circular list of cache entries.
 
-      时钟句柄在循环列表上运行，寻找要驱逐的未固定条目，但如果自上次扫描以来已使用过，也给每个条目第二次机会留在缓存中。
+      A clock hand runs over the circular list and looks for unpinned entries to evict. If an entry has been used since the last scan, it receives a second chance to stay in the cache.
 
-      ClockCache 还不稳定，不建议使用
+      ClockCache is not stable yet and is not recommended.
 
-![查询操作](<../../../.gitbook/assets/image (1) (2).png>)
+![Query operation](<../../../.gitbook/assets/image (1) (2).png>)
 
 #### **Write Buffer Manager**:
 
-用于控制**多个列族或者多个数据库实例**的内存表总使用量。
+The Write Buffer Manager controls total MemTable memory usage across **multiple column families or multiple database instances**.
 
-使用方式：用户创建一个`write buffer manager`对象，并将对象传递到需要控制内存的列族或数据库实例中。
+Usage: users create a `write buffer manager` object and pass it to the column families or database instances whose memory usage should be controlled.
 
-有两种限制方式：
+There are two limiting modes:
 
-1、**限制 memtables 的总内存用量**
+1. **Limit total MemTable memory usage**
 
-触发其中一个条件将会在**实例的列族上触发flush操作**：
+Either of the following conditions triggers a **flush on the instance's column family**:
 
-* 如果活跃的 memtables 使用**超过阈值的90%**
-* 总内存超过限制，活跃的 mamtables 使用也超过阈值的 50% 时。
+* Active MemTables use **more than 90% of the threshold**.
+* Total memory exceeds the limit and active MemTables also use more than 50% of the threshold.
 
-2、**memtable 的内存占用转移到 block cache**
+2. **Charge MemTable memory usage to Block Cache**
 
-大多数情况下，block cache中实际使用的block**远小于**block cache中缓存的，所以当用户启用该功能时，**block cache容量将覆盖block cache和memtable两者的内存使用量**。
+In most cases, the blocks actually used in Block Cache are **much smaller** than the cache's configured capacity. When users enable this feature, **the Block Cache capacity covers the combined memory usage of both Block Cache and MemTables**.
 
-**如果用户同时开启 `cache_index_and_filter_blocks`，那么RocksDB的三大内存区域（`index and filter cache`， `memtables`， `block cache`）内存占用都在block cache中。**
+**If `cache_index_and_filter_blocks` is also enabled, then RocksDB's three major memory areas, `index and filter cache`, `memtables`, and `block cache`, are all accounted under Block Cache.**
 
-#### **SSTable**：
+#### **SSTable**:
 
-默认表格式：`BlockBaseTable`
+Default table format: `BlockBaseTable`.
 
-具体类型与LevelDB无区别：
+The concrete structure is not very different from LevelDB:
 
-* DataBlock (数据块)：**键值对序列**按照根据排序规则顺序排列，划分为一系列数据块（data block）。这些块在文件开头一个接一个排列，每个数据块可选择性压缩。
-*   MetaBlock (元数据块) ：紧接着数据块，元数据块**包括**：过滤块（`filter block`）、索引块（`index block`）、压缩字典块（`compression dictionary block`）、范围删除块（`range deletion block`）、属性块（`properties block`）。
+* DataBlock: a **sequence of key-value pairs** ordered according to the comparator and divided into a series of data blocks. These blocks are laid out one after another at the beginning of the file, and each data block can optionally be compressed.
+*   MetaBlock: placed after the data blocks. MetaBlocks **include** the filter block, index block, compression dictionary block, range deletion block, and properties block.
 
-    具体来讲：
+    More specifically:
 
-    *   <mark style="color:purple;">**filter block**</mark>: `bloom filter`实现
+    *   <mark style="color:purple;">**filter block**</mark>: implemented with a `bloom filter`.
 
-        全局过滤器 **Full Filter**: 在此过滤器中，整个 SST 文件只有一个过滤器块。
+        Global filter, or **Full Filter**: the entire SST file has only one filter block.
 
-        分区过滤器 **Partitioned Filter**: Full Filter 被分成多个子过滤器块，在这些块的顶层有一个索引块用于将key映射到相应的子过滤器块。
-    *   <mark style="color:purple;">**index block**</mark>：用于查找包含指定key的数据块。是一种**基于二分搜索**的数据结构。
+        **Partitioned Filter**: the Full Filter is split into multiple sub-filter blocks, with an index block above them that maps keys to the corresponding sub-filter block.
+    *   <mark style="color:purple;">**index block**</mark>: used to find the data block that contains a given key. It is a **binary-search based** data structure.
 
-        一个文件可能包含一个索引块，也可能包含一组[**分区索引块**](https://github.com/facebook/rocksdb/wiki/Partitioned-Index-Filters)，这取决于使用配置。
+        A file may contain one index block or a set of [**partitioned index blocks**](https://github.com/facebook/rocksdb/wiki/Partitioned-Index-Filters), depending on the configuration.
 
-        即存在**全局索引**与**分区索引**两种索引方式。
-    * <mark style="color:purple;">**Compression Dictionary Block**</mark>：包含用于在压缩/解压缩每个块之前准备压缩库的字典。
-    *   <mark style="color:purple;">**range deletion block**</mark>：包含**文件中key 与 序列号中的删除范围**。在读请求下发到sst的时候能够从sst中的指定区域判断key是否在deleterange 的范围内部，存在则直接返回NotFound。
+        Therefore, there are two index modes: **global index** and **partitioned index**.
+    * <mark style="color:purple;">**Compression Dictionary Block**</mark>: contains the dictionary used to prepare the compression library before compressing or decompressing each block.
+    *   <mark style="color:purple;">**range deletion block**</mark>: contains deletion ranges over **keys and sequence numbers** in the file. When a read request reaches an SST, RocksDB can check the relevant range inside the SST to determine whether the key falls within a `DeleteRange`; if it does, RocksDB can return `NotFound` directly.
 
-        memtable中也有一块区域实现同样的功能。
+        MemTables also contain an area that implements the same function.
 
-        compaction或者flush的时候会清除掉过时的tombstone数据。
-    *   <mark style="color:purple;">**properties block**</mark>：每种属性都是一个键值对
+        During compaction or flush, obsolete tombstone data is removed.
+    *   <mark style="color:purple;">**properties block**</mark>: each property is a key-value pair.
 
-        `data size`：data block总大小
+        `data size`: total size of data blocks.
 
-        `index size`：index block总大小
+        `index size`: total size of index blocks.
 
-        `filter size`：filter block总大小
+        `filter size`: total size of filter blocks.
 
-        `raw key size`：所有key的原始大小
+        `raw key size`: total raw size of all keys.
 
-        `raw value size`：所有value的原始大小
+        `raw value size`: total raw size of all values.
 
         `number of entries`
 
         `number of data blocks`
-* MetaIndexBlock (元索引块) ： 元索引块包含一个**映射表**指向**每个meta block**，**key是meta block的名称，value是指向该meta block的指针，指针通过offset、size指向数据块**。
-* Footer (页脚) ：文件末尾是固定长度的页脚。包括指向**metaindex block**的指针，指向**index block**(metablock中)的指针，以及一个**magic number**。
+* MetaIndexBlock: the meta-index block contains a **mapping table** pointing to **each meta block**. The key is the meta-block name, and the value is a pointer to that meta block. The pointer locates the block through offset and size.
+* Footer: the fixed-size footer is stored at the end of the file. It includes a pointer to the **metaindex block**, a pointer to the **index block** in the meta block area, and a **magic number**.
 
-#### Column Family：
+#### Column Family:
 
-![CF 列族](<../../../.gitbook/assets/image (4) (2).png>)
+![CF column family](<../../../.gitbook/assets/image (4) (2).png>)
 
-可以将数据的键值对按照不同的属性分配给不同的CF，可以让某些内存和SST文件中存的都是相同类型的数据，可以极大地增加读写的效率、提升数据压缩率；
+Key-value pairs can be assigned to different column families according to different attributes. This allows the data stored in certain MemTables and SST files to have the same type, which can greatly improve read/write efficiency and data compression ratio.
 
-落数的时候会自带CF1、CF2、default 来决定落入哪个分片中；
+When data is written, the target column family, such as CF1, CF2, or `default`, determines which logical partition receives the data.
 
-**内存和SST**文件都按照CF分了，但是**WAL**没有按照CF区分
+Both **MemTables and SST** files are separated by column family, but the **WAL** is not separated by column family.

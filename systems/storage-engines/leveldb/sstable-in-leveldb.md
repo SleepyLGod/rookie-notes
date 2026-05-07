@@ -1,28 +1,28 @@
 ---
-description: 接续上文sstable结构
+description: Continuation of the previous SSTable structure notes.
 ---
 
-# 🤓 SsTable in LevelDB
+# 🤓 SSTable in LevelDB
 
 #### **Data Block**
 
-Data Block 存放的就是一系列有序的key-value，为了节省存储空间，Data block做了一些改进。
+A Data Block stores a sequence of ordered key-value entries. To reduce storage overhead, LevelDB applies several optimizations inside the data block format.
 
-首先要了解到，data block是变长的。
+The first thing to note is that a data block is variable-sized.
 
 ```tex
-"block_size" is not a "size", it is a threshold.  
-Data is never split across blocks.  
+"block_size" is not a "size", it is a threshold.
+Data is never split across blocks.
 A single block contains one or more key/value pairs.
 Leveldb starts a new block only when the total size of all key/values in the current block exceed the threshold.
 ```
 
-只不过它总是在写满`options.block_size`的时候开始`Flush`，追加写入到`sstable file`，如**table/table\_build.cc**中的
+In practice, LevelDB starts flushing the current data block and appends it to the `sstable file` once it reaches `options.block_size`. This logic appears in **table/table\_build.cc**:
 
 ```cpp
 void TableBuilder::Add(const Slice& key, const Slice& value) {
   Rep* r = rep_;
-  ...	
+  ...
   r->data_block.Add(key, value);
 
   const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
@@ -32,19 +32,19 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
 }
 ```
 
-而这个`options.block_size`默认为4KB。
+The default value of `options.block_size` is 4 KB.
 
-注意，很多key可能有**重复的字节**，比如“hellokitty”和”helloworld“是两个相邻的key。
+Notice that many adjacent keys may share repeated bytes. For example, `"hellokitty"` and `"helloworld"` can be two neighboring keys.
 
-因此，如果**将公共的部分提取**，可以有效的节省存储空间。
+Therefore, extracting and storing the shared prefix can save storage space effectively.
 
-处于这种考虑，LevelDB采用了前缀压缩(**prefix-compressed**)，由于LevelDb中key是按序排列的，这可以显著的减少空间占用。
+Based on this observation, LevelDB uses prefix compression. Since keys in LevelDB are stored in sorted order, prefix compression can significantly reduce the space occupied by repeated key prefixes.
 
-另外，每间隔16个keys(**目前版本中`options_->block_restart_interval`默认为16**)，LevelDB就取消使用前缀压缩，而是**存储整个key**(我们把存储整个key的点叫做**重启点**)。
+In addition, after every 16 keys, LevelDB disables prefix compression and stores the complete key instead. In the current implementation, this interval is controlled by `options_->block_restart_interval`, whose default value is 16. A position where the complete key is stored is called a **restart point**.
 
 ![img](https://s2.loli.net/2022/07/24/A6DlYdV5hHxoXMP.png)
 
-向sstable添加一个key－value，函数的入口点是：
+The entry point for adding a key-value pair to an SSTable is:
 
 ```cpp
 void TableBuilder::Add(const Slice& key, const Slice& value) {
@@ -55,7 +55,7 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
     assert(r->options.comparator->Compare(key, Slice(r->last_key)) > 0);
   }
 
-  /*此处我们先忽略index block的部分*/
+  /* Ignore the index block part for now. */
   if (r->pending_index_entry) {
     assert(r->data_block.empty());
     r->options.comparator->FindShortestSeparator(&r->last_key, key);
@@ -65,14 +65,14 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
     r->pending_index_entry = false;
   }
 
-  /*此处我们先忽略filter block的部分*/
+  /* Ignore the filter block part for now. */
   if (r->filter_block != NULL) {
     r->filter_block->AddKey(key);
   }
 
   r->last_key.assign(key.data(), key.size());
   r->num_entries++;
-  /* 向data block中添加一组key-value pair */
+  /* Add a key-value pair to the data block. */
   r->data_block.Add(key, value);
 
   const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
@@ -82,7 +82,7 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
 }
 ```
 
-我们先忽略index block和filter block的部分，集中精力查看**data block如何新增key－value对**：
+For now, ignore the index block and filter block logic and focus on how a data block adds a key-value pair:
 
 ```cpp
 void BlockBuilder::Add(const Slice& key, const Slice& value) {
@@ -92,7 +92,7 @@ void BlockBuilder::Add(const Slice& key, const Slice& value) {
   assert(buffer_.empty() // No values yet?
          || options_->comparator->Compare(key, last_key_piece) > 0);
   size_t shared = 0;
-  if (counter_ < options_->block_restart_interval) {`
+  if (counter_ < options_->block_restart_interval) {
     // See how much sharing to do with previous string
     const size_t min_length = std::min(last_key_piece.size(), key.size());
     while ((shared < min_length) && (last_key_piece[shared] == key[shared])) {
@@ -100,7 +100,7 @@ void BlockBuilder::Add(const Slice& key, const Slice& value) {
     }
   } else {
     // Restart compression
-    /*新的重启点，记录下位置*/
+    /* This is a new restart point, so record the current position. */
     restarts_.push_back(buffer_.size());
     counter_ = 0;
   }
@@ -123,11 +123,11 @@ void BlockBuilder::Add(const Slice& key, const Slice& value) {
 }
 ```
 
-对于data block中的每一个记录，其格式如下：
+Each record in a data block has the following layout:
 
 ![](http://bean-li.github.io/assets/LevelDB/data\_block\_record.png)
 
-当前data\_block中的内容足够多时，预计大于预设的门限值的时候，就开始flush，所谓data block的Flush就是将所有的重启点指针记录下来，并且记录重启点的个数：
+When the current `data_block` contains enough content and its estimated size exceeds the configured threshold, LevelDB starts flushing the block. Flushing a data block means appending all restart-point offsets and then writing the number of restart points:
 
 ```cpp
 Slice BlockBuilder::Finish() {
@@ -141,8 +141,8 @@ Slice BlockBuilder::Finish() {
 }
 ```
 
-至此，介绍完了SSTable文件中的data block。
+This completes the data-block part of an SSTable file.
 
-注意，一个SSTable中存在着多个data block，尽管他们之间是有序的，可是你查找的key到底位于哪个block上？典型的sstable文件大小为2M，可以设置的更大，每个sstable 文件中data block 的个数可能上百，如何在这上百个data block中寻找你要的key？
+However, one SSTable contains multiple data blocks. Although these data blocks are ordered, a lookup still needs to answer a practical question: which block contains the target key? A typical SSTable file is about 2 MB, and it can be configured to be larger. Each SSTable may contain hundreds of data blocks. How should LevelDB locate the key among all those blocks?
 
-显然依次查找效率太低，这时候 index block就起到作用了。
+Sequentially scanning the data blocks is clearly inefficient. This is where the index block becomes necessary.

@@ -1,470 +1,470 @@
 ---
-description: 😀 google三驾马车第二弹！
+description: The second paper in Google's classic infrastructure trilogy.
 ---
 
-# 😍 Google File System
+# Google File System
 
-### **GFS 主要需求**
+### **Main Requirements of GFS**
 
-* 节点失效是常态。系统会构建在大量的普通机器上，这使得节点失效的可能性很高。因此，GFS 必须能有较高的**容错性**、能够持续地监控自身的状态，同时还要能够顺畅地从节点失效中快速恢复
-* **存储内容以大文件为主**。系统需要存储的内容在通常情况下由数量不多的大文件构成，每个文件通常有几百 MB 甚至是几 GB 的大小；系统应当支持小文件，但不需要为其做出优化
-* 主要负载为**大容量连续读**、**小容量随机读**以及**追加式的连续写**
-* 系统应当支持**高效且原子的文件追加操作**，源于在 Google 的情境中，这些文件多用于生产者-消费者模式或是多路归并
-* 当需要做出取舍时，系统应**选择高数据吞吐量而不是低延时**
+* Node failure is the norm. The system is built from a large number of commodity machines, so machine failures are expected rather than exceptional. GFS must provide strong **fault tolerance**, continuously monitor its own state, and recover quickly from node failures.
+* **The stored data is mostly large files**. In the common case, the system stores a relatively small number of large files, each usually hundreds of MB or several GB in size. The system should support small files, but it does not need to optimize for them.
+* The dominant workloads are **large streaming reads**, **small random reads**, and **append-style streaming writes**.
+* The system should support **efficient and atomic file append operations**, because in Google's setting these files are often used in producer-consumer pipelines or multi-way merge workloads.
+* When the system must choose, it should prefer **high aggregate throughput over low latency**.
 
-### **GFS 集群组成**
+### **GFS Cluster Components**
 
-简单来讲，除了客户端以外，一个 GFS 集群还包括一个 **Master** 节点和若干个 **Chunk Server**。它们会作为用户级进程运行在普通的 Linux 机器上。
+At a high level, apart from clients, a GFS cluster contains one **Master** and multiple **Chunk Servers**. They run as user-level processes on ordinary Linux machines.
 
-在**存储文件**时，GFS 会把文件切分成**若干个拥有固定长度的 Chunk**（块）并存储。
+When **storing a file**, GFS splits the file into **fixed-size chunks**.
 
-Master 在创建 Chunk 时会为它们赋予一个**唯一的 64 位 Handle**，并把它们移交给 Chunk Server，而 Chunk Server 则以普通文件的形式将每个 Chunk 存储在自己的本地磁盘上。为了确保 Chunk 的可用性，**GFS 会把每个 Chunk 备份成若干个 Replica 分配到其他 Chunk Server 上**。
+When the Master creates a chunk, it assigns the chunk a **globally unique 64-bit handle** and hands it to Chunk Servers. A Chunk Server stores each chunk as a normal file on its local disk. To keep chunks available, **GFS stores each chunk as multiple replicas distributed across different Chunk Servers**.
 
-Master 负责维护整个集群的元数据，包括集群的 Namespace（命名空间，即文件元数据）以及 Chunk Lease 管理、无用 Chunk 回收等系统级操作
+The Master maintains cluster metadata, including the cluster namespace, chunk lease management, garbage chunk collection, and other system-level operations.
 
-Chunk Server 除了保存 Chunk 以外也会周期地和 Master 通过心跳信号进行通信
+A Chunk Server stores chunks and periodically communicates with the Master through heartbeat messages.
 
-Master 也借此得以收集每个 Chunk Server 当前的状态，并向其发送指令
+Through these heartbeats, the Master collects each Chunk Server's current state and sends instructions back to it.
 
-鉴于整个集群只有一个 Master，客户端在和 GFS 集群通信时，首先会从 Master 处获取 GFS 的元数据
+Because the whole cluster has only one Master, a client first contacts the Master to obtain GFS metadata.
 
-而实际文件的数据传输则会与 Chunk Server 直接进行，以避免 Master 成为整个系统的数据传输瓶颈
+Actual file data transfer happens directly between the client and Chunk Servers, so that the Master does not become the data-transfer bottleneck.
 
-除此以外，客户端也会在一定时间内缓存 Master 返回的集群元数据。
+In addition, clients cache metadata returned by the Master for a limited time.
 
-#### **MetaData**
+#### **Metadata**
 
-GFS 集群的所有元数据都会保存在 Master 的**内存**中。鉴于整个集群只会有一个 Master，这也使得元数据的管理变得更为简单
+All GFS cluster metadata is stored in the Master's **memory**. Since the cluster has only one Master, metadata management becomes much simpler.
 
-GFS 集群的元数据主要包括以下三类信息：
+GFS metadata mainly consists of three kinds of information:
 
-* 文件与 Chunk 的 Namespace（元数据）
-* 文件与 Chunk 之间的映射关系
-* 每个 Chunk Replica 所在的位置
+* The file and chunk namespace.
+* The mapping between files and chunks.
+* The location of every chunk replica.
 
-元数据保存在 Master 的内存中，使得 Master 要对元数据做出变更变得极为容易。同时，这也使得 Master 能够更加高效地扫描集群的元数据，以唤起 Chunk 回收、Chunk 均衡等系统级管理操作。
+Keeping metadata in the Master's memory makes metadata changes very easy for the Master. It also lets the Master scan cluster metadata efficiently in order to trigger system-level management operations such as chunk garbage collection and chunk rebalancing.
 
-唯一的不足在于这使得整个集群所能拥有的 **Chunk 数量受限于 Master 的内存大小**，不过从论文的内容来看，这样的瓶颈在 Google 中从来没有被触及过，源于对于一个 64MB 大小的 Chunk，Master 只需要维持不到 64 字节的元数据。况且，相比于增加代码的复杂度，提高 Master 内存容量的成本要小得多。
+The only drawback is that the total **number of chunks in the cluster is limited by the Master's memory size**. According to the paper, this bottleneck was never reached at Google, because for a 64 MB chunk the Master needs less than 64 bytes of metadata. Moreover, compared with increasing code complexity, adding more memory to the Master is much cheaper.
 
-为了保证元数据的可用性，Master 在对元数据做**任何**操作前对会用**WAL**的形式将操作进行记录，日志写入完成后再进行实际操作，而这些**日志也会被备份**到多个机器上进行保存。
+To keep metadata available, before the Master performs **any** metadata operation, it first records the operation in a **WAL-style operation log**. Only after the log record is written does it apply the actual operation. These **logs are also replicated** to multiple machines.
 
-Chunk Replica 的位置不会被持久化到日志中，而是由 **Master 在启动时询问各个 Chunk Server 其当前所有的 Replica**。这可以省去 **Master 与 Chunk Server 同步数据的成本**，同时进一步简化 Master 日志持久化的工作（毕竟 Chunk Server 当前实际持有哪些 Replica 也应由 Chunk Server 自己说了算）。
+Chunk replica locations are not persisted in the log. Instead, **when the Master starts, it asks each Chunk Server which replicas it currently has**. This avoids the cost of synchronizing location state between the Master and Chunk Servers, and further simplifies log persistence on the Master. After all, the Chunk Server itself is the authority on which replicas it actually stores.
 
-### **数据一致性**
+### **Data Consistency**
 
-用户在使用 GFS 这类数据存储系统时，首先应当了解其所能提供的数据一致性，而作为学习者我们也应先理解 GFS **对外呈现**的数据一致性功能。
+When users work with a storage system like GFS, they first need to understand the consistency it provides. As readers, we should also start by understanding the consistency behavior that GFS **exposes externally**.
 
-**Namspace:**
+**Namespace:**
 
-首先，命名空间完全由单节点 Master 管理在其内存中，这部分数据的修改可以通过**让 Master 为其添加互斥锁来解决并发修改的问题**，因此命名空间的数据修改是可以确保**完全原子**的。
+The namespace is managed entirely by the single Master in memory. Concurrent modification can be handled by having the Master use mutual exclusion for namespace changes. Therefore, namespace modifications can be made **fully atomic**.
 
 **File:**
 
-文件的数据修改则相对复杂
+File data modification is more complicated.
 
-首先我们先明确，在文件的某一部分被修改后，它可能进入以下三种状态的其中之一：
+After a region of a file is modified, it may be in one of the following three states:
 
-* 客户端读取不同的 Replica 时可能会读取到不同的内容，那这部分文件是**不一致**的（**Inconsistent**）
-* 所有客户端无论读取哪个 Replica 都会读取到相同的内容，那这部分文件就是**一致**的（**Consistent**）
-* 所有客户端都能**看到上一次修改的所有完整内容**，且这部分文件是一致的，那么我们说这部分文件是**确定**的（**Defined**）
+* If clients may read different contents from different replicas, that file region is **inconsistent**.
+* If every client reads the same content regardless of which replica it reads from, that file region is **consistent**.
+* If every client can **see the complete content of the last successful mutation**, and that region is also consistent, then the region is **defined**.
 
-在修改后，一个文件的当前状态将取决于此次修改的**类型**以及修改**是否成功**。具体来说：
+After a mutation, the current state of a file region depends on the **type** of mutation and whether the mutation **succeeds**. More concretely:
 
-* 如果一次写入操作成功且没有与其他并发的写入操作**发生重叠**，那这部分的文件是**确定**的（同时也是一致的）
-* 如果有若干个写入操作并发地执行成功，那么这部分文件会是**一致**的但会是**不确定**的：在这种情况下，客户端所能看到的数据通常不能直接体现出其中的任何一次修改
-* 失败的写入操作会让文件进入**Inconsistent**的状态
+* If a write succeeds and does **not overlap** with any concurrent write, the file region is **defined** and therefore also consistent.
+* If several writes execute successfully at the same time, the region is **consistent** but **undefined**. In this case, the data visible to clients usually cannot be interpreted as the result of any one of the concurrent writes.
+* A failed write leaves the region **inconsistent**.
 
 [![img](https://mr-dai.github.io/img/gfs/consistency-model.png)](https://mr-dai.github.io/img/gfs/consistency-model.png)
 
-GFS 支持的文件数据修改数据包括两种：
+GFS supports two kinds of file data mutation:
 
-* 指定偏移值的数据写入（Write）
-* 数据追加（Record Append）
+* Writing data at a specified offset, called Write.
+* Appending data, called Record Append.
 
-> **Write （随机写）:**
+> **Write, or random write:**
 
-当写入时，指定的数据会被直接写入到客户端指定的偏移位置中，**覆盖**原有的数据
+For a write, the specified data is written directly at the offset chosen by the client and **overwrites** the old data.
 
-GFS 并未为该操作提供太多的一致性保证：如果不同的客户端**并发地写入同一块文件区域**，操作完成后这块区域的数据可能由各次写入的**数据碎片**所组成，即进入**undefined**的状态。
+GFS does not provide strong consistency guarantees for this operation. If different clients **write concurrently to the same file region**, the resulting region may contain **fragments** from multiple writes and become **undefined**.
 
-> **Record Append （尾部追加写）:**
+> **Record Append, or append-at-end write:**
 
-可以原子地将长度小于 16MB 的数据写入指定文件的末尾。
+Record Append atomically appends data smaller than 16 MB to the end of a specified file.
 
-GFS 之所以设计这个接口，是因为 record append 不是简单地将 offset 取值设置为文件末尾的 write 操作，而是不同于 write 的一个操作，并且是具有原子性的操作。
+GFS provides this interface because Record Append is not simply a Write whose offset is set to the current end of the file. It is a different operation with atomicity guarantees.
 
-GFS 确保即便是在并发时，Record Append 也是原子且 at least once（至少一次）的。
+GFS guarantees that even under concurrency, Record Append is atomic and at-least-once.
 
-操作完成后，GFS 会把**实际写入的偏移值返回给客户端**，该偏移值即代表包含所写入数据的**确定**的文件区域的起始位置。由于数据追加操作是 at least once 的，GFS 有可能会在文件中写入填充（padding）或是重复数据，但出现的概率不高。
+After the operation finishes, GFS returns the **actual offset where the data was written** to the client. This offset marks the start of a **defined** file region containing the appended data. Because Record Append is at-least-once, GFS may insert padding or duplicate data into the file, although this should be uncommon.
 
-读取数据时，为了避免读入填充数据或是损坏的数据，数据在写入前往往会放入一些如校验和等元信息以用于**验证其可用性**，如此一来 GFS 的客户端 library 便可以在读取时自动跳过填充和损坏的数据。
+When reading, applications usually write extra metadata such as checksums together with the data before appending it. This lets the GFS client library **validate the data** and automatically skip padding or corrupted records during reads.
 
-不过，鉴于数据追加操作的 at lease once 特性，客户端仍有可能读入重复的数据，此时只能由\*\*上层应用通过鉴别记录的唯一 ID \*\*等信息来过滤重复数据了。
+However, because Record Append is at-least-once, a client may still read duplicate records. In that case, the **upper-level application must filter duplicates**, for example by checking a unique record ID.
 
-**对应用的影响**
+**Impact on Applications**
 
-GFS 的一致性模型是相对松散的，这就要求上层应用在使用 GFS 时能够适应 GFS 所提供的一致性语义。简单来讲，上层应用可以通过两种方式来做到这一点：
+GFS has a relatively relaxed consistency model, so applications using GFS must adapt to the semantics it provides. In simple terms, applications can do this in two ways:
 
-* **更多使用追加操作**而不是覆写操作
-* 写入包含校验信息的数据
+* **Prefer append operations** over overwrite operations.
+* Write data together with validation information.
 
-青睐追加操作而不是覆写操作的原因是明显的：GFS 针对追加操作做出了显著的优化，这使得这种数据写入方式的性能更高，而且也**能提供更强的一致性语义**。尽管如此，追加操作 at least once 的特性仍使得客户端可能读取到填充或是重复数据，这要求客户端能够容忍这部分无效数据。
+The reason to prefer append over overwrite is clear. GFS is heavily optimized for append operations, which makes this write pattern faster and also gives it **stronger consistency semantics**. Nevertheless, because append is at-least-once, clients may still read padding or duplicate records, so clients must tolerate this invalid data.
 
-一种可行的做法是在**写入的同时为所有记录写入各自的校验和，并在读取时进行校验**，以剔除无效的数据；
+One practical approach is to **write a checksum for every record and verify it during reads**, so invalid data can be discarded.
 
-如果客户端无法容忍重复数据，**客户端也可以在写入时为每条记录写入唯一的标识符**，以便在读取时通过标识符去除重复的数据。
+If clients cannot tolerate duplicate data, **they can also write a unique identifier for every record** and use that identifier to remove duplicates during reads.
 
-### **GFS 集群常见操作流程**
+### **Common Operation Flows in a GFS Cluster**
 
-#### **Master Namespace 管理**
+#### **Master Namespace Management**
 
-Namespace 作为 GFS 元信息的一部分会被维持在 Master 的内存中，由 Master 负责管理。
+The namespace is part of GFS metadata. It is kept in the Master's memory and managed by the Master.
 
-在逻辑上，GFS Master 并不会根据文件与目录的关系以分层的结构来管理这部分数据，而是单纯地将其表示为从**完整路径名到对应文件元数据的映射表**，并在**路径名上应用前缀压缩**以减少内存占用。
+Logically, the GFS Master does not manage this data with a hierarchical structure based on file-directory relationships. Instead, it represents the namespace as a mapping from **full pathnames to file metadata**, and applies **prefix compression** to pathnames to reduce memory consumption.
 
-为了管理来自不同客户端的并发请求对 Namespace 的修改，Master 会为 Namespace 中的每个文件和目录都分配一个**读写锁**（Read-Write Lock）。由此，**对不同 Namespace 区域的并发请求便可以同时进行**。
+To handle concurrent namespace modifications from different clients, the Master assigns a **read-write lock** to every file and directory in the namespace. This allows concurrent requests that touch different namespace regions to proceed at the same time.
 
-所有 Master 操作在执行前都会需要先获取一系列的锁：
+Every Master operation must acquire a sequence of locks before it executes.
 
-通常，当操作涉及某个路径 `/d1/d2/.../dn/leaf` 时，Master 会需要**先获取从 `/d1`、`/d1/d2` 到 `/d1/d2/.../dn` 的读锁**，然后再根据操作的类型获取 `/d1/d2/.../dn/lead` 的**读锁或写锁 —— 获取父目录的读锁是为了避免父目录在此次操作执行的过程中被重命名或删除**。
+Usually, when an operation involves a path such as `/d1/d2/.../dn/leaf`, the Master first acquires read locks from `/d1`, `/d1/d2`, through `/d1/d2/.../dn`, and then acquires either a read lock or a write lock on `/d1/d2/.../dn/leaf` depending on the operation. The reason for acquiring read locks on parent directories is to prevent a parent directory from being renamed or deleted while the operation is running.
 
-由于大量的读写锁可能会造成较高的内存占用，这些锁会实际需要时才进行创建，并在不再需要时被销毁。
+Because a large number of read-write locks could consume significant memory, these locks are created only when needed and destroyed when no longer needed.
 
-除外，所有的**锁获取操作**也会按照一个相同的顺序进行，以避免发生**死锁**：
+In addition, all **lock acquisition** follows a consistent order to avoid **deadlocks**:
 
-锁首先按 Namespace 树的层级排列，同一层级内则以路径名字典序排列。
+Locks are ordered first by namespace tree level. Within the same level, they are ordered lexicographically by pathname.
 
-#### **读取文件**
+#### **Reading a File**
 
-客户端从 GFS 集群中读取文件内容的过程大致如下：
+The process for reading data from a GFS cluster is roughly as follows:
 
 ![img](https://pic2.zhimg.com/v2-670802df1fc494933e0a4edf61e3791d\_b.jpg)
 
-* 对于**指定的文件名和读取位置偏移值**，**客户端**可以根据固定的 Chunk 大小来计算出该位置在该文件的**哪一个 Chunk** 中
-* 客户端向 Master 发出请求，其中包含要读取的**文件名以及 Chunk 索引**值
-*   Master 向客户端响应 该 Chunk 的 Handle 以及其所有 Replica 当前所在的位置（由chunk server告知master）。
+* Given a **file name and a read offset**, the **client** can compute which **chunk** contains that offset based on the fixed chunk size.
+* The client sends a request to the Master containing the **file name and chunk index**.
+* The Master responds with the chunk handle and the locations of all current replicas of that chunk, as reported by Chunk Servers.
 
-    客户端会以**文件名和 Chunk 索引值为键**缓存该数据
-* 之后，客户端便可以**选取其中一个 Replica 所在的 Chunk Server 并向其发起请求**，请求中会指定需**要读取的 Chunk 的 Handle 以及要读取的范围**
+    The client caches this information using the **file name and chunk index** as the key.
+* The client then **chooses one Chunk Server that has a replica and sends it a request**. The request specifies the **chunk handle and the byte range to read**.
 
 #### **Chunk Lease**
 
-在客户端对**某个 Chunk** 做出修改时，GFS 为了能够处理不同的并发修改，**会把该 Chunk 的 Lease 交给某个 Replica，使其成为 Primary**：
+When a client modifies **a chunk**, GFS handles concurrent modifications by **granting the chunk's lease to one replica, making it the Primary**.
 
-Primary 会负责为这些修改**安排一个执行顺序**，然后其他 Replica 便按照相同的顺序执行这些修改。
+The Primary assigns a **serial order** to all modifications, and the other replicas apply those modifications in the same order.
 
-**Chunk Lease 在初始时会有 60 秒的超时时间**。
+The initial timeout for a **chunk lease is 60 seconds**.
 
-在未超时前，Primary 可以向 Master **申请延长** Chunk Lease 的时间
+Before the lease expires, the Primary can ask the Master to **extend** the lease.
 
-必要时 Master 也可以**直接撤回**已分配的 Chunk Lease
+When necessary, the Master can also **revoke** a lease that it previously granted.
 
-#### **文件写入**
+#### **Writing a File**
 
-客户端尝试**将数据写入到 某个 Chunk 的指定位置**的过程大致如下：
+The process for a client writing data to **a specified offset in a chunk** is roughly as follows:
 
 ![img](https://pic4.zhimg.com/v2-d92b00ff01399aa34176c04f2c14a79b\_b.jpg)
 
-* 客户端向 Master 询问目前哪个 **Chunk Server** 持有该 Chunk 的 Lease
-* Master 向客户端返回 Primary 和其他 Replica 的位置
-* **客户端将数据推送到所有的 Replica 上**。Chunk Server 会把这些数据保存在缓冲区中，等待使用
-*   待所有 Replica （chunck的备份）都接收到数据后，**客户端发送写请求给 Primary**
+* The client asks the Master which **Chunk Server** currently holds the lease for the chunk.
+* The Master returns the locations of the Primary and the other replicas.
+* **The client pushes the data to all replicas**. Chunk Servers store the data in buffers and wait for the actual write request.
+* After all replicas have received the data, **the client sends the write request to the Primary**.
 
-    Primary 为来自各个客户端的修改操作安排连续的执行序列号，并按顺序地应用于其本地存储的数据
-* Primary 将**写请求转发给其他 Secondary Replica**，Replica 们按照相同的顺序应用这些修改
-* Secondary Replica 响应 Primary，示意自己已经完成操作
-* Primary **响应客户端**，并返回该过程中发生的错误（若有）
+    The Primary assigns consecutive sequence numbers to mutation requests from different clients, then applies them to its local stored data in that order.
+* The Primary forwards the **write request to the Secondary replicas**. The replicas apply the mutations in the same order.
+* The Secondary replicas respond to the Primary to indicate completion.
+* The Primary **responds to the client** and reports any errors that occurred.
 
-如果该过程有发生错误，可以认为修改已在 Primary 和部分 Secondary 上成功执行（**如果在 Primary 上就出错了，那么写请求不会被转发给secondary**）。
+If an error occurs during this process, the mutation may have succeeded on the Primary and only some of the Secondaries. If the error occurs on the Primary, the write request will not be forwarded to the Secondaries.
 
-此时可以认为此次修改操作没有成功，因为数据会处于**不一致**的状态。实际上，GFS 所使用的客户端 lib 在此时会重新尝试执行此次操作。
+At that point, the mutation is considered unsuccessful because the data is now **inconsistent**. In practice, the GFS client library retries the operation.
 
-值得注意的是，这个流程特意将**数据流与控制流分开**：客户端先向 Chunk Server 提交数据，再将写请求发往 Primary。这么做的好处在于 GFS 能够更好地利用网络带宽资源。
+It is worth noting that this process deliberately separates the **data flow from the control flow**. The client first sends data to Chunk Servers, then sends the write request to the Primary. This lets GFS make better use of network bandwidth.
 
-从上述步骤可见，控制流借由写请求从客户端流向 Primary，再流向其他 Secondary Replica。
+As the steps above show, the control flow goes from the client to the Primary and then to the Secondary replicas through the write request.
 
-实际上，**数据流以一条线性数据管道进行传递**：
+In contrast, the **data flow is transferred through a linear data pipeline**:
 
-客户端会把数据上传到离自己最近的 Replica（就近原则，链式转发给所有CS，写入**LRU Buffer**）
+The client uploads the data to the nearest replica first, following the principle of locality. That replica writes the data into its **LRU buffer** and forwards it along the chain to the nearest next Chunk Server.
 
-该 Replica 在接收到数据后再转发给离自己最近的另一个 Replica，如此_**递归**_直到所有 Replica 都能接收到数据，如此一来便能够利用上每台机器的所有出口带宽。
+After receiving the data, each replica forwards it to the next nearest replica, and this continues _**recursively**_ until every replica has received the data. This lets the system use the outgoing bandwidth of every machine in the pipeline.
 
-#### **文件追加**
+#### **Appending to a File**
 
-文件追加操作的过程和写入的过程有几分相似：
+The append process is similar to the write process:
 
-* 同上
-* 客户端将数据推送到每个 Replica，然后客户端将请求发往 Primary
-*   **Primary 首先判断将数据追加到该块后是否会令块的大小超过上限**：
+* Same setup as above.
+* The client pushes data to every replica, then sends the request to the Primary.
+* **The Primary first checks whether appending the data to the chunk would exceed the chunk size limit**.
 
-    如果是，那么 Primary 会为该块**写入填充**至其大小达到上限
+    If it would, the Primary writes padding to the chunk until it reaches the size limit.
 
-    通知其他 Replica 执行相同的操作
+    It then tells the other replicas to perform the same padding operation.
 
-    再响应客户端，通知其应在下一个块上重试该操作
-* 如果数据能够被放入到当前块中，那么 Primary 会把数据追加到自己的 Replica 中，拿到追加成功返回的偏移值，然后通知其他 Replica 将数据**写入**到该偏移位置中
-* 最后 Primary 再响应客户端
+    Finally, it responds to the client and tells the client to retry the append on the next chunk.
+* If the data fits in the current chunk, the Primary appends the data to its own replica, obtains the offset returned by the successful append, and then tells the other replicas to **write** the data at that same offset.
+* Finally, the Primary responds to the client.
 
-当追加操作在部分 Replica 上执行失败时，Primary 会响应客户端，通知它此次操作已失败，客户端便会重试该操作。和写入操作的情形相同，此时已有部分 Replica 顺利写入这些数据，**重新进行数据追加便会导致这一部分的 Replica 上出现重复数据**，不过 GFS 的一致性模型也确实并未保证每个 Replica 都会是完全一致的。
+If the append succeeds on only some replicas, the Primary responds to the client that the operation failed, and the client retries it. As with normal writes, some replicas may already have successfully written the data. **Retrying the append can therefore create duplicate data on those replicas**. GFS's consistency model does not guarantee that every replica is byte-for-byte identical in every such case.
 
-**GFS 只确保数据会以一个原子的整体被追加到文件中至少一次**。由此我们可以得出，当追加操作成功时，数据必然已被写入到**所有 Replica 的相同偏移位置**上，且每个 Replica 的长度都至少超出此次追加的记录的尾部，下一次的追加操作必然会被分配一个比该值更大的偏移值，或是被分配到另一个新的块上。
+**GFS only guarantees that the data is appended as an atomic whole at least once**. Therefore, when an append operation succeeds, the data must have been written at the **same offset on all replicas**, and every replica's length is at least past the end of the appended record. The next append will be assigned an offset greater than that value, or it will be assigned to a new chunk.
 
-#### **文件快照**
+#### **File Snapshot**
 
-GFS 还提供了文件快照操作，**可为指定的文件或目录创建一个副本**。
+GFS also provides a snapshot operation that **creates a copy of a specified file or directory**.
 
-快照操作的实现采用了\*\*写时复制（Copy on Write）\*\*的思想：
+The snapshot operation is implemented with the idea of **copy-on-write**:
 
-*   在 **Master 接收到快照请求后，它首先会撤回这些 Chunk 的 Lease**
+* When the **Master receives a snapshot request, it first revokes the leases for the relevant chunks**.
 
-    从而让接下来其他客户端对这些 Chunk 进行写入时都会需要请求 Master 获知 Primary 的位置
+    This ensures that later client writes to those chunks must contact the Master to learn the Primary's location.
 
-    Master 便可利用这个机会创建新的 Chunk
-* 当 Chunk Lease 撤回或失效后，Master 会WAL，然后**对自己管理的命名空间进行复制操作**，复制产生的**新记录指向原本的 Chunk**
-*   当有客户端尝试对这些 Chunk 进行写入时（这时要发请求给Master了），Master 会注意到这个 Chunk 的引用计数大于 1
+    The Master can use this opportunity to create new chunks.
+* After the chunk leases are revoked or expire, the Master writes the operation to its WAL and then **copies the namespace metadata**. The **new records point to the original chunks**.
+* When a client later tries to write to one of these chunks, the Master notices that the chunk's reference count is greater than 1.
 
-    此时，Master 会为即将产生的新 Chunk 生成一个 **Handle**
+    The Master generates a new **handle** for the new chunk that is about to be created.
 
-    然后通知所有**持有这些 Chunk 的 Chunk Server** 在本地复制出一个新的 Chunk，**应用上新的 Handle**，然后再返回给客户端
+    It then tells all **Chunk Servers that hold the original chunk** to make a local copy, **apply the new handle**, and return the result to the client.
 
-#### **Replica 管理**
+#### **Replica Management**
 
-为了进一步优化 GFS 集群的效率，Master 在 **Replica 的位置选取**上会采取一定的策略。
+To further improve the efficiency of a GFS cluster, the Master uses several strategies when choosing **where replicas should be placed**.
 
-Master 的 Replica 编排策略主要为了实现**两个目标**：
+The Master's replica-placement policy has two main goals:
 
-* **最大化数据的可用性**
-* **最大化网络带宽的利用率**
+* **Maximize data availability**.
+* **Maximize network bandwidth utilization**.
 
-为此，Replica 不仅需要被保存在不同的机器上，还会需要被保存在不同的机架（机架服务器）上
+For this reason, replicas should not only be stored on different machines, but also on different racks.
 
-这样如果整个机架不可用了，数据仍然得以存活
+If an entire rack becomes unavailable, the data can still survive.
 
-如此一来，不同客户端对同一个 Chunk 进行**读取时便可以利用上不同机架的出口带宽**
+This also lets different clients reading the same chunk use outgoing bandwidth from different racks.
 
-但坏处就是进行写入时数据也会需要在不同机架间流转，不过在 GFS 的设计者看来这是个合理的 trade-off（妥协）。
+The downside is that writes must transfer data across racks. The GFS designers considered this a reasonable trade-off.
 
-Replica 的生命周期转换操作实际只有两个：**创建和删除**。
+Replica lifecycle transitions only have two real operations: **creation and deletion**.
 
-首先，Replica 的创建可能源于以下三种事件：创建 Chunk、为 Chunk 重备份、以及 Replica 均衡。
+First, replica creation may be caused by three events: creating a new chunk, re-replicating an existing chunk, or rebalancing replicas.
 
-在 Master 创建一个新的 Chunk 时，首先它要考虑在哪放置新的 Replica。Master 会考虑如下几个因素：
+When the Master creates a new chunk, it first decides where to place the new replicas. The Master considers the following factors:
 
-* Master 会倾向于把新的 Replica 放在**磁盘使用率较低的 Chunk Server 上**
-* Master 会**倾向于确保每个 Chunk Server 上“较新”的 Replica 不会太多**，因为新 Chunk 的创建意味着接下来会有大量的写入，如果某些 Chunk Server 上有太多的新 Chunk Replica，那么写操作压力就会集中在这些 Chunk Server 上
-* 如上文所述，Master 会倾向于把 Replica 放在**不同的机架**上
+* The Master prefers to place new replicas on **Chunk Servers with lower disk utilization**.
+* The Master **tries to ensure that each Chunk Server does not have too many "recent" replicas**, because creating a new chunk usually means that many writes will arrive soon. If some Chunk Servers have too many new chunk replicas, write pressure will be concentrated on those machines.
+* As mentioned above, the Master prefers to place replicas on **different racks**.
 
-当某个 Chunk 的 Replica 数量低于用户指定的阈值时，Master 就会对该 Chunk 进行**重备份**。
+When the number of replicas for a chunk falls below the user-specified threshold, the Master **re-replicates** that chunk.
 
-这可能由 Chunk Server 失效、Chunk Server 回报 Replica 数据损坏 or 用户提高 Replica 数量阈值所触发。
+This may be triggered by a Chunk Server failure, a Chunk Server reporting corrupted replica data, or a user increasing the replica-count threshold.
 
-首先，Master 会按照以下因素**为每个需要重备份的 Chunk 安排优先级**：
+The Master first assigns **a priority to every chunk that needs re-replication** according to the following factors:
 
-* 该 Chunk 的 Replica 数距离用户指定的 Replica 数量**阈值的差距**有多大
-* 优先为**未删除的文件**（见下文）的 Chunk 进行重备份
-* 除外，Master 还会**提高任何正在阻塞用户操作的 Chunk 的优先级**
+* How far the chunk's replica count is below the user-specified **replica threshold**.
+* Whether the chunk belongs to a **non-deleted file**, which is prioritized.
+* In addition, the Master **raises the priority of any chunk that is blocking user operations**.
 
-有了 Chunk 的优先级后，Master 会选取当前拥有最高优先级的 Chunk，**并指定若干 Chunk Server 直接从现在已有的 Replica 上复制数据**。
+After priorities are assigned, the Master selects the highest-priority chunk and **instructs several Chunk Servers to copy data directly from existing replicas**.
 
-Master 具体会指定哪些 Chunk Server 进行复制操作同样会考虑上面提到的几个因素。除外，为了减少重备份对用户使用的影响，Master 会**限制**当前整个集群正在进行的复制操作的数量，同时 Chunk Server 也会**限制**复制操作所使用的带宽。
+The Master's choice of target Chunk Servers uses the same placement factors described above. In addition, to reduce the impact of re-replication on users, the Master **limits** the total number of ongoing replication operations in the cluster, and each Chunk Server also **limits** the bandwidth used for copying.
 
-最后，Master 会周期地检查每个 Chunk 当前在集群内的分布情况，并在必要时迁移部分 Replica 以更好地均衡各节点的磁盘利用率和负载。
+Finally, the Master periodically checks the distribution of each chunk in the cluster. When necessary, it migrates some replicas to better balance disk utilization and load across nodes.
 
-新 Replica 的位置选取策略和上面提到的大体相同，除此以外 Master 还会需要选择要移除哪个已有的 Replica：简单概括的话，**Master 会倾向于移除磁盘占用较高的 Chunk Server 上的 Replica，以均衡磁盘使用率**。
+The placement strategy for a new replica is broadly the same as above. In addition, the Master must choose which existing replica to remove. In short, **the Master tends to remove replicas from Chunk Servers with high disk usage in order to balance disk utilization**.
 
-#### **删除文件**
+#### **Deleting a File**
 
-当用户对某个文件进行删除时，GFS 不会立刻删除数据，而是在**文件和 Chunk 两个层面上**都 lazy 地对数据进行移除。
+When a user deletes a file, GFS does not immediately delete the data. Instead, it removes data lazily at both the **file level and chunk level**.
 
-首先，当用户删除某个文件时，GFS 不会从 Namespace 中直接移除该文件的记录，而是将该文件**重命名**为另一个隐藏的名称，并带上**删除时的时间戳**。
+First, when a user deletes a file, GFS does not directly remove the file record from the namespace. It **renames** the file to a hidden name and attaches the **deletion timestamp**.
 
-在 Master 周期扫描 Namespace 时，它会发现那些已被“删除”较长时间（如三天）的文件，这时候 Master 才会真正地将其从 Namespace 中移除。
+During the Master's periodic namespace scan, it finds files that have been "deleted" for a long time, for example three days. Only then does the Master actually remove them from the namespace.
 
-在文件被彻底从 Namespace 删除前，客户端仍然可以利用这个重命名后的隐藏名称读取该文件，**甚至再次将其重命名以撤销删除操作**。
+Before the file is completely removed from the namespace, a client can still read the file using its hidden renamed path, and can even rename it again to undo the deletion.
 
-Master 在元数据中有维持文件与 Chunk 之间的映射关系：
+The Master maintains the mapping between files and chunks in metadata.
 
-当 Namespace 中的文件被移除后，**对应 Chunk 的引用计数便自动减 1**。
+When a file is removed from the namespace, **the reference count of its chunks automatically decreases by 1**.
 
-同样是在 Master 周期扫描元数据的过程中，Master 会发现**引用计数已为 0 的 Chunk**，此时 Master 便会从自己的内存中移除与这些 Chunk 有关的元数据。在 Chunk Server 和 Master 进行的周期心跳通信中，Chunk Server 会汇报自己所持有的 Chunk Replica，此时 Master 便会告知 Chunk Server 哪些 Chunk 已不存在于元数据中，Chunk Server 则可自行移除对应的 Replica。
+Again during the Master's periodic metadata scan, the Master finds **chunks whose reference count has reached 0** and removes their metadata from memory. During the periodic heartbeat between Chunk Servers and the Master, each Chunk Server reports the chunk replicas it holds. The Master then tells the Chunk Server which chunks no longer exist in metadata, and the Chunk Server can delete the corresponding replicas by itself.
 
-采用这种删除机制主要有如下三点好处：
+This deletion mechanism has three main advantages:
 
-*   对于大规模的分布式系统来说，这样的机制更为**可靠**：
+* For a large-scale distributed system, this mechanism is more **reliable**.
 
-    在 Chunk 创建时，创建操作可能在某些 Chunk Server 上成功了，在其他 Chunk Server 上失败了，这导致**某些 Chunk Server 上可能存在 Master 不知道的 Replica**。
+    When a chunk is created, the creation may succeed on some Chunk Servers and fail on others. This means **some Chunk Servers may contain replicas unknown to the Master**.
 
-    除此以外，删除 Replica 的请求可能会发送失败，Master 会需要记得尝试重发。相比之下，由 Chunk Server 主动地删除 Replica 能够以一种更为统一的方式解决以上的问题
-*   这样的删除机制将**存储回收过程与 Master 日常的周期扫描过程合并在了一起**，这就使得这些操作可以以批的形式进行处理，以减少资源损耗；
+    In addition, a request to delete a replica may fail to be delivered, and the Master would have to remember to retry it. In contrast, letting Chunk Servers delete replicas proactively solves these problems in a more uniform way.
+* This deletion mechanism **merges storage reclamation with the Master's routine periodic scans**, so the operations can be processed in batches and resource consumption is reduced.
 
-    这样也得以让 Master 选择在相对**空闲**的时候进行这些操作
-* 用户发送删除请求和数据被实际删除之间的延迟也有效避免了用户误操作的问题
+    This also lets the Master perform cleanup when the system is relatively **idle**.
+* The delay between the user's delete request and actual data deletion also protects users from accidental deletion.
 
-不过，如果在存**储资源较为稀缺的情况下**，用户对存储空间使用的调优可能就会受到该机制的阻碍。
+However, if **storage resources are scarce**, this mechanism may make storage-space tuning harder for users.
 
-为此，GFS 允许客户端**再次指定删除**该文件，以确实地从 Namespace 层移除该文件。
+For this reason, GFS allows the client to **explicitly delete** the file again in order to truly remove it at the namespace level.
 
-除外，GFS 还可以让用户为 Namespace 中**不同的区域指定不同的备份和删除策略**，如限制 GFS 不对某个目录下的文件进行 Chunk 备份等。
+In addition, GFS lets users specify different replication and deletion policies for different namespace regions, such as instructing GFS not to replicate chunks for files under a certain directory.
 
-### **高可用机制**
+### **High Availability Mechanisms**
 
 #### Master
 
-前面我们提到，Master 会以先写日志（Operation Log）的形式对集群元数据进行持久化：日志在被确实写出前，Master 不会对客户端的请求进行响应，后续的变更便不会继续执行；除外，日志还会被备份到其他的多个机器上，**日志只有在写入到本地以及远端备份的持久化存储中才被视为完成写出**。
+As mentioned earlier, the Master persists cluster metadata through an operation log. Before the log is durably written, the Master does not respond to the client request and subsequent changes do not proceed. In addition, the log is replicated to several other machines. **A log record is considered written only after it has been written to persistent storage both locally and on remote backups**.
 
-在重新启动时，Master 会通过重放已保存的操作记录来恢复自身的状态。
+On restart, the Master recovers its state by replaying saved operation records.
 
-为了保证 Master 能够快速地完成恢复，Master 会在**日志达到一定大小后为自身的当前状态创建 Checkpoint（检查点）**，**删除** Checkpoint 创建以前的日志，重启时便从**最近一次创建的 Checkpoint 开始恢复**。
+To make recovery fast, after the operation log reaches a certain size, the Master creates a **checkpoint** of its current state and **deletes** log records before that checkpoint. During restart, it recovers from the **most recent checkpoint**.
 
-Checkpoint 文件的内容会以 **B 树**的形式进行组织，且在被映射到内存后便能够在不做其他额外的解析操作的情况下检索其所存储的 Namespace，这便进一步减少了 Master 恢复所需的时间。
+The checkpoint file is organized as a **B-tree**. Once mapped into memory, it can be searched without additional parsing to retrieve the stored namespace. This further reduces Master recovery time.
 
-为了简化设计，同一时间只会有一个 Master 起作用。当 Master 失效时，外部的监控系统会侦测到这一事件，并在其他地方重新启动新的 Master 进程。
+To simplify the design, only one Master is active at a time. When the Master fails, an external monitoring system detects the event and starts a new Master process elsewhere.
 
-除外，集群中还会有其他**提供只读功能**的 **Shadow Master**：
+In addition, the cluster has **Shadow Masters** that provide **read-only** service.
 
-它们会同步 Master 的状态变更，但有可能延迟若干秒，其主要用于为 Master 分担读操作的压力。Shadow Master 会通过读取 Master 操作日志的**某个备份**来让自己的状态与 Master 同步；
+They synchronize state changes from the Master, but may lag by several seconds. Their main purpose is to offload read pressure from the Master. A Shadow Master keeps its state synchronized by reading **a backup** of the Master's operation log.
 
-它也会像 Master 那样，在启动时**轮询**各个 Chunk Server，获知它们所持有的 Chunk Replica 信息，并持续监控它们的状态。**实际上，在 Master 失效后，Shadow Master 仍能为整个 GFS 集群提供只读功能，而 Shadow Master 对 Master 的依赖只限于 Replica 位置的更新事件**。
+Like the Master, a Shadow Master also polls Chunk Servers at startup to learn which chunk replicas they hold, and it continuously monitors their state. **In practice, after the Master fails, a Shadow Master can still provide read-only service for the GFS cluster. Its dependency on the Master is limited to replica-location update events**.
 
 #### Chunk Server
 
-作为集群中的 Slave 角色，Chunk Server 失效的几率比 Master 要大得多。在前面我们已经提到，**Chunk Server 失效时，其所持有的 Replica 对应的 Chunk 的 Replica 数量便会降低**，Master 也会发现 Replica 数量低于用户指定阈值的 Chunk 并安排重备份。
+As the slave role in the cluster, a Chunk Server is much more likely to fail than the Master. As mentioned earlier, **when a Chunk Server fails, the replica count of the chunks stored on it decreases**, and the Master discovers chunks whose replica count is below the user-specified threshold and schedules re-replication.
 
-除外，当 Chunk Server 失效时，用户的**写入操作还会不断地进行**，那么当 Chunk Server 重启后，Chunk Server 上的 Replica 数据便有可能是已经过期的。
+In addition, while a Chunk Server is down, users may continue to perform **writes**. When the Chunk Server restarts, the replica data on it may therefore be stale.
 
-为此，Master 会为**每个 Chunk 维持一个版本号**，以区分正常的和过期的 Replica。
+To handle this, the Master maintains **a version number for every chunk** to distinguish fresh replicas from stale replicas.
 
-每当 Master 将 **Chunk Lease 分配给一个 Chunk Server 时，Master 便会提高 Chunk 的版本号，并通知其他最新的 Replica 更新自己的版本号**。如果此时有 Chunk Server 失效了，那么它上面的 Replica 的版本号就不会变化。
+Whenever the Master grants a **chunk lease to a Chunk Server, it increases the chunk version number and informs the other up-to-date replicas to update their version numbers**. If a Chunk Server is down at that moment, the version number of its replica does not change.
 
-在 Chunk Server 重启时，Chunk Server 会向 Master 汇报自己所持有的 Chunk Replica 及对应的版本号。如果 Master 发现某个 Replica 版本号过低，便会认为这个 Replica 不存在，如此一来这个过期的 Replica 便会在**下一次的 Replica 回收过程中**被移除。
+When the Chunk Server restarts, it reports the chunk replicas it holds and their version numbers to the Master. If the Master finds that a replica's version number is too low, it treats that replica as nonexistent. The stale replica will then be removed during the **next replica garbage-collection process**.
 
-此外，Master 向客户端返回 Replica 位置信息时也会返回 Chunk 当前的版本号，如此一来客户端便不会读取到旧的数据。
+In addition, when the Master returns replica-location information to a client, it also returns the current chunk version number, so the client will not read stale data.
 
-#### **数据完整性**
+#### **Data Integrity**
 
-如前面所述，每个 Chunk 都会以 Replica 的形式被备份在不同的 Chunk Server 中，而且用户可以为 Namespace 的不同部分赋予不同的备份策略。
+As discussed earlier, every chunk is replicated on different Chunk Servers, and users can assign different replication policies to different parts of the namespace.
 
-为了保证数据完整，每个 Chunk Server 都会以**校验和**的形式来检测自己保存的数据是否有损坏；
+To preserve data integrity, each Chunk Server uses **checksums** to detect whether its stored data has been corrupted.
 
-在侦测到损坏数据后，Chunk Server 也可以利用其它 Replica 来**恢复**数据。
+After detecting corrupted data, the Chunk Server can also use another replica to **recover** the data.
 
-首先，Chunk Server 会把每个 Chunk Replica 切分为若干个 64KB 大小的块，并为每个块计算 32 位校验和。
+First, a Chunk Server divides each chunk replica into multiple 64 KB blocks and computes a 32-bit checksum for every block.
 
-和 Master 的元数据一样，这些校验和会被保存在 Chunk Server 的内存中，每次修改前都会用先写日志的形式来保证可用。
+Like the Master's metadata, these checksums are stored in the Chunk Server's memory. Before each modification, changes are protected with a write-ahead-log style mechanism to ensure availability.
 
-当 Chunk Server 接收到**读**请求时，Chunk Server 首先会利用校验和检查所需读取的数据是否有发生损坏，如此一来 Chunk Server 便不会把损坏的数据传递给其他请求发送者，无论它是客户端还是另一个 Chunk Server。
+When a Chunk Server receives a **read** request, it first uses checksums to verify whether the requested data is corrupted. This prevents the Chunk Server from sending corrupted data to any requester, whether the requester is a client or another Chunk Server.
 
-发现损坏后，Chunk Server 会为**请求发送者**发送一个错误，并向 \*\*Master \*\*告知数据损坏事件。接收到错误后，请求发送者会选择另一个 Chunk Server 重新发起请求，而 Master 则会利用另一个 Replica 为该 Chunk 进行重备份。当新的 Replica 创建完成后，Master 便会通知该 Chunk Server 删除这个损坏的 Replica。
+After detecting corruption, the Chunk Server sends an error to the **requester** and reports the corruption event to the **Master**. After receiving the error, the requester retries the request against another Chunk Server. The Master then uses another replica to re-replicate the chunk. After the new replica is created, the Master tells the corrupted Chunk Server to delete the bad replica.
 
-当进行数据追加操作时，Chunk Server 可以**为位于 Chunk 尾部的校验和块的校验和进行增量式的更新**，或是在产生了新的校验和块时为其**计算新的校验和**。
+During append operations, a Chunk Server can **incrementally update the checksum of the checksum block at the end of the chunk**, or **compute a new checksum** when a new checksum block is created.
 
-即使是被追加的校验和块在之前已经发生了数据损坏，增量更新后的校验和依然会无法与实际的数据相匹配，在下一次读取时依然能够检测到数据的损坏。在进行数据写入操作时，Chunk Server 必须读取并校验包含写入范围起始点和结束点的校验和块，然后进行写入，最后再重新计算校验和。
+Even if the checksum block being appended to was already corrupted, the incrementally updated checksum will still fail to match the actual data, so the corruption can still be detected on the next read. During write operations, the Chunk Server must read and verify the checksum blocks containing the start and end of the write range, perform the write, and then recompute the checksums.
 
-除外，在空闲的时候，Chunk Server 也会周期地扫描并校验不活跃的 Chunk Replica 的数据，以确保某些 Chunk Replica 即使在不怎么被读取的情况下，其数据的损坏依然能被检测到，同时也确保了这些已损坏的 Chunk Replica 不至于让 Master 认为该 Chunk 已有足够数量的 Replica。
+In addition, when idle, a Chunk Server periodically scans and verifies the data of inactive chunk replicas. This ensures that corruption can be detected even for chunk replicas that are rarely read, and also prevents corrupted replicas from causing the Master to believe that a chunk has enough valid replicas.
 
-### **附录**
+### **Appendix**
 
-#### **节点缓存**
+#### **Node Caching**
 
-在 GFS 中，**客户端和 Chunk Server 都不会对文件数据进行缓存**。
+In GFS, **clients and Chunk Servers do not cache file data**.
 
-* 对于客户端而言，考虑到大多数应用都会选择**顺序读取某些大文件**，缓存的作用微乎其微，不过客户端确实会**缓存 GFS 的元数据以减少和 Master 的通信**
-* 对于 Chunk Server 来说，缓存文件数据也是不必要的，因为这些内容本身就保存在它的本地磁盘上，**Linux 内核的缓存机制也会把经常访问的磁盘内容放置在内存**中。
+* For clients, most applications **sequentially read large files**, so caching file data has little value. However, clients do **cache GFS metadata to reduce communication with the Master**.
+* For Chunk Servers, caching file data is unnecessary because the data is already stored on local disk. In addition, **the Linux kernel buffer cache already keeps frequently accessed disk data in memory**.
 
-#### **Chunk 的大小**
+#### **Chunk Size**
 
-对于 GFS 而言，Chunk 的大小是一个比较重要的参数，而 GFS 选择了使用 64MB 作为 Chunk 的大小。
+For GFS, chunk size is an important parameter. GFS chooses 64 MB as its chunk size.
 
-较大的 Chunk 主要带来了如下几个好处：
+A large chunk size brings several benefits:
 
-* 降低客户端与 Master 通信的频率
-* 增大客户端进行操作时这些操作落到同一个 Chunk 上的概率
-* 减少 Master 所要保存的元数据的体积
+* It reduces the frequency of client-Master communication.
+* It increases the probability that a client's operations fall on the same chunk.
+* It reduces the amount of metadata the Master must store.
 
-不过，较大的 Chunk 会使得小文件占据额外的存储空间；一般的小文件通常只会占据一个 Chunk，这些 Chunk 也容易成为系统的**负载热点**。
+However, large chunks can make small files consume extra storage space. A typical small file usually occupies only one chunk, and those chunks can easily become **load hot spots**.
 
-但正如之前所设想的需求那样，这样的文件在 Google 的场景下不是普遍存在的，这样的问题并未在 Google 中真正出现过。即便真的出现了，也可以通过提升这类文件的 Replica 数量来将负载进行均衡。
+But as assumed in the original requirements, such files were not common in Google's workload, and this problem did not really appear at Google. Even if it did appear, the load could be balanced by increasing the replica count for those files.
 
-#### **组件的快速恢复**
+#### **Fast Component Recovery**
 
-GFS 的组件在设计时**着重提高了状态恢复的速度**，通常能够在几秒钟内完成启动。
+GFS components are designed with a strong emphasis on **fast state recovery**, and they can usually start within a few seconds.
 
-在这样的保证下，GFS 的组件实际上并不对正常关闭和异常退出做区分：要关闭某个组件时直接 `kill -9` 即可。
+With this guarantee, GFS components do not distinguish normal shutdown from abnormal exit in an important way. To shut down a component, it is acceptable to directly use `kill -9`.
 
 ### FAQ
 
-MIT 6.824 的课程材料中给出了和 GFS 有关的 FAQ，在此我简单地翻译一下其中比较重要的一些内容。
+The MIT 6.824 course material provides a FAQ about GFS. I translate the important parts here.
 
-> Q：为什么原子记录追加操作是至少一次（At Least Once），而不是确定一次（Exactly Once）？
+> Q: Why is atomic record append at-least-once rather than exactly-once?
 
-要让追加操作做到确定一次是不容易的，因为如此一来 Primary 会需要保存一些状态信息以检测重复的数据，而这些信息也需要复制到其他服务器上，以确保 Primary 失效时这些信息不会丢失。在 Lab 3 中你会实现确定一次的行为，但用的是比 GFS 更复杂的协议（Raft）。
+Making append exactly-once is not easy, because the Primary would need to keep state to detect duplicate data. That state would also need to be replicated to other servers so that it is not lost when the Primary fails. In Lab 3, you will implement exactly-once behavior, but using a more complex protocol, Raft.
 
-> Q：应用怎么知道 Chunk 中哪些是填充数据或者重复数据？
+> Q: How does an application know which parts of a chunk are padding or duplicate data?
 
-要想检测填充数据，应用可以在每个有效记录之前加上一个魔数（Magic Number）进行标记
+To detect padding, an application can put a magic number before every valid record.
 
-或者用校验和保证数据的有效性。
+It can also use checksums to validate data.
 
-应用可通过在记录中添加唯一 ID 来检测重复数据，这样应用在读入数据时就可以利用已经读入的 ID 来排除重复的数据了。GFS 本身提供了 library 来支撑这些典型的用例。
+An application can detect duplicate data by adding a unique ID to every record. When reading data, the application can use IDs it has already read to filter out duplicates. GFS itself provides library support for these typical use cases.
 
-> Q：考虑到**原子记录追加操作会把数据写入到文件的一个不可预知的偏移值**中，客户端该怎么找到它们的数据？
+> Q: Since **atomic record append writes data at an unpredictable offset in the file**, how does a client find its data?
 
-追加操作（以及 GFS 本身）主要是面向那些会完整读取文件的应用的。
+Append operations, and GFS itself, are mainly intended for applications that read complete files.
 
-这些应用会读取所有的记录，所以它们并不需要提前知道记录的位置。例如，一个文件中可能包含若干个并行的网络爬虫获取的所有链接 URL。这些 URL 在文件中的偏移值是不重要的，应用只会想要完整读取所有 URL。
+These applications read all records, so they do not need to know the position of a record in advance. For example, a file might contain all link URLs collected by several parallel web crawlers. The offset of each URL in the file is not important. The application only wants to read all URLs.
 
-> Q：如果一个应用使用了标准的 POSIX 文件 API，为了使用 GFS 它会需要做出修改吗？
+> Q: If an application uses the standard POSIX file API, does it need to be modified to use GFS?
 
-需要，不过 GFS 并不是设计给已有的应用的，它主要面向的是新开发的应用，如 MapReduce 程序。
+Yes. GFS was not designed for existing applications. It was mainly designed for newly developed applications, such as MapReduce programs.
 
-> Q：GFS 是怎么确定最近的 Replica 的位置的？
+> Q: How does GFS determine which replica is nearest?
 
-论文中有提到 GFS 是**基于保存 Replica 的服务器的 IP 地址来判断距离**的。
+The paper mentions that GFS determines distance **based on the IP address of the server that stores the replica**.
 
-在 2003 年的时候，Google 分配 IP 地址的方式应该确保了如果两个服务器的 IP 地址在 IP 地址空间中较为接近，那么它们在机房中的位置也会较为接近。
+In 2003, Google's IP address allocation should have ensured that if two servers were close in the IP address space, they were also close in the data center.
 
-> Q：Google 现在还在使用 GFS 吗？
+> Q: Is Google still using GFS?
 
-Google 仍然在使用 GFS，而且是作为其他如 BigTable 等存储系统的后端。由于工作负载的扩大以及技术的革新，GFS 的设计在这些年里无疑已经经过大量调整了，但我并不了解其细节。HDFS 是公众可用的对 GFS 的设计的一种效仿，很多公司都在使用它。
+Google still uses GFS, and it is used as the backend for other storage systems such as Bigtable. As workloads grew and technology changed, GFS's design has certainly been adjusted significantly over the years, but I do not know the details. HDFS is a public imitation of the GFS design, and many companies use it.
 
-> Q：Master 不会成为性能瓶颈吗？
+> Q: Does the Master become a performance bottleneck?
 
-确实有这个可能，GFS 的设计者也花了很多心思来避免这个问题。例如，Master 会把它的状态保存在内存中以快速地进行响应。从实验数据来看，对于大文件读取（GFS 主要针对的负载类型），Master 不是瓶颈所在；对于小文件操作以及目录操作，Master 的性能也还跟得上（见 6.2.4 节）。
+It is possible. The GFS designers made many efforts to avoid this problem. For example, the Master keeps its state in memory to respond quickly. According to the experimental results, for large-file reads, which are the main workload GFS targets, the Master is not the bottleneck. For small-file operations and directory operations, Master performance is also sufficient, see Section 6.2.4.
 
-> Q：GFS 为了性能和简洁而牺牲了正确性，这样的选择有多合理呢？
+> Q: How reasonable is GFS's choice to sacrifice correctness for performance and simplicity?
 
-这是分布式系统领域的老问题了。保证强一致性通常需要更加复杂且需要机器间进行更多通信的协议（正如我们会在接下来几门课中看到的那样）。通过利用某些类型的应用可以容忍较为松懈的一致性的事实，人们就能够设计出拥有良好性能以及足够的一致性的系统。例如，GFS 对 MapReduce 应用做出了特殊优化，这些应用需要的是对大文件的高读取效率，还能够容忍文件中存在数据空洞、重复记录或是不一致的读取结果；另一方面，GFS 则不适用于存储银行账号的存款信息。
+This is an old question in distributed systems. Strong consistency usually requires more complex protocols and more communication between machines, as we will see in later courses. By taking advantage of the fact that certain applications can tolerate relaxed consistency, people can design systems with good performance and sufficient consistency. For example, GFS is specially optimized for MapReduce applications. These applications need efficient reads of large files and can tolerate holes, duplicate records, or inconsistent read results. On the other hand, GFS is not suitable for storing bank-account balances.
 
-> Q：如果 Master 失效了会怎样？
+> Q: What happens if the Master fails?
 
-GFS 集群中会有持有 Master 状态完整备份的 Replica Master；通过论文中没有提到的某个机制，GFS 会在 Master 失效时切换到其中一个 Replica（见 5.1.3 节）。有可能这会需要一个人类管理者的介入来指定一个新的 Master。无论如何，我们都可以确定集群中潜伏着一个故障单点，理论上能够让集群无法从 Master 失效中进行自动恢复。我们会在后面的课程中学习如何使用 Raft 协议实现可容错的 Master。
+A GFS cluster has replica Masters that hold complete backups of the Master's state. Through a mechanism not described in the paper, GFS switches to one of these replicas when the Master fails, see Section 5.1.3. This may require a human administrator to designate a new Master. In any case, we can be sure that the cluster has a latent single point of failure that could theoretically prevent automatic recovery from Master failure. Later in the course, we will learn how to use Raft to implement a fault-tolerant Master.
 
-#### **问题**
+#### **Question**
 
-除了 FAQ，课程还要求学生在阅读 GFS 的论文后回答一个问题，问题如下：
+Besides the FAQ, the course also asks students to answer one question after reading the GFS paper:
 
 > Describe a sequence of events that result in a client reading stale data from the Google File System
 >
-> 描述一个事件序列，使得客户端会从 Google File System 中读取到过时的数据
+> Describe an event sequence in which a client reads stale data from Google File System.
 
-通过查阅论文，不难找到两处答案：由失效后重启的 Chunk Server + 客户端缓存的 Chunk 位置数据导致客户端读取到过时的文件内容（见 4.5 和 2.7.1 节），和由于 Shadow Master 读取到的过时文件元信息（见 5.1.3 节）。以上是保证所有写入操作都成功时客户端可能读取到过时数据的两种情况 —— 如果有写入操作失败，数据会进入**不确定**的状态，自然客户端也有可能读取到过时或是无效的数据。
+By checking the paper, it is not hard to find two answers. One is stale file data caused by a Chunk Server that failed and restarted, combined with cached chunk-location data on the client, see Sections 4.5 and 2.7.1. The other is stale file metadata read by a Shadow Master, see Section 5.1.3. These are two situations where a client may read stale data even when all write operations succeed. If a write operation fails, the data enters an **undefined** state, and naturally the client may also read stale or invalid data.
 
-### **结语**
+### **Conclusion**
 
-本文没有总结论文中第六、七章的内容：
+This note does not summarize Chapters 6 and 7 of the paper.
 
-第六章是 GFS 各项指标的测试结果，受限于篇幅故没能在此放出，若读者对 Google 测试 GFS 性能指标的方法有所兴趣也可参考这一章的内容；
+Chapter 6 contains the evaluation results for GFS. Due to space limits, I did not include them here. Readers interested in how Google measured GFS performance can refer to that chapter.
 
-第七章则提到了 Google 在开发 GFS 时踩过的一些坑，主要和 Linux 本身的 bug 有关，此处没能放出这部分的内容主要是考虑到这些 bug 主要涉及 Linux 2.2 和 2.4 版本，相较于今日已失去其时效性，况且这些 bug 也很有可能已经由 GFS 的开发者修复并提交到新版的 Linux 中了。
+Chapter 7 describes some pitfalls Google encountered while developing GFS, mainly related to Linux bugs. I did not include that part because those bugs mostly involved Linux 2.2 and 2.4, which are no longer timely today. Those bugs were also likely fixed by the GFS developers and submitted to later Linux versions.
 
-从内容上看，阅读 GFS 的论文是对**高性能和强一致性之间的矛盾的一次很好的 Case Study**：
+From a content perspective, reading the GFS paper is a useful case study of **the tension between high performance and strong consistency**.
 
-在强一致性面前，GFS 选择了更高的吞吐性能以及自身架构的简洁。
+When facing strong consistency, GFS chose higher throughput and a simpler architecture.
 
-高性能与强一致性之间的矛盾是分布式系统领域经久不衰的话题，源于它们通常是不可兼得的。
+The tension between high performance and strong consistency is a long-standing topic in distributed systems because they are usually difficult to achieve at the same time.
 
-除外，为了实现理想的一致性，系统也可能面临来自并发操作、机器失效、网络隔离等问题所带来的挑战。
+In addition, to achieve ideal consistency, a system must also handle challenges caused by concurrent operations, machine failures, network partitions, and similar problems.
 
-从概念上来讲，一致指的是某个正确的状态，而一个系统往往会有很多种不同的正确的状态，它们又常被统称为系统的**一致性模型**。在后面要阅读的论文中，我们还会不断地看到这个概念。
+Conceptually, consistency refers to a correct state. A system may have many different correct states, and these are often collectively called the system's **consistency model**. We will continue to see this concept in later papers.
 
-Google File System 论文的发表催生了后来的 **HDFS**，后者直到今天依然是开源分布式文件系统解决方案的首选。Google MapReduce 加上 Google File System 这两篇论文可谓是大数据时代的开山之作，与 Google BigTable 并称 Google 的三架马车，由此看来这几篇经典论文还是很值得我们去学习一番的。
+The Google File System paper later inspired **HDFS**, which is still one of the most important open-source distributed file-system solutions. Google MapReduce and Google File System can be seen as foundational papers of the big-data era. Together with Google Bigtable, they are often called Google's three classic infrastructure papers. These papers are still very worth studying.

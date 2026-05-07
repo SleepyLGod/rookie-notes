@@ -1,11 +1,11 @@
 ---
-description: 一个比LevelDB更彪悍的引擎
+description: A high-performance embeddable key-value storage engine derived from LevelDB.
 ---
 
 # 🤩 RocksDB
 
-RocksDB 是face book基于Google LevelDB研发的高性能kv持久化存储引擎，以库组件形式嵌入程序中，为大规模分布式应用在ssd上运行提供优化。
+RocksDB is a high-performance persistent key-value storage engine developed by Facebook based on Google's LevelDB. It is embedded into applications as a library component and is optimized for large-scale distributed applications running on SSDs.
 
-RocksDB不提供高层级的操作，例如备份、负载均衡、快照等，而是选择提供工具支持将实现交给上层应用。
+RocksDB does not directly provide high-level system operations such as backup orchestration, load balancing, or snapshot management. Instead, it provides lower-level tools and leaves those system-level policies to the application layer.
 
-正是这种高度可定制化能力，允许RocksDB对广泛的需求和工作负载场景进行定制。
+This high degree of configurability allows RocksDB to be tuned for a wide range of requirements and workload patterns.

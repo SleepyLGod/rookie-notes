@@ -1,48 +1,48 @@
 ---
-description: Some note about the famous LevelDB.
+description: Notes on LevelDB architecture, public interfaces, and implementation details.
 ---
 
 # 🤩 LevelDB
 
-### **LevelDB 整体架构**
+### **Overall Architecture of LevelDB**
 
-![LevelDB 整体架构](https://pic2.zhimg.com/v2-796529d39d931069e82629e73eefa8d1\_b.jpg)
+![Overall architecture of LevelDB](https://pic2.zhimg.com/v2-796529d39d931069e82629e73eefa8d1\_b.jpg)
 
-:thumbsup:先嫖个好图，简单展示了 LevelDB 的整体架构。
+:thumbsup: The diagram gives a concise overview of LevelDB's architecture.
 
-1. <mark style="color:purple;">**MemTable**</mark>：内存数据结构，具体实现是 SkipList。 接受用户的读写请求，新的数据会先在这里写入。
-2. <mark style="color:purple;">**Immutable MemTable**</mark>：当 MemTable 的大小达到设定的阈值后，会被转换成 Immutable MemTable，只接受读操作，不再接受写操作，然后由后台线程 flush 到磁盘上 —— 这个过程称为 minor compaction。
-3. <mark style="color:purple;">**Log**</mark>：数据写入 MemTable 之前会先写日志，用于防止宕机导致 MemTable 的数据丢失。一个日志文件对应到一个 MemTable。
-4. <mark style="color:purple;">**SSTable**</mark>：Sorted String Table。分为 level-0 到 level-n 多层，每一层包含多个 SSTable，文件内数据有序。除了 level-0 之外，每一层内部的 SSTable 的 key 范围都不相交。
-5. <mark style="color:purple;">**Manifest**</mark>：Manifest 文件中记录 SSTable 在不同 level 的信息，包括每一层由哪些 SSTable，每个 SSTable 的文件大小、最大 key、最小 key 等信息。
-6. <mark style="color:purple;">**Current**</mark>：重启时，LevelDB 会重新生成 Manifest，所以 Manifest 文件可能同时存在多个，Current 记录的是当前使用的 Manifest 文件名。
-7. <mark style="color:purple;">**TableCache**</mark>：TableCache 用于缓存 SSTable 的文件描述符、索引和 filter。
-8. <mark style="color:purple;">**BlockCache**</mark>：SSTable 的数据是被组织成一个个 block。BlockCache 用于缓存这些 block（解压后）的数据。
+1. <mark style="color:purple;">**MemTable**</mark>: an in-memory data structure implemented as a SkipList. It serves user read and write requests, and new writes are first inserted here.
+2. <mark style="color:purple;">**Immutable MemTable**</mark>: once a MemTable reaches the configured size threshold, it is converted into an immutable MemTable. It accepts reads but no further writes, and a background thread flushes it to disk. This process is called minor compaction.
+3. <mark style="color:purple;">**Log**</mark>: before data is written into the MemTable, LevelDB first writes it to a log to avoid losing MemTable data after a crash. One log file corresponds to one MemTable.
+4. <mark style="color:purple;">**SSTable**</mark>: Sorted String Table. LevelDB organizes SSTables into levels from level-0 to level-n. Each level contains multiple SSTables, and records inside each file are sorted. Except for level-0, SSTables within the same level have non-overlapping key ranges.
+5. <mark style="color:purple;">**Manifest**</mark>: the Manifest records SSTable metadata across levels, including which SSTables belong to each level, each file's size, and each SSTable's minimum and maximum keys.
+6. <mark style="color:purple;">**Current**</mark>: after restart, multiple Manifest files may exist. The Current file records the name of the Manifest currently in use.
+7. <mark style="color:purple;">**TableCache**</mark>: caches SSTable file descriptors, indexes, and filters.
+8. <mark style="color:purple;">**BlockCache**</mark>: SSTable data is organized into blocks. BlockCache caches the decompressed data of these blocks.
 
-**解析详见：**[**doc/index.md**](https://github.com/google/leveldb/blob/master/doc/index.md) **.**&#x20;
+**For the official overview, see:** [**doc/index.md**](https://github.com/google/leveldb/blob/master/doc/index.md) **.**&#x20;
 
-**实现概览参考：**[**doc/impl.md**](https://github.com/google/leveldb/blob/master/doc/impl.md) **.**
+**For the implementation overview, see:** [**doc/impl.md**](https://github.com/google/leveldb/blob/master/doc/impl.md) **.**
 
-公共接口在 <mark style="color:purple;">**`include/leveldb/*.h`**</mark>. 调用者不应引用包内任何其他头文件，内部API可能会变更且没有提示性警告。.
+Public interfaces are defined in <mark style="color:purple;">**`include/leveldb/*.h`**</mark>. Callers should not include any other headers from the package, because internal APIs may change without warning.
 
-<mark style="background-color:green;">**头文件指引**</mark><mark style="background-color:green;"><mark style="color:blue;">**:**<mark style="color:blue;"></mark>
+<mark style="background-color:green;">**Header Guide**</mark><mark style="background-color:green;"><mark style="color:blue;">**:**<mark style="color:blue;"></mark>
 
-<mark style="color:blue;">`include/leveldb/db.h`</mark>: DB的主要接口.
+<mark style="color:blue;">`include/leveldb/db.h`</mark>: the main DB interface.
 
-<mark style="color:blue;">`include/leveldb/options.h`</mark>: 整个数据库的操作控制，读写操作的控制.
+<mark style="color:blue;">`include/leveldb/options.h`</mark>: controls database-wide behavior and read/write operation behavior.
 
-<mark style="color:blue;">`include/leveldb/comparator.h`</mark>: 用户指定的比较函数的抽象接口. 若只需要按key的字节比较，可使用默认的比较函数；也可以自己编写比较函数来自定义排序方式 (例如处理不同的字符编码等.).
+<mark style="color:blue;">`include/leveldb/comparator.h`</mark>: the abstract interface for user-defined comparison functions. If bytewise key ordering is sufficient, the default comparator can be used; otherwise, users can implement their own comparator to customize ordering, for example to handle different character encodings.
 
-<mark style="color:blue;">`include/leveldb/iterator.h`</mark>: 数据迭代的接口，可以从 DB 对象中获取迭代器.
+<mark style="color:blue;">`include/leveldb/iterator.h`</mark>: the data-iteration interface. Iterators can be obtained from a DB object.
 
-<mark style="color:blue;">`include/leveldb/write_batch.h`</mark>: 使用原子性的多重更新的接口.
+<mark style="color:blue;">`include/leveldb/write_batch.h`</mark>: the interface for atomic batches of multiple updates.
 
-<mark style="color:blue;">`include/leveldb/slice.h`</mark>: 保存某个字节数组的地址和长度的简单模块.
+<mark style="color:blue;">`include/leveldb/slice.h`</mark>: a lightweight module that stores the address and length of a byte array.
 
-<mark style="color:blue;">`include/leveldb/status.h`</mark>: 多数公共接口都会返回 Status ，以获取成功或不同类型失败.
+<mark style="color:blue;">`include/leveldb/status.h`</mark>: most public interfaces return `Status`, which represents success or different categories of failure.
 
-<mark style="color:blue;">`include/leveldb/env.h`</mark>: 操作系统环境的抽象。posix 环境对应的实现在 <mark style="color:purple;">`util/env_posix.cc`</mark>.
+<mark style="color:blue;">`include/leveldb/env.h`</mark>: the abstraction over the operating-system environment. The POSIX implementation is in <mark style="color:purple;">`util/env_posix.cc`</mark>.
 
-<mark style="color:blue;">`include/leveldb/table.h`</mark><mark style="color:blue;">:</mark> 大多数客户端不太会直接用的底层模型.&#x20;
+<mark style="color:blue;">`include/leveldb/table.h`</mark><mark style="color:blue;">:</mark> a low-level model that most clients are unlikely to use directly.&#x20;
 
-<mark style="color:blue;">`include/leveldb/table_builder.h`</mark>: 大多数客户端不太会直接用的底层模型.&#x20;
+<mark style="color:blue;">`include/leveldb/table_builder.h`</mark>: a low-level model that most clients are unlikely to use directly.&#x20;

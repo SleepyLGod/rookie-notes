@@ -1,71 +1,71 @@
-# 😇 LSM Tree
+# LSM Tree
 
-> 目前`HBase`,`LevelDB`,`RocksDB`这些`NoSQL`存储都是采用的LSM树
+> `HBase`, `LevelDB`, `RocksDB`, and many other `NoSQL` storage systems use LSM-trees.
 >
-> 利用**顺序写**来**提高写性能**
+> The core goal is to use **sequential writes** to **improve write performance**.
 >
-> 将所有的增删查改操作记录存入内存，一定数量之后批量写入磁盘，更新数据时直接append一条更新记录（顺序写），不去修改之前的key。（B+树数据的更新会直接在原数据所在处修改对应的值）
+> Insert, delete, query, and update operations are first recorded in memory. After a certain amount of data accumulates, they are written to disk in batches. When data is updated, the system directly appends an update record, which is a sequential write, rather than modifying the previous key in place. By contrast, updating data in a B+ tree usually modifies the value at the original data location.
 >
-> 读性能低：分层（内存和文件）以读性能作为trade-off换取写性能
+> Read performance is lower: the system trades read performance for write performance through multiple layers, including memory and files.
 >
-> `sstable`以`SST`简写代替
+> `sstable` is abbreviated as `SST` below.
 
-## **core idea**
+## **Core Idea**
 
 ![img](https://s2.loli.net/2022/07/06/labHV5Nc8FJqeZo.jpg)
 
 ### MemTable
 
-内存中的DS（定义自便），按键值有序组织最近更新的数据
+The MemTable is an in-memory data structure, with the exact implementation chosen by the system. It keeps recently updated data organized by key order.
 
-非可靠存储，需要`WAL`（预写式日志）方式保存可靠性（执行写操作时，先同时写`memtable`与预写日志`WAL`）
+It is not reliable storage by itself, so it needs a `WAL`, or write-ahead log, to provide durability. When a write is executed, the system writes both the `memtable` and the `WAL` first.
 
 ### Immutable MemTable
 
 `Memtable` -> `Immutable MemTable` -> `SSTable`
 
-中间状态，写操作由新的`memtable`处理，转存中不会阻塞数据更新
+The immutable MemTable is an intermediate state. New writes are handled by a new `memtable`, so flushing the old one does not block data updates.
 
-（`memtable`写满后会自动转换成不可变的（`immutable`）`memtable`，并`flush`到磁盘，形成`L0`级`sstable`文件）
+After a `memtable` becomes full, it is automatically converted into an `immutable` memtable and then `flush`ed to disk, forming an `L0` `sstable` file.
 
 ### Sorted String Table
 
-**有序**键值对组合，树在**磁盘**中的DS
+An SSTable is an **ordered** collection of key-value pairs. It is the on-disk data structure used by the tree.
 
-加快读取：建立`key`的索引和布隆过滤器加快查找`key`
+To speed up reads, SSTables build indexes over `key`s and use Bloom filters to accelerate key lookup.
 
-执行**读操作**时，会首先读取内存中的数据（根据**局部性原理**，刚写入的数据很有可能被马上读取），即`memtable`→`immutable memtable`→`block cache`。如果内存无法命中，就会遍历`L0`层`sstable`来查找。如果仍未命中，就通过**二分查找法**在`L1`层及以上的`sstable`来定位对应的key
+During a **read operation**, the system first reads in-memory data. According to the principle of locality, recently written data is likely to be read soon. The lookup order is `memtable` -> `immutable memtable` -> `block cache`. If memory does not hit, the system scans `L0` `sstable`s. If the key is still not found, the system uses **binary search** in `L1` and higher-level `sstable`s to locate the corresponding key.
 
-随着`sstable`的不断写入，系统打开的文件就会越来越多，并且对于同一个`key`积累的数据改变（更新、删除）操作也就越多。由于`sstable`是不可变的，为了减少文件数并及时清理无效数据，就要进行`compaction`操作，将多个key区间有重合的`sstable`进行合并。本文暂无法给出"compaction"这个词的翻译，个人认为把它翻译成“压缩”（compression？）或者“合并”（merge？）都是片面的。
+As more `sstable`s are written, the system opens more files, and multiple updates or deletions may accumulate for the same `key`. Since an `sstable` is immutable, the system needs `compaction` to reduce the number of files and clean up invalid data. Compaction merges multiple `sstable`s whose key ranges overlap. I do not think there is a perfect Chinese translation for "compaction": translating it as "compression" or "merge" only captures part of the meaning.
 
-当`MemTable`达到一定大小`flush`到持久化存储变成`SSTable`后，在不同的`SSTable`中，可能存在相同`Key`的记录，当然**最新的那条记录才是准确的**。这样设计的虽然大大提高了写性能，但同时也会带来一些问题:
+After a `MemTable` reaches a certain size and is flushed to persistent storage as an `SSTable`, different `SSTable`s may contain records for the same `Key`. Of course, **the newest record is the correct one**. This design greatly improves write performance, but it also introduces several problems:
 
-* 冗余存储：某个key只有最新的有用，需要使用compact合并多个和sstable清除冗余记录
-* 读取时由最新的倒着查，最坏情况需要查完整个sstable，索引/布隆过滤器来优化查找速度
+* Redundant storage: only the newest value of a key is useful. The system needs compaction to merge multiple SSTables and remove redundant records.
+* Reads must search from newest to oldest. In the worst case, the system may need to check the entire SSTable set. Indexes and Bloom filters are used to improve lookup speed.
 
-## **compact strategy**
+## **Compaction Strategy**
 
-### **三大概念**
+### **Three Amplification Concepts**
 
-* 读放大：实际读取数量 > 真正数据量（eg：查memtable再查sstable）
-* 写放大：实际写入数量 > 真正数据量（eg：写入时触发compact操作）
-* 空间放大：实际占用磁盘空间 > 真正大小（eg：冗余存储）
+* Read amplification: the actual amount of data read is greater than the amount of useful data, for example checking the memtable and then SSTables.
+* Write amplification: the actual amount of data written is greater than the logical amount of user data, for example when writes trigger compaction.
+* Space amplification: actual disk usage is greater than the logical data size, for example because of redundant versions.
 
-### **两个策略**
+### **Two Strategies**
 
-#### size-tiered strategy
+#### Size-Tiered Strategy
 
 ![](https://s2.loli.net/2022/07/24/NkClzSVE6OpAfeR.jpg)
 
-每层sstable大小相近，同时限制每一层sstable的数量N， 达到N后触发compact合并成为一个更大的sstable到下一层
+SSTables in the same level have similar sizes. Each level limits the number of SSTables to `N`. Once the number reaches `N`, compaction is triggered and the files are merged into a larger SSTable in the next level.
 
-优点是简单且易于实现，并且SST数目少，定位到文件的速度快。当然，单个SST的大小有可能会很大，较高的层级出现数百GB甚至TB级别的SST文件都是常见的。
+The advantage is that the design is simple and easy to implement. The number of SST files is small, so locating the target file is fast. However, a single SST may become very large. At higher levels, it is common to see SST files of hundreds of GB or even TB.
 
-空间放大很严重，同一层的sstable，每一个key可能存在多份，直到该层执行compact合并消除冗余
+Space amplification can be serious. Within the same level, each key may have multiple versions until compaction for that level removes the redundancy.
 
-但是重复key过多，就算每层compact过后消除了本层的空间放大，但key重复的数据仍然存在于较低层中，始终有冗余。只有手动触发了full compaction，才能完全消除空间放大，但我们也知道full compaction是极耗费性能的。
+However, if there are many duplicate keys, even if compaction removes space amplification within one level, duplicate key data can still exist in lower levels. Redundancy remains. Only a manually triggered full compaction can fully remove space amplification, but full compaction is extremely expensive.
 
-#### leveled
+#### Leveled
 
 &#x20;
 
@@ -73,56 +73,56 @@
 
 ![](https://s2.loli.net/2022/07/24/xvNIaosr56mVBAt.jpg)
 
-分层（顶层在上底层在下），每一层限制总文件的大小
+Leveled compaction organizes data into levels, with upper levels above lower levels. Each level limits its total file size.
 
-对于`L1`层及以上的数据，将`size-tiered compaction`中原本的大SST拆开，成为多个key互不相交的小SST的序列，这样的序列叫做“**run**”。`L0`层是从`memtable` flush过来的新SST，该层各个SST的key是**可以相交**的，并且其数量阈值单独控制。从`L1`层开始，**每层都包含恰好一个run**，并且run内包含的数据量阈值呈指数增长
+For data in `L1` and above, the large SST used in `size-tiered compaction` is split into a sequence of smaller SSTs whose key ranges do not overlap. Such a sequence is called a **run**. `L0` consists of new SSTs flushed from the `memtable`, and key ranges of SSTs in this level **may overlap**. Its file-count threshold is controlled separately. Starting from `L1`, **each level contains exactly one run**, and the data-size threshold of each run grows exponentially.
 
-每一层切分成大小相近的sstable，全局有序，key在本层不存在冗余记录
+Each level is split into similarly sized SSTables. The data is globally ordered, and a key does not have redundant records within the same level.
 
-合并策略不同于上一个：
+The merge strategy differs from the previous strategy:
 
-* 如果L1总大小超过本层限制，从L1中选择至少一个文件，把它跟L2的交集合并，生成文件放入L2，同时L1相关数据删除
-* 如此重复下去
-* 多个不相干的层的合并可以并发进行
+* If the total size of `L1` exceeds the level limit, the system selects at least one file from `L1`, merges it with overlapping files in `L2`, writes the output into `L2`, and deletes the related data from `L1`.
+* The same process repeats for lower levels.
+* Compactions from unrelated levels can run concurrently.
 
-相较于size-tiered，leveled每层的key不重复，即使最坏情况（除了最底层，其余都是重复key），冗余占比也很小，空间放大问题得到缓解
+Compared with size-tiered compaction, leveled compaction avoids duplicate keys within each level. Even in the worst case, where every level except the bottom level contains duplicate keys, the proportion of redundant data remains small, so space amplification is reduced.
 
-但是写放大问题突出：Ln层SST在合并到Ln+1层时是一对多的，故重复写入的次数会更多。最坏情景，第N层某个sstable的key跨很大，覆盖了N+1层的所有key，故合并的时候写入量很大
+However, write amplification becomes more prominent. When an SST in level `Ln` is merged into level `Ln+1`, it may overlap with many files, so the data is rewritten more times. In the worst case, an SSTable in level `N` has a very wide key range and overlaps all keys in level `N+1`, so the compaction writes a large amount of data.
 
-## RocksDB的compaction策略✔
+## RocksDB Compaction Strategy
 
-> [_**参考PPT：👈**_](https://www.slideshare.net/FlinkForward/flink-forward-berlin-2018-stefan-richter-tuning-flink-for-robustness-and-performance)
+> [_**Reference slides**_](https://www.slideshare.net/FlinkForward/flink-forward-berlin-2018-stefan-richter-tuning-flink-for-robustness-and-performance)
 >
-> `RocksDB`的写缓存（即`LSM`树的最低一级）名为`memtable`，对应`HBase`的`MemStore`；
+> The write cache in `RocksDB`, which is the lowest level of the `LSM` tree, is called the `memtable`. It corresponds to `MemStore` in `HBase`.
 >
-> 读缓存名为`block cache`，对应`HBase`的同名组件
+> The read cache is called the `block cache`, the same name as the corresponding component in `HBase`.
 
-RocksDB 支持多种 compaction style，其中默认、最常见的是 **leveled compaction**。在 leveled compaction 下，`L0` 比较特殊：它由 memtable flush 直接产生，文件 key range 可以重叠；`L1` 及以上则按 key range 切分，同一层内文件通常不重叠。
+RocksDB supports multiple compaction styles. The default and most common one is **leveled compaction**. Under leveled compaction, `L0` is special: it is produced directly by memtable flushes, and file key ranges may overlap. `L1` and higher levels are split by key range, and files in the same level usually do not overlap.
 
-当 `L0` 层文件数达到 `level0_file_num_compaction_trigger` 阈值时，RocksDB 会触发 `L0 -> L1` compaction。因为 `L0` 文件通常互相重叠，这一步一般需要选择多个 `L0` 文件和 `L1` 中重叠范围一起合并。
+When the number of files in `L0` reaches the `level0_file_num_compaction_trigger` threshold, RocksDB triggers `L0 -> L1` compaction. Since `L0` files usually overlap with each other, this step typically needs to select multiple `L0` files and merge them with the overlapping range in `L1`.
 
 **>= L1**
 
-leveled compaction策略中每一层的数据量是有阈值的，那么在`RocksDB`中这个阈值该如何确定呢？需要分两种情况来讨论。
+In a leveled compaction strategy, every level has a data-size threshold. In `RocksDB`, how this threshold is determined depends on two cases.
 
-*   **参数 `level_compaction_dynamic_level_bytes` = false**
+* **Parameter `level_compaction_dynamic_level_bytes` = false**
 
-    > L1的阈值由参数`max_bytes_for_level_base`确定，单位为字节
+    > The threshold for `L1` is determined by `max_bytes_for_level_base`, in bytes.
     >
-    > 余层递推：
+    > The remaining levels are derived recursively:
     >
     > **target\_size(Lk+1) = target\_size(Lk) \* max\_bytes\_for\_level\_multiplier \* max\_bytes\_for\_level\_multiplier\_addition\[k]**
     >
-    > `max_bytes_for_level_multiplier`是固定的倍数因子`max_bytes_for_level_multiplier_additional[k]`是第k层对应的可变倍数因子
-*   **参数 `level_compaction_dynamic_level_bytes` = true**
+    > `max_bytes_for_level_multiplier` is the fixed multiplier factor, and `max_bytes_for_level_multiplier_additional[k]` is the variable multiplier factor for level `k`.
+* **Parameter `level_compaction_dynamic_level_bytes` = true**
 
-    > 最高一层的大小**不设阈值限制**，亦即target\_size(Ln)就是Ln层的实际大小
+    > The highest level has **no explicit threshold limit**, so `target_size(Ln)` is the actual size of level `Ln`.
     >
-    > 而更低层的大小阈值会满足如下的**倒推**关系:
+    > The thresholds of lower levels are derived **backward**:
     >
     > **target\_size(Lk-1) = target\_size(Lk) / max\_bytes\_for\_level\_multiplier**
     >
-    > `max_bytes_for_level_multiplier`的作用从乘法因子变成了除法因子。特别地，如果出现了**target\_size(Lk) < max\_bytes\_for\_level\_base / max\_bytes\_for\_level\_multiplier**的情况，那么这一层**及比它低的层**就都不会再存储任何数据。
+    > The role of `max_bytes_for_level_multiplier` changes from a multiplication factor to a division factor. In particular, if **target\_size(Lk) < max\_bytes\_for\_level\_base / max\_bytes\_for\_level\_multiplier**, then this level **and all lower levels** will no longer store data.
     >
     >
 
@@ -130,29 +130,29 @@ leveled compaction策略中每一层的数据量是有阈值的，那么在`Rock
 
 **Universal compaction**
 
-`universal compaction` 不是 leveled compaction 中专门用于 `L0` 的机制，而是 RocksDB 另一种 compaction style。它属于 tiered/size-tiered family，目标通常是降低写放大，但会用更高的读放大和空间放大作为代价。
+`universal compaction` is not a mechanism specifically used for `L0` inside leveled compaction. It is a separate RocksDB compaction style. It belongs to the tiered or size-tiered family, and its usual goal is to reduce write amplification at the cost of higher read amplification and space amplification.
 
-使用 universal compaction 时，SST 文件被组织为按时间范围划分的 sorted runs，compaction 只在相邻时间范围的 runs 之间发生。它会检查以下条件：
+When universal compaction is used, SST files are organized as sorted runs divided by time range, and compaction only happens between runs in adjacent time ranges. RocksDB checks the following conditions:
 
-*   **空间放大比例**：
+* **Space amplification ratio**:
 
-    > 假设`L0`层现有的SST文件为`(R1, R1, R2, ..., Rn)`，其中`R1`是最新写入的SST，`Rn`是较旧的SST。
+    > Suppose the existing SST files in `L0` are `(R1, R1, R2, ..., Rn)`, where `R1` is the newest SST and `Rn` is the older SST.
     >
-    > **空间放大比例 = L0层文件总大小 / Rn大小**
+    > **Space amplification ratio = total size of L0 files / size of Rn**
     >
-    > 若比值 > `max_size_amplification_percent / 100`，将L0层所有的SST进行合并
-*   **相邻文件大小比例**：
+    > If the ratio is greater than `max_size_amplification_percent / 100`, RocksDB merges all SST files in `L0`.
+* **Adjacent file size ratio**:
 
-    > 参数`size_ratio`用于控制相邻文件大小比例的阈值
+    > The parameter `size_ratio` controls the threshold for the size ratio between adjacent files.
     >
     > ```go
     > if (size(R2) / size(R1)) < 1 + size_ratio / 100 
     > 	then compact R1 with R2
     > if (size(R3) / size({R1, R2})) < 1 + size_ratio / 100
     > 	then compact {R1, R2} with R3
-    > ……
+    > ...
     > ```
     >
-    > 直到不再满足上述条件为止
+    > This continues until the condition no longer holds.
 
-若上述两个条件都没有触发compaction，该策略就会线性地从R1开始合并，直到L0层文件数小于`level0_file_num_compaction_trigger`阈值
+If neither of the two conditions triggers compaction, the strategy linearly merges files starting from `R1` until the number of files in `L0` becomes smaller than the `level0_file_num_compaction_trigger` threshold.
