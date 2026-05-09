@@ -2,9 +2,9 @@
 description: 'PROJECT #4 - CONCURRENCY CONTROL'
 ---
 
-# 😉 Concurrency Control
+# Concurrency Control
 
-> 这个 project 主要是实现数据库的锁管理（Lock Manager），并且支持并发查询执行。LM 负责管理事务发出的 tuple-level 锁，并且 LM 还有基于事务的隔离级别实现 Shared & Exclusive 锁的授予和释放。
+> This project mainly implements the database lock manager and supports concurrent query execution. The lock manager manages tuple-level locks issued by transactions, and grants or releases shared and exclusive locks according to each transaction's isolation level.
 
 * [**Task #1 - Lock Manager**](https://15445.courses.cs.cmu.edu/fall2020/project4/#lock\_manager)
 * [**Task #2 - Deadlock Detection**](https://15445.courses.cs.cmu.edu/fall2020/project4/#deadlock\_detection)
@@ -12,7 +12,7 @@ description: 'PROJECT #4 - CONCURRENCY CONTROL'
 
 ### TASK #1 - LOCK MANAGER
 
-下面主要是 LM 需要实现的函数的思路，注意每个调用下面的每个函数应该先获得 LM 的 `latch_`。
+The following describes the implementation ideas for the functions required by the lock manager. Note that each function below should first acquire the lock manager's `latch_`.
 
 | <pre><code>1
 2
@@ -91,27 +91,27 @@ bool LockManager::Unlock(Transaction *txn, const RID &#x26;rid) {
 
 ### TASK #2 - DEADLOCK DETECTION
 
-1. 为了检测死锁的事务，首先应该构建一个 wait for graph。
-2. 然后运行 DFS 判断环的算法检测图中是否存在环。
+1. To detect deadlocked transactions, first build a wait-for graph.
+2. Then run a DFS-based cycle detection algorithm to check whether the graph contains a cycle.
 
-如果发现死锁的事务，将它 Aborted 后，如何通知其他事务继续获得 tuple-lock 呢？这里采用了群友提供的思路
+If a deadlocked transaction is found and aborted, how should other transactions be notified so they can continue acquiring tuple locks? Here I used an idea provided by classmates:
 
-> 1. 进入条件变量等待时，使用哈希表保存 `txn_id_t -> RID` 的映射。
-> 2. 找到死锁节点后，设置为 Aborted，唤醒 `txn_id_t` 对应的 RID 请求队列，唤醒后进行状态检查。如果事务的状态的 Aborted，那么抛出异常。
+> 1. When entering condition-variable waiting, store a `txn_id_t -> RID` mapping in a hash table.
+> 2. After finding a deadlock node, set it to `Aborted`, wake up the RID request queue corresponding to `txn_id_t`, and check the transaction state after wakeup. If the transaction state is `Aborted`, throw an exception.
 
 ***
 
 ### TASK #3 - CONCURRENT QUERY EXECUTION
 
-* 对于 SeqScan：如果隔离级别是 `READ_UNCOMMITTED`，则不需要加锁；如果隔离级别是 `READ_COMMITTED` 和 `REPEATABLE_READ`，则访问某个 RID 时需要对它加 `S-Lock`。区别在释放时机：`READ_COMMITTED` 通常读完当前 tuple 后即可释放 `S-Lock`；`REPEATABLE_READ` 需要持有读锁直到事务结束，避免同一事务内重复读发生变化。
-* 对于 Delete 和 Update：如果当前 RID 拥有 `S-Lock`，则需要将 `S-Lock` 升级为 `X-Lock`，否则对这个 RID 加 `X-Lock`
-* 对于 Unlock：释放锁是否让事务进入 shrinking 状态，需要和隔离级别配套理解。`REPEATABLE_READ` 下释放锁后不能再获取新锁；`READ_COMMITTED` 下读锁可以较早释放，但写锁仍应持有到事务结束。
+* For `SeqScan`: if the isolation level is `READ_UNCOMMITTED`, no lock is needed. If the isolation level is `READ_COMMITTED` or `REPEATABLE_READ`, acquire an `S-Lock` when accessing a RID. The difference is the release timing: under `READ_COMMITTED`, the `S-Lock` can usually be released after the current tuple is read; under `REPEATABLE_READ`, read locks should be held until the transaction ends, so repeated reads within the same transaction do not change.
+* For `Delete` and `Update`: if the current RID already has an `S-Lock`, upgrade it to an `X-Lock`; otherwise acquire an `X-Lock` on this RID.
+* For `Unlock`: whether releasing a lock moves the transaction into the shrinking state must be understood together with the isolation level. Under `REPEATABLE_READ`, a transaction cannot acquire new locks after releasing a lock. Under `READ_COMMITTED`, read locks may be released earlier, but write locks should still be held until the transaction ends.
 
 ***
 
-### 测试/验证/打包
+### Testing / Verification / Packaging
 
-* 测试
+* Tests
 
 | <pre><code>1
 2
@@ -126,7 +126,7 @@ make transaction_test
 </code></pre> |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 
-* 格式验证
+* Format checks
 
 | <pre><code>1
 2
@@ -137,7 +137,7 @@ make check-clang-tidy
 </code></pre> |
 | ------------------------------ | -------------------------------------------------------------------------- |
 
-* 打包
+* Packaging
 
 | <pre><code>1
 2
@@ -182,4 +182,4 @@ make check-clang-tidy
 </code></pre> |
 | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 
-然后前往 [**Gradescope**](https://www.gradescope.com/) 提交代码
+Then go to [**Gradescope**](https://www.gradescope.com/) and submit the code.

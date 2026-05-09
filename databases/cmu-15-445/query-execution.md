@@ -2,25 +2,25 @@
 description: 'PROJECT #3 - QUERY EXECUTION'
 ---
 
-# 😉 Query Execution
+# Query Execution
 
-> 这个 project 主要是实现增加对数据库系统的执行计划的支持。需要实现各种 **executors**，将 **query plan** 传入 executors 然后执行它们。需要实现下列的 executors：
+> This project mainly adds support for execution plans in the database system. We need to implement multiple **executors**, pass **query plans** into those executors, and run them. The following executors need to be implemented:
 >
 > * **Access Methods:** Sequential Scans, Index Scans
 > * **Modifications:** Inserts, Updates, Deletes
 > * **Miscellaneous:** Nested Loop Joins, Index Nested Loop Joins, Aggregation, Limit/Offset
 
-我们需要实现迭代查询处理模型，每个查询计划执行器实现了一个 `Init()` 函数和 `Next()` 函数。当 DBMS 调用 executors 的 `Next()` 函数时，它会返回
+We need to implement the iterator query processing model. Each query plan executor implements an `Init()` function and a `Next()` function. When the DBMS calls an executor's `Next()` function, it returns:
 
-* 一个 `tuple` 并返回 `true`
-* 没有 `tuple` 可以再返回时，返回 `false`
+* a `tuple` and `true`, or
+* `false` when there is no more `tuple` to return.
 
 ### TASK #1 - SYSTEM CATALOG
 
-> 这个 task 不难，主要是实现 `src/include/catalog/catalog.h` 文件（catalog 维护了数据库的 meta-data）中的要求实现的函数，这些函数与数据库的表和索引有关。
+> This task is not difficult. It mainly requires implementing the functions specified in `src/include/catalog/catalog.h`. The catalog maintains database metadata, and these functions are related to database tables and indexes.
 
-* `GetTable()` 使用 `std::unordered_map` 的 `at` 函数，它会做下标检查，当 `key` 不存在时会抛出异常
-* 在 `CreateIndex` 函数中，创建表的索引时，需要使用 table heap 的迭代器取出每个 tuple，然后使用 tuple 的 `KeyFromTuple` 构造 **key tuple** 插入到 B+ Tree 中
+* `GetTable()` uses the `at` function of `std::unordered_map`. It performs bounds checking and throws an exception when the `key` does not exist.
+* In `CreateIndex`, when creating an index for a table, use the table heap iterator to retrieve each tuple, then use the tuple's `KeyFromTuple` to construct the **key tuple** and insert it into the B+ tree.
 
 ***
 
@@ -28,7 +28,7 @@ description: 'PROJECT #3 - QUERY EXECUTION'
 
 #### SEQUENTIAL SCAN
 
-> 在顺序执行器中，如何保存 `table_heap_` 的迭代器呢？一直没找到解决方案，因为我先选择在使用 `std::vector<Tuple>` 先保存结果，然后在 `Next` 中一个一个返回。在返回结果时，记得要根据 `OutputSchema` 构造 tuple 返回
+> For the sequential scan executor, how should the iterator of `table_heap_` be stored? I did not find a clean solution at first, so I chose to use `std::vector<Tuple>` to store the results, then return them one by one in `Next`. When returning a result, remember to construct the returned tuple according to `OutputSchema`.
 
 | <pre class="language-cpp" data-line-numbers><code class="lang-cpp">Tuple make_tuple(const Tuple &#x26;tuple, const Schema *output_schema) {
   std::vector&#x3C;Value> values;
@@ -42,46 +42,46 @@ description: 'PROJECT #3 - QUERY EXECUTION'
 
 #### INDEX SCANS
 
-> 通过 B+ Tree 索引，先获得 `RID`，然后根据 `RID` 在 `table_heap_` 中得到对应的 tuple
+> Through the B+ tree index, first obtain the `RID`, then use the `RID` to retrieve the corresponding tuple from `table_heap_`.
 
-* 通过 `dynamic_cast<BPlusTreeIndex<GenericKey<8>, RID, GenericComparator<8>> *>(indexInfo_->index_.get());` 将 `Index` 转成 `BPlusTreeIndex` 类型
+* Use `dynamic_cast<BPlusTreeIndex<GenericKey<8>, RID, GenericComparator<8>> *>(indexInfo_->index_.get());` to cast `Index` to `BPlusTreeIndex`.
 
 #### INSERT
 
-> 1. 插入执行器需要区分待插入的数据是 `RawInsert` 还是来自 `child_executor_`
-> 2. 如果待插入的表存在索引需要使用 `KeyFromTuple` 构造 `index_key`，然后将它插入到 B+ Tree 索引中
-> 3. engine 在插入、更新、删除不需要将 tuple 添加到 `result_set` 中，否则在 test 中会报 `result_set` 不为空的错误
+> 1. The insert executor needs to distinguish whether the data to be inserted is `RawInsert` or comes from `child_executor_`.
+> 2. If the target table has indexes, use `KeyFromTuple` to construct the `index_key`, then insert it into the B+ tree index.
+> 3. For insert, update, and delete, the engine does not need to add tuples to `result_set`; otherwise the tests will fail because `result_set` is not empty.
 
 #### UPDATE
 
-> 由 `child_executor_` 的 `Next` 提供 tuple，然后调用 `GenerateUpdatedTuple` 生成待更新的 tuple，最后使用 `table_heap_->UpdateTuple` 进行更新操作
+> `child_executor_->Next` provides the tuple. Then call `GenerateUpdatedTuple` to generate the tuple to be updated, and finally use `table_heap_->UpdateTuple` to perform the update.
 
 #### DELETE
 
-> 1. 由 `child_executor_` 的 `Next` 提供 tuple
-> 2. 调用 `table_heap_->MarkDelete` 标记这个 tuple 需要删除
-> 3. 如果待插入的表存在索引需要使用 `KeyFromTuple` 构造 `index_key`，然后在 B+ Tree 索引中将这个 Key 删除
+> 1. `child_executor_->Next` provides the tuple.
+> 2. Call `table_heap_->MarkDelete` to mark this tuple for deletion.
+> 3. If the target table has indexes, use `KeyFromTuple` to construct the `index_key`, then delete this key from the B+ tree index.
 
 #### NESTED LOOP JOIN
 
-> 使用 `left_executor` 和 `right_executor` 提供的 tuple 进行 `EvaluateJoin` 构造符合条件的 tuple
+> Use tuples provided by `left_executor` and `right_executor`, then call `EvaluateJoin` to construct tuples that satisfy the join condition.
 
 #### INDEX NESTED LOOP JOIN
 
-> 使用索引来进行 Join，这样就不需要扫描整个 inner table。因此我们需要将 outer tuple 转化为对应的 `key`，然后在 inner table index 中进行查找。
+> Use an index to perform the join, so the executor does not need to scan the entire inner table. Therefore, convert the outer tuple into the corresponding `key`, then look it up in the inner table index.
 
 ***
 
-### 测试/验证/打包
+### Testing / Verification / Packaging
 
-* 测试
+* Tests
 
 ```bash
 cd build
 make executor_test
 ```
 
-* 格式验证
+* Format checks
 
 ```bash
 make format
@@ -89,7 +89,7 @@ make check-lint
 make check-clang-tidy
 ```
 
-* 打包
+* Packaging
 
 ```bash
 zip project3-submission.zip src/include/buffer/lru_replacer.h src/buffer/lru_replacer.cpp \
@@ -113,4 +113,4 @@ zip project3-submission.zip src/include/buffer/lru_replacer.h src/buffer/lru_rep
 	src/include/storage/index/b_plus_tree_index.h src/storage/index/b_plus_tree_index.cpp
 ```
 
-然后前往 [**Gradescope**](https://www.gradescope.com/) 提交代码
+Then go to [**Gradescope**](https://www.gradescope.com/) and submit the code.

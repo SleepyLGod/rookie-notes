@@ -4,12 +4,12 @@ coverY: 0
 
 # Blockchain
 
-这一节主要是 Uniswap V2 合约阅读、主网 fork 测试和 BigNumber 使用笔记。
+This section mainly contains notes on Uniswap V2 contract reading, mainnet-fork testing, and BigNumber usage.
 
-建议阅读顺序：
+Suggested reading order:
 
-1. [Uniswap V2 合约概览](uniswap-v2/README.md)：先理解 core/periphery、Pair、Factory、Router 和常见流程。
-2. [对接 Uniswap V2 兑换代币](uniswap-v2/how-to-swap.md)：再看 Hardhat fork 主网测试和 Router 调用。
-3. [bignumber.js 中常见运算](bignumber.md)：最后补齐链上金额计算的精度处理。
+1. [Uniswap V2 Contract Overview](uniswap-v2/README.md): first understand core/periphery, Pair, Factory, Router, and common flows.
+2. [Integrating Uniswap V2 Token Swaps](uniswap-v2/how-to-swap.md): then read the Hardhat mainnet-fork test and Router call flow.
+3. [Common arithmetic operations in bignumber.js](bignumber.md): finally review precision handling for on-chain amount calculations.
 
-内容状态：Uniswap V2 仍适合作为 AMM 入门材料，但当前生态已经有 v3/v4。涉及实际集成时，需要按目标协议版本重新核对官方文档和合约地址。
+Content status: Uniswap V2 is still useful as introductory AMM material, but the current ecosystem already has V3 and V4. For real integration, re-check the official documentation and contract addresses for the target protocol version.

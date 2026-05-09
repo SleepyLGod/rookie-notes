@@ -1,84 +1,82 @@
 # Tuples and Variants
 
-### 元组
+### Tuples
 
-纵观传统 C++ 中的容器，除了 `std::pair` 外， 似乎没有现成的结构能够用来存放不同类型的数据（通常我们会自己定义结构）。 但 `std::pair` 的缺陷是显而易见的，只能保存两个元素。
+Looking across containers in traditional C++, except for `std::pair`, there does not seem to be a ready-made structure for storing data of different types. Usually we define our own structure for that. The limitation of `std::pair` is obvious: it can store only two elements.
 
-#### 基本操作
+#### Basic operations
 
-关于元组的使用有三个核心的函数：
+There are three core functions for using tuples:
 
-1. `std::make_tuple`: 构造元组
-2. `std::get`: 获得元组某个位置的值
-3. `std::tie`: 元组拆包
+1. `std::make_tuple`: construct a tuple
+2. `std::get`: get the value at a specific position in a tuple
+3. `std::tie`: unpack a tuple
 
 ```cpp
 #include<tuple>
 #include<iostream>
 
 auto get_student(int id) {
-    // 返回类型被推断为 std::tuple<double, char, std::string>
+    // The return type is inferred as std::tuple<double, char, std::string>.
     if (id == 0) {
         return std::make_tuple(3.8, 'A', "zhangsan");
     } else if (id == 1) {
-        return std::make_tuple(2.9, 'C', "李四");
+        return std::make_tuple(2.9, 'C', "Li Si");
     } else if (id == 2) {
-        return std::make_tuple(1.7, 'D', "王五");
+        return std::make_tuple(1.7, 'D', "Wang Wu");
     }
     return std::make_tuple(0.0, 'D', "null");
-    // 如果只写 0 会出现推断错误, 编译失败!!!!!
+    // If only 0 is written here, type inference fails and compilation fails.
 }
 
 int main() {
     auto student = get_student(0);
     std:cout << "ID: 0, "
     << "GPA: " << std::get<0>(student) << ", "
-    << "成绩: " << std::get<1>(student) << ", "
-    << "姓名: " << std::get<2>(student) << '\n';
+    << "Grade: " << std::get<1>(student) << ", "
+    << "Name: " << std::get<2>(student) << '\n';
 
     double gpa;
     char grade;
     std::string name;
 
-    // 元组进行拆包
+    // Unpack the tuple.
     std::tie(gpa, grade, name) = get_student(1);
     std::cout << "ID: 1, "
     << "GPA: " << gpa << ", "
-    << "成绩: " << grade << ", "
-    << "姓名: " << name << '\n';
+    << "Grade: " << grade << ", "
+    << "Name: " << name << '\n';
 }   
 ```
 
-`std::get` 除了使用常量获取元组对象外，**C++14** 增加了使用类型来获取元组中的对象：
+Besides using a constant index to access a tuple object with `std::get`, **C++14** added support for accessing tuple elements by type:
 
 ```cpp
 std::tuple<std::string, double, double, int> t("123", 4.5, 6.7, 8);
 std::cout << std::get<std::string>(t) << std::endl;
-std::cout << std::get<double>(t) << std::endl; // 非法, 引发编译期错误
+std::cout << std::get<double>(t) << std::endl; // Illegal; triggers a compile-time error.
 std::cout << std::get<3>(t) << std::endl;
 ```
 
-#### 运行期索引
+#### Runtime index
 
-如果你仔细思考一下可能就会发现上面代码的问题，`std::get<>` 依赖一个编译期的常量，所以下面的方式是不合法的：
+If we think carefully about the code above, we can see the issue: `std::get<>` depends on a compile-time constant. Therefore, the following form is illegal:
 
 ```cpp
 int index = 1;
 std::get<index>(t);
 ```
 
-那么要怎么处理？
+How should this be handled?
 
-答案是，使用 `std::variant<>`（**C++ 17** 引入），提供给 `variant<>` 的类型模板参数
-
-可以让一个 `variant<>` 从而容纳提供的几种类型的变量（在其他语言，例如 Python/JavaScript 等，表现为动态类型）：
+The answer is to use `std::variant<>`, which was introduced in **C++17**. The type template parameters supplied to `variant<>` allow one `variant<>` object to hold values of several possible types. In other languages such as Python or JavaScript, this looks similar to dynamic typing:
 
 ```cpp
 #include<variant>
 template<size_t n, typename... T>
 constexpr std::variant<T...> _tuple_index(const std::tuple<T...>& tp1, size_t i) {
     if constexpr (n >= sizeof...(T)) {
-        throw std::out_of_range("越界");
+        throw std::out_of_range("out of range");
     }
     if (i == n) {
         return std::variant<T...> {
@@ -100,22 +98,22 @@ std::ostream & operator<< (std::ostream & s, std::variant<T0, Ts...> const & v) 
 }
 ```
 
-这样我们就能：
+Then we can write:
 
 ```cpp
 int index = 1;
 std::cout << tuple_index(t, index) << std::endl;
 ```
 
-#### 元组合并和遍历
+#### Tuple concatenation and traversal
 
-还有一个常见的需求就是合并两个元组，这可以通过 `std::tuple_cat` 来实现：
+Another common requirement is merging two tuples. This can be done with `std::tuple_cat`:
 
 ```cpp
 auto new_tuple = std::tuple_cat(get_student(1), std::move(t));
 ```
 
-马上就能够发现，应该如何快速遍历一个元组？但是我们刚才介绍了如何在运行期通过非常数索引一个 `tuple` 那么遍历就变得简单了， 首先我们需要知道一个元组的长度，可以：
+This immediately raises another question: how can a tuple be traversed quickly? We have just introduced how to index a `tuple` at runtime with a non-constant index, so traversal becomes straightforward. First, we need to know the length of a tuple:
 
 ```cpp
 template <typename T>
@@ -124,7 +122,7 @@ auto tuple_len(T &tp1) {
 }
 ```
 
-这样就能够对元组进行迭代了：
+Then the tuple can be iterated:
 
 ```cpp
 for (int i = 0; i != tuple_len(new_tuple); ++i) {

@@ -1,10 +1,10 @@
 # Storage Devices
 
-这一节放 SSD 和 NVMe 相关笔记，作为理解数据库、存储引擎和 DPU I/O offload 的硬件背景。
+This section contains notes on SSD and NVMe as hardware background for understanding databases, storage engines, and DPU I/O offload.
 
-建议阅读顺序：
+Suggested reading order:
 
-1. [SSD](ssd.md)：先看 NAND flash、FTL 和写放大等基础概念。
-2. [NVMe](nvme.md)：再看主机到存储设备的现代接口和队列模型。
+1. [SSD](ssd.md): start with basic concepts such as NAND flash, FTL, and write amplification.
+2. [NVMe](nvme.md): then read the modern host-to-storage interface and queue model.
 
-内容状态：目前偏基础概念整理，后续可以补充 SPDK、io_uring 和真实性能测试语境。
+Content status: the current notes focus on basic concepts. Later additions can cover SPDK, `io_uring`, and real performance-testing context.

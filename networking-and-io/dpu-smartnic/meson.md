@@ -1,30 +1,30 @@
 ---
-description: meson 入门介绍
+description: Meson introduction
 ---
 
-# 😁 meson
+# Meson
 
 ### Install
 
-Meson 是基于 Python 3 实现的构建系统。当前官方文档要求 Python 3.10 或更新版本；旧版发行版仓库中的 Meson 可能要求更低，但新项目应按当前官方要求准备环境。Meson 默认采用 Ninja 作为后端。\
-在Ubuntu下最简单的是通过pip3安装
+Meson is a build system implemented in Python 3. The current official documentation requires Python 3.10 or newer. Meson packages in older distribution repositories may require lower Python versions, but new projects should prepare the environment according to the current official requirement. Meson uses Ninja as its default backend.\
+On Ubuntu, the simplest installation method is through `pip3`:
 
 ```shell
 sudo apt-get install python3 python3-pip ninja-build
 sudo pip3 install meson
 ```
 
-也可以只将meson安装到当前用户目录下
+You can also install Meson only under the current user's directory:
 
 ```shell
 pip3 install --user meson
 ```
 
-这种方式会将meson安装到`~/.local/bin`目录下，因此需要将这个目录增加到PATH中。
+This installs Meson under `~/.local/bin`, so this directory needs to be added to `PATH`.
 
 ### Compile Configuration
 
-下面是个例子：
+The following is an example:
 
 ```shell
 $ cat > meson.build << EOF
@@ -38,15 +38,15 @@ $ ./mesontest
 hello meson.
 ```
 
-meson通过`meson.build`文件配置编译语言及文件，`project`指定项目名称及语言类型，`executable`指定可执行文件名及源文件。
+Meson configures the compilation language and files through `meson.build`. `project` specifies the project name and language type, and `executable` specifies the executable name and source files.
 
-`meson builddir (meson build)` 用于执行构建；
+`meson builddir` or `meson build` is used to generate the build directory.
 
-`cd builddir` 和 `ninja` 用于执行编译，其中 ninja 是后端编译器，相当于 make。
+`cd builddir` and `ninja` are used to compile the project. Ninja is the backend build tool, roughly similar to `make` in this workflow.
 
-下面用 `meson configure` 查看meson内置的选项、默认值及可选值：
+Use `meson configure` to view Meson's built-in options, default values, and possible values:
 
-项目可以通过 `meson_options.txt` 来增加项目特有的选项。
+Projects can add project-specific options through `meson_options.txt`.
 
 ```shell
 meson configure
@@ -57,7 +57,7 @@ Project options:
 ...
 ```
 
-在生成编译配置时，可以通过 -D 指定编译选项：
+When generating the build configuration, use `-D` to specify compilation options:
 
 ```shell
 meson builddir -Dprefix=/usr -Dgtk_doc=disabled -Dtests=disabled
@@ -65,20 +65,12 @@ cd builddir && ninja -j8
 meson install
 ```
 
-可以在源码根目录通过 configure更新编译选项，再执行ninja重新编译：
+From the source root directory, `configure` can update compilation options, and then `ninja` can rebuild:
 
 ```shell
 1 $ meson configure builddir -Dprefix=/home/dev/tmp
 ```
 
-### Referance
+### Reference
 
 [https://mesonbuild.com/Reference-manual.html](https://mesonbuild.com/Reference-manual.html)
-
-
-
-
-
-
-
-

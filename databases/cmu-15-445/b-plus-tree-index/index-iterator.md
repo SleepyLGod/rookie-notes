@@ -1,12 +1,12 @@
 # Index Iterator
 
-# 😂 Expand3: Index\_Iterator
+# Expand3: Index Iterator
 
-这里就是需要实现迭代器的一些操作,比如begin、end、isend等等
+This part implements iterator operations such as `begin`, `end`, and `isEnd`.
 
-下面是对于`IndexIterator`的构造函数
+The following is the constructor of `IndexIterator`.
 
-其中idx表示当前page中的第几个tuple
+Here, `idx` indicates which tuple in the current page the iterator points to.
 
 {% code lineNumbers="true" %}
 ```cpp
@@ -15,10 +15,10 @@ INDEXITERATOR_TYPE::IndexIterator(LeafPage *leftmost_leaf, int idx, BufferPoolMa
 ```
 {% endcode %}
 
-### 1. 首先我们来看begin函数的实现[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#1-%E9%A6%96%E5%85%88%E6%88%91%E4%BB%AC%E6%9D%A5%E7%9C%8Bbegin%E5%87%BD%E6%95%B0%E7%9A%84%E5%AE%9E%E7%8E%B0)[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#1-%E9%A6%96%E5%85%88%E6%88%91%E4%BB%AC%E6%9D%A5%E7%9C%8Bbegin%E5%87%BD%E6%95%B0%E7%9A%84%E5%AE%9E%E7%8E%B0)
+### 1. First, look at the implementation of begin [#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#1-%E9%A6%96%E5%85%88%E6%88%91%E4%BB%AC%E6%9D%A5%E7%9C%8Bbegin%E5%87%BD%E6%95%B0%E7%9A%84%E5%AE%9E%E7%8E%B0)[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#1-%E9%A6%96%E5%85%88%E6%88%91%E4%BB%AC%E6%9D%A5%E7%9C%8Bbegin%E5%87%BD%E6%95%B0%E7%9A%84%E5%AE%9E%E7%8E%B0)
 
-1. 利用key值找到叶子结点
-2. 然后获取当前key值的index就是begin的位置
+1. Use the key value to find the leaf node.
+2. Then get the index of the current key value; this index is the `begin` position.
 
 {% code lineNumbers="true" %}
 ```cpp
@@ -29,13 +29,13 @@ Page *page = FindLeafPage(KeyType{}, true);  // leftmost_leaf pinned
 ```
 {% endcode %}
 
-### 2. end函数的实现[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#2-end%E5%87%BD%E6%95%B0%E7%9A%84%E5%AE%9E%E7%8E%B0)[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#2-end%E5%87%BD%E6%95%B0%E7%9A%84%E5%AE%9E%E7%8E%B0)
+### 2. Implementation of end [#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#2-end%E5%87%BD%E6%95%B0%E7%9A%84%E5%AE%9E%E7%8E%B0)[#](https://www.cnblogs.com/JayL-zxl/p/14333395.html#2-end%E5%87%BD%E6%95%B0%E7%9A%84%E5%AE%9E%E7%8E%B0)
 
-1. 找到最开始的结点
-2. 然后一直向后遍历直到`nextPageId=-1`结束
-3. 这里注意需要重载`!=`和`==`
+1. Find the starting node.
+2. Then keep traversing forward until `nextPageId = -1`.
+3. Note that `!=` and `==` need to be overloaded.
 
-`end`函数
+The `end` function:
 
 {% code lineNumbers="true" %}
 ```cpp
@@ -55,9 +55,9 @@ Page *page = FindLeafPage(KeyType{}, true);  // leftmost_leaf pinned
 ```
 {% endcode %}
 
-`==和 !=`函数
+The `==` and `!=` functions:
 
-这里注意在！= 那里不能写成itr != \*this
+For `!=`, be careful not to write `itr != *this`.
 
 {% code lineNumbers="true" %}
 ```cpp
@@ -71,11 +71,11 @@ bool INDEXITERATOR_TYPE::operator!=(const IndexIterator &itr) const { return !(i
 ```
 {% endcode %}
 
-### 3. 重载++和\*(解引用符号)
+### 3. Overload `++` and `*` (dereference)
 
-1. 重载++
+1. Overload `++`.
 
-> 简单的index++然后设置nextPageId即可
+> Simply increment `index`, then set `nextPageId` as needed.
 
 {% code lineNumbers="true" %}
 ```cpp
@@ -96,9 +96,9 @@ INDEXITERATOR_TYPE &INDEXITERATOR_TYPE::operator++() {
 ```
 {% endcode %}
 
-1. 重载\*
+1. Overload `*`.
 
-> return array\[index]即可
+> Just return `array[index]`.
 
 {% code overflow="wrap" %}
 ```cpp

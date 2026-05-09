@@ -1,6 +1,6 @@
-# bignumber.js 中常见加减乘除运算
+# Common arithmetic operations in bignumber.js
 
-链上金额、token decimals、wei 等场景不要先用 JavaScript `number` 表示再传给 BigNumber。`number` 本身已经可能发生二进制浮点精度损失，BigNumber 只能精确保存传入后的值。实际项目中优先使用字符串、整数最小单位，或从合约/SDK 返回的整数类型构造 BigNumber。
+For on-chain amounts, token decimals, `wei`, and similar scenarios, do not first represent the value as a JavaScript `number` and then pass it to BigNumber. A `number` may already have suffered binary floating-point precision loss, and BigNumber can only preserve the value after it has been passed in. In real projects, prefer strings, integer smallest units, or integer types returned by contracts or SDKs when constructing BigNumber values.
 
 ```html
 <!DOCTYPE html>
@@ -21,99 +21,99 @@
 
       let x = BigNumber(n);
       console.log(x);
-      // 判断类型是否是BigNumber
-      console.log("判断类型是否是BigNumber => BigNumber.isBigNumber(n) Result:", BigNumber.isBigNumber(n));
-      console.log("判断类型是否是BigNumber => BigNumber.isBigNumber(x) Result:", BigNumber.isBigNumber(x));
-      // 取最大值
-      console.log("取最大值 => BigNumber.max(12, 2, 3, 34, 55).toNumber() Result:", BigNumber.max(12, 2, 3, 34, 55).toNumber());
-      console.log("取最大值 => BigNumber.maximum(12, 2, 3, 34, 55).toNumber() Result:", BigNumber.maximum(12, 2, 3, 34, 55).toNumber());
-      // 取最小值
-      console.log("取最小值 => BigNumber.min(12, 2, 3, 34, 55).toNumber() Result:", BigNumber.min(12, 2, 3, 34, 55).toNumber());
-      console.log("取最小值 => BigNumber.minimum(12, 2, 3, 34, 55).toNumber() Result:", BigNumber.minimum(12, 2, 3, 34, 55).toNumber());
-      // 求和
-      console.log("求和 => BigNumber.sum(4e9, x, '1').toNumber() Result:", BigNumber.sum(4e9, x, "1").toNumber());
-      // 2位小于1随机数
-      console.log("2位小于1随机数 => BigNumber.random(2).toNumber() Result:", BigNumber.random(2).toNumber());
-      // 绝对值
-      console.log("绝对值 => BigNumber('-1.21').abs().toNumber() Result:", BigNumber("-1.21").abs().toNumber());
-      // 比较大小
-      // 1    如果这个大数字的价值大于n
-      // -1    如果这个大数字的价值低于n
-      // 0    如果这个大数字和有相同的价值n
-      // null    如果这个大数字的价值或是nNaN
-      console.log("比较大小 => BigNumber(111111).comparedTo(2222) Result:", BigNumber(111111).comparedTo(2222));
-      // 四舍五入
-      // 三位小数
-      console.log("四舍五入 三位小数 => BigNumber(12.32162).decimalPlaces(3).toNumber() Result:", BigNumber(12.32162).decimalPlaces(3).toNumber());
-      console.log("四舍五入 三位小数 => BigNumber(12.32162).dp(3).toNumber() Result:", BigNumber(12.32162).dp(3).toNumber());
+      // Check whether the type is BigNumber.
+      console.log("Check type => BigNumber.isBigNumber(n) Result:", BigNumber.isBigNumber(n));
+      console.log("Check type => BigNumber.isBigNumber(x) Result:", BigNumber.isBigNumber(x));
+      // Get the maximum value.
+      console.log("Maximum => BigNumber.max(12, 2, 3, 34, 55).toNumber() Result:", BigNumber.max(12, 2, 3, 34, 55).toNumber());
+      console.log("Maximum => BigNumber.maximum(12, 2, 3, 34, 55).toNumber() Result:", BigNumber.maximum(12, 2, 3, 34, 55).toNumber());
+      // Get the minimum value.
+      console.log("Minimum => BigNumber.min(12, 2, 3, 34, 55).toNumber() Result:", BigNumber.min(12, 2, 3, 34, 55).toNumber());
+      console.log("Minimum => BigNumber.minimum(12, 2, 3, 34, 55).toNumber() Result:", BigNumber.minimum(12, 2, 3, 34, 55).toNumber());
+      // Sum.
+      console.log("Sum => BigNumber.sum(4e9, x, '1').toNumber() Result:", BigNumber.sum(4e9, x, "1").toNumber());
+      // Random number below 1 with 2 decimal places.
+      console.log("Random below 1 with 2 decimal places => BigNumber.random(2).toNumber() Result:", BigNumber.random(2).toNumber());
+      // Absolute value.
+      console.log("Absolute value => BigNumber('-1.21').abs().toNumber() Result:", BigNumber("-1.21").abs().toNumber());
+      // Compare values.
+      // 1    if this BigNumber is greater than n
+      // -1   if this BigNumber is less than n
+      // 0    if this BigNumber has the same value as n
+      // null if this BigNumber or n is NaN
+      console.log("Compare => BigNumber(111111).comparedTo(2222) Result:", BigNumber(111111).comparedTo(2222));
+      // Round.
+      // Three decimal places.
+      console.log("Round to three decimal places => BigNumber(12.32162).decimalPlaces(3).toNumber() Result:", BigNumber(12.32162).decimalPlaces(3).toNumber());
+      console.log("Round to three decimal places => BigNumber(12.32162).dp(3).toNumber() Result:", BigNumber(12.32162).dp(3).toNumber());
 
-      // 四舍五入 整数
-      console.log("四舍五入 整数 => BigNumber(123.756).integerValue().toNumber() Result:", BigNumber(123.756).integerValue().toNumber());
+      // Round to an integer.
+      console.log("Round to integer => BigNumber(123.756).integerValue().toNumber() Result:", BigNumber(123.756).integerValue().toNumber());
 
-      // 等于
-      console.log("等于 => BigNumber(123).isEqualTo(123.00000000000000001) Result:", BigNumber(123).isEqualTo(123.00000000000000001));
-      console.log("等于 => BigNumber(123).isEqualTo(123.100000000000000001) Result:", BigNumber(123).isEqualTo(123.100000000000000001));
-      console.log("等于 => BigNumber(123).eq(123.00000000000000001) Result:", BigNumber(123).eq(123.00000000000000001));
-      console.log("等于 => BigNumber(123).eq(123.100000000000000001) Result:", BigNumber(123).eq(123.100000000000000001));
+      // Equal to.
+      console.log("Equal => BigNumber(123).isEqualTo(123.00000000000000001) Result:", BigNumber(123).isEqualTo(123.00000000000000001));
+      console.log("Equal => BigNumber(123).isEqualTo(123.100000000000000001) Result:", BigNumber(123).isEqualTo(123.100000000000000001));
+      console.log("Equal => BigNumber(123).eq(123.00000000000000001) Result:", BigNumber(123).eq(123.00000000000000001));
+      console.log("Equal => BigNumber(123).eq(123.100000000000000001) Result:", BigNumber(123).eq(123.100000000000000001));
 
-      // 大于
-      console.log("大于 => BigNumber(0.3).minus(0.2).isGreaterThan(0.1) Result:", BigNumber(0.3).minus(0.2).isGreaterThan(0.1));
-      console.log("大于 => BigNumber(0.3).minus(0.2).gt(0.1) Result:", BigNumber(0.3).minus(0.2).gt(0.1));
+      // Greater than.
+      console.log("Greater than => BigNumber(0.3).minus(0.2).isGreaterThan(0.1) Result:", BigNumber(0.3).minus(0.2).isGreaterThan(0.1));
+      console.log("Greater than => BigNumber(0.3).minus(0.2).gt(0.1) Result:", BigNumber(0.3).minus(0.2).gt(0.1));
 
-      // 大于等于
-      console.log("大于等于 => BigNumber(0.3).minus(0.2).isGreaterThanOrEqualTo(0.1) Result:", BigNumber(0.3).minus(0.2).isGreaterThanOrEqualTo(0.1));
-      console.log("大于等于 => BigNumber(0.3).minus(0.2).gte(0.1) Result:", BigNumber(0.3).minus(0.2).gte(0.1));
+      // Greater than or equal to.
+      console.log("Greater than or equal to => BigNumber(0.3).minus(0.2).isGreaterThanOrEqualTo(0.1) Result:", BigNumber(0.3).minus(0.2).isGreaterThanOrEqualTo(0.1));
+      console.log("Greater than or equal to => BigNumber(0.3).minus(0.2).gte(0.1) Result:", BigNumber(0.3).minus(0.2).gte(0.1));
 
-      // 小于
-      console.log("小于 => BigNumber(0.3).minus(0.2).isLessThan(0.1) Result:", BigNumber(0.3).minus(0.2).isLessThan(0.1));
-      console.log("小于 => BigNumber(0.3).minus(0.2).lt(0.1) Result:", BigNumber(0.3).minus(0.2).lt(0.1));
+      // Less than.
+      console.log("Less than => BigNumber(0.3).minus(0.2).isLessThan(0.1) Result:", BigNumber(0.3).minus(0.2).isLessThan(0.1));
+      console.log("Less than => BigNumber(0.3).minus(0.2).lt(0.1) Result:", BigNumber(0.3).minus(0.2).lt(0.1));
 
-      // 小于等于
-      console.log("小于等于 => BigNumber(0.3).minus(0.2).isLessThanOrEqualTo(0.1) Result:", BigNumber(0.3).minus(0.2).isLessThanOrEqualTo(0.1));
-      console.log("小于等于 => BigNumber(0.3).minus(0.2).lte(0.1) Result:", BigNumber(0.3).minus(0.2).lte(0.1));
+      // Less than or equal to.
+      console.log("Less than or equal to => BigNumber(0.3).minus(0.2).isLessThanOrEqualTo(0.1) Result:", BigNumber(0.3).minus(0.2).isLessThanOrEqualTo(0.1));
+      console.log("Less than or equal to => BigNumber(0.3).minus(0.2).lte(0.1) Result:", BigNumber(0.3).minus(0.2).lte(0.1));
 
-      // 加
-      console.log("加 => BigNumber(0.2).plus(0.1).toNumber() Result:", BigNumber(0.2).plus(0.1).toNumber());
-      // 减
-      console.log("减 => BigNumber(0.3).minus(0.1).toNumber() Result:", BigNumber(0.3).minus(0.1).toNumber());
-      // 乘
-      console.log("乘 => BigNumber(0.3).multipliedBy(0.2).toNumber() Result:", BigNumber(0.3).multipliedBy(0.2).toNumber());
-      console.log("乘 => BigNumber(0.3).times(0.2).toNumber() Result:", BigNumber(0.3).times(0.2).toNumber());
-      // 除
-      console.log("除 => BigNumber(12).dividedBy(7).toNumber() Result:", BigNumber(12).dividedBy(7).toNumber());
-      console.log("除 => BigNumber(12).div(7).toNumber() Result:", BigNumber(12).div(7).toNumber());
-      // 除 取整数部分
-      console.log("除 取整数部分 => BigNumber(12).dividedToIntegerBy(7).toNumber() Result:", BigNumber(12).dividedToIntegerBy(7).toNumber());
-      console.log("除 取整数部分 => BigNumber(12).idiv(7).toNumber() Result:", BigNumber(12).idiv(7).toNumber());
+      // Addition.
+      console.log("Addition => BigNumber(0.2).plus(0.1).toNumber() Result:", BigNumber(0.2).plus(0.1).toNumber());
+      // Subtraction.
+      console.log("Subtraction => BigNumber(0.3).minus(0.1).toNumber() Result:", BigNumber(0.3).minus(0.1).toNumber());
+      // Multiplication.
+      console.log("Multiplication => BigNumber(0.3).multipliedBy(0.2).toNumber() Result:", BigNumber(0.3).multipliedBy(0.2).toNumber());
+      console.log("Multiplication => BigNumber(0.3).times(0.2).toNumber() Result:", BigNumber(0.3).times(0.2).toNumber());
+      // Division.
+      console.log("Division => BigNumber(12).dividedBy(7).toNumber() Result:", BigNumber(12).dividedBy(7).toNumber());
+      console.log("Division => BigNumber(12).div(7).toNumber() Result:", BigNumber(12).div(7).toNumber());
+      // Integer division.
+      console.log("Integer division => BigNumber(12).dividedToIntegerBy(7).toNumber() Result:", BigNumber(12).dividedToIntegerBy(7).toNumber());
+      console.log("Integer division => BigNumber(12).idiv(7).toNumber() Result:", BigNumber(12).idiv(7).toNumber());
 
-      // 取余 10 % 3
-      console.log("取余 => BigNumber(10).modulo(3).toNumber() Result:", BigNumber(10).modulo(3).toNumber());
-      console.log("取余 => BigNumber(10).mod(3).toNumber() Result:", BigNumber(10).mod(3).toNumber());
+      // Remainder: 10 % 3.
+      console.log("Remainder => BigNumber(10).modulo(3).toNumber() Result:", BigNumber(10).modulo(3).toNumber());
+      console.log("Remainder => BigNumber(10).mod(3).toNumber() Result:", BigNumber(10).mod(3).toNumber());
 
-      // 取反数 -1.3 * -1
-      console.log("取反数 -1.3 * -1 => BigNumber(-1.3).negated().toNumber() Result:", BigNumber(-1.3).negated().toNumber());
+      // Negation: -1.3 * -1.
+      console.log("Negation -1.3 * -1 => BigNumber(-1.3).negated().toNumber() Result:", BigNumber(-1.3).negated().toNumber());
 
-      // 指数
-      console.log("指数 2^10 => BigNumber(2).exponentiatedBy(10).toNumber() Result:", BigNumber(2).exponentiatedBy(10).toNumber());
-      console.log("指数 2^10 => BigNumber(2).pow(10).toNumber() Result:", BigNumber(2).pow(10).toNumber());
+      // Exponentiation.
+      console.log("Exponentiation 2^10 => BigNumber(2).exponentiatedBy(10).toNumber() Result:", BigNumber(2).exponentiatedBy(10).toNumber());
+      console.log("Exponentiation 2^10 => BigNumber(2).pow(10).toNumber() Result:", BigNumber(2).pow(10).toNumber());
 
-      // 是否是有限的数字
-      console.log("是否是有限的数字 =>  Result:", BigNumber(123).isFinite());
-      console.log("是否是有限的数字 =>  Result:", BigNumber(Infinity).isFinite());
+      // Whether the value is finite.
+      console.log("Finite =>  Result:", BigNumber(123).isFinite());
+      console.log("Finite =>  Result:", BigNumber(Infinity).isFinite());
 
-      // 是否是一个整数
-      console.log("是否是一个整数 =>  Result:", BigNumber(0.3).isInteger());
-      console.log("是否是一个整数 =>  Result:", BigNumber(3).isInteger());
+      // Whether the value is an integer.
+      console.log("Integer =>  Result:", BigNumber(0.3).isInteger());
+      console.log("Integer =>  Result:", BigNumber(3).isInteger());
 
-      // 是否是NaN
-      console.log("是否是NaN =>  Result:", BigNumber(NaN).isNaN());
-      console.log("是否是NaN =>  Result:", BigNumber(Infinity).isNaN());
+      // Whether the value is NaN.
+      console.log("NaN =>  Result:", BigNumber(NaN).isNaN());
+      console.log("NaN =>  Result:", BigNumber(Infinity).isNaN());
 
-      // 是否是负数
-      console.log("是否是负数 =>  Result:", BigNumber(-0).isNegative());
-      console.log("是否是负数 =>  Result:", BigNumber(0).isNegative());
+      // Whether the value is negative.
+      console.log("Negative =>  Result:", BigNumber(-0).isNegative());
+      console.log("Negative =>  Result:", BigNumber(0).isNegative());
 
-      // 格式化
+      // Formatting.
       let fmt = {
         prefix: "$",
         decimalSeparator: ".",
@@ -124,7 +124,7 @@
         fractionGroupSize: 0,
         suffix: " ",
       };
-      console.log("格式化 =>  Result:", BigNumber("123456789.123456789").dp(2).toFormat(fmt));
+      console.log("Format =>  Result:", BigNumber("123456789.123456789").dp(2).toFormat(fmt));
     </script>
   </body>
 </html>
