@@ -1,79 +1,79 @@
 ---
-description: RocksDB 进阶版！
+description: A more advanced RocksDB-based storage system.
 ---
 
 # 🤩 TiKV
 
-TiKV 是一个分布式事务型的键值数据库，提供了满足 ACID 约束的分布式事务接口，并且通过 [Raft 协议](https://raft.github.io/raft.pdf)保证了多副本数据一致性以及高可用。TiKV 作为 TiDB 的存储层，为用户写入 TiDB 的数据提供了持久化以及读写服务，同时还存储了 TiDB 的统计信息数据。
+TiKV is a distributed transactional key-value database. It provides distributed transaction interfaces that satisfy ACID constraints, and it uses the [Raft protocol](https://raft.github.io/raft.pdf) to guarantee replicated-data consistency and high availability. As the storage layer of TiDB, TiKV provides persistence and read/write services for data written through TiDB, and it also stores TiDB statistics data.
 
-#### 优势
+#### Advantages
 
-* 异地复制：使用Raft和Placement Driver进行异地复制来保证数据的安全性。
-* 水平扩展：直接增加节点即可实现系统扩容
-* 一致性分布式事务：使用基于Google Percolator、优化后的两阶段提交协议来支持分布式事务。可以使用“begin”来开启事务，再使用“commit”提交事务或者“rollback”来回滚事务。
-* 分布式计算的协处理器：跟HBase一样，支持协处理器框架来让用户直接在Tikv中做计算。
-* 与TiDB深度融合：使用TiKV作为TiDB的后端存储引擎，提供分布式关系型数据库
+* Geo-replication: uses Raft and Placement Driver to replicate data across locations and protect data safety.
+* Horizontal scalability: the system can be expanded by directly adding nodes.
+* Consistent distributed transactions: uses an optimized two-phase commit protocol based on Google Percolator to support distributed transactions. A transaction can be started with `begin`, committed with `commit`, or rolled back with `rollback`.
+* Coprocessor for distributed computation: like HBase, TiKV supports a coprocessor framework that lets users execute computation directly inside TiKV.
+* Deep integration with TiDB: TiKV acts as TiDB's backend storage engine and provides a distributed relational database storage layer.
 
-#### RocksDB in TiKV（摘自官方文档）
+#### RocksDB in TiKV (excerpted from the official documentation)
 
-RocksDB 是用于快速存储环境的持久键值存储。以下是 RocksDB 的一些亮点功能：
+RocksDB is a persistent key-value store for fast storage environments. Some highlights of RocksDB are:
 
-1. RocksDB 使用完全用 C++ 编写的日志结构数据库引擎，以获得最佳性能。键和值只是任意大小的字节流。
-2. RocksDB 针对快速、低延迟的存储进行了优化，例如闪存驱动器和高速磁盘驱动器。RocksDB 充分利用了闪存或 RAM 提供的高读/写速率的全部潜力。
-3. RocksDB 可以适应不同的工作负载
-4. 从 MyRocks 等数据库存储引擎到应用程序数据缓存再到嵌入式工作负载，RocksDB 可用于满足各种数据需求。
-5. RocksDB 提供了基本操作，例如打开和关闭数据库，读取和写入更高级的操作，例如合并和压缩过滤器。
+1. RocksDB uses a log-structured database engine written entirely in C++ for the best performance. Keys and values are arbitrary byte streams.
+2. RocksDB is optimized for fast, low-latency storage such as flash drives and high-speed disk drives. RocksDB fully exploits the high read/write rates provided by flash or RAM.
+3. RocksDB can adapt to different workloads.
+4. From database storage engines such as MyRocks, to application data caches, to embedded workloads, RocksDB can serve many data needs.
+5. RocksDB provides basic operations such as opening and closing a database, as well as reads, writes, and more advanced operations such as merge and compaction filters.
 
-TiKV 使用 RocksDB 是因为 RocksDB 成熟且高性能。在本节中，我们将探讨 TiKV 如何使用 RocksDB。
+TiKV uses RocksDB because RocksDB is mature and high-performance. In this section, we explore how TiKV uses RocksDB.
 
-我们将在下面重点介绍 TiKV 中使用的一些特殊功能。
+The following subsections highlight some special features used by TiKV.
 
-### [前缀布隆过滤器](https://github.com/facebook/rocksdb/wiki/RocksDB-Bloom-Filter)
+### [Prefix Bloom Filter](https://github.com/facebook/rocksdb/wiki/RocksDB-Bloom-Filter)
 
-布隆过滤器是一种神奇的数据结构，它使用的资源很少，但有很大的帮助。我们不会在这里解释整个算法。如果您不熟悉 Bloom Filters，您可以将其视为数据集中的一个黑匣子，它可以在不实际搜索数据集的情况下告诉您某个键是否_可能_存在或 _绝对_不存在。有时布隆过滤器会给你一个误报的答案，尽管它很少发生。
+A Bloom Filter is a useful data structure that uses very few resources while providing significant benefit. This section does not explain the entire algorithm. If you are not familiar with Bloom Filters, you can think of one as a black box for a dataset: without actually searching the dataset, it can tell you whether a key _may_ exist or _definitely_ does not exist. Sometimes a Bloom Filter returns a false positive, although this happens rarely when configured properly.
 
-TiKV 使用 Bloom Filter 以及称为 **Prefix Bloom Filter (PBF)** 的变体。PBF 不会告诉您数据集中是否存在整个键，而是会告诉您是否存在具有相同前缀的其他键。由于 PBF 只存储唯一的前缀而不是所有唯一的完整键，因此它也可以节省一些内存，但缺点是误报率较大。
+TiKV uses Bloom Filters and a variant called **Prefix Bloom Filter (PBF)**. A PBF does not tell you whether a whole key exists in the dataset; instead, it tells you whether another key with the same prefix may exist. Because a PBF stores only unique prefixes rather than all unique full keys, it can save memory, with the tradeoff of a higher false-positive rate.
 
-TiKV 支持 MVCC，这意味着 RocksDB 中存储的同一行可以有多个版本。同一行的所有版本共享相同的前缀（行键），但具有不同的时间戳作为后缀。当我们想要读取一行时，我们通常不知道要读取的确切版本，而只想读取特定时间戳的最新版本。这就是 PBF 大放异彩的地方。PBF 可以过滤掉不可能包含与我们提供的行键具有相同前缀的键的数据。然后我们只需要在可能包含不同版本的行键的数据中搜索，找到我们想要的具体版本。
+TiKV supports MVCC, which means the same row stored in RocksDB can have multiple versions. All versions of the same row share the same prefix, the row key, but have different timestamps as suffixes. When we want to read a row, we usually do not know the exact version to read; instead, we want to read the latest version at a specific timestamp. This is where PBF is useful. PBF can filter out data that cannot possibly contain keys with the same prefix as the row key we provide. Then we only need to search data that may contain different versions of that row key and find the specific version we need.
 
-### 表属性
+### Table Properties
 
-RocksDB 允许我们注册一些表属性收集器。RocksDB 在构建 SST 文件时，会将排序后的键值一一传递给每个收集器的回调，以便我们可以收集任何我们想要的东西。然后当 SST 文件完成后，收集的属性也将存储在 SST 文件中。
+RocksDB allows users to register table-property collectors. When RocksDB builds an SST file, it passes sorted key-value pairs one by one to each collector's callback, so the collector can gather whatever information it needs. When the SST file is completed, the collected properties are stored in the SST file.
 
-我们使用此功能来优化两个功能。
+TiKV uses this feature to optimize two functions.
 
-第一个用于拆分检查。拆分检查是检查区域是否足够大以进行拆分的工作人员。我们必须扫描一个区域内的所有数据来计算原始实现时区域的大小，这是资源消耗。使用该`TableProperties` 功能，我们记录每个 SST 文件中小子范围的大小，以便我们可以从表属性中计算出一个区域的大致大小，而无需扫描任何数据。
+The first is split checking. Split checking is the worker that checks whether a region is large enough to split. In the original implementation, TiKV had to scan all data in a region to compute its size, which consumed resources. With `TableProperties`, TiKV records the size of small sub-ranges in each SST file, so it can compute an approximate region size from table properties without scanning any data.
 
-另一种是用于 MVCC 垃圾收集 (GC)。GC 是清理每一行的垃圾版本（比配置的生命周期更旧的版本）的过程。如果我们不知道一个区域是否包含一些垃圾版本，我们必须定期检查所有区域。为了跳过不必要的垃圾回收，我们在每个 SST 文件中记录一些 MVCC 统计信息（例如行数和版本数）。因此，在逐行检查每个区域之前，我们检查表属性以查看是否有必要对某个区域进行垃圾收集。
+The second is MVCC garbage collection (GC). GC is the process of cleaning obsolete versions of each row, namely versions older than the configured lifetime. If we do not know whether a region contains obsolete versions, we have to check all regions periodically. To skip unnecessary GC, TiKV records some MVCC statistics in each SST file, such as row count and version count. Therefore, before checking each region row by row, TiKV first checks table properties to decide whether GC is necessary for that region.
 
-### 紧凑型
+### Compaction
 
-有时，某些区域可能会因为 GC 或其他删除操作而包含大量的 tombstone 条目。Tombstone 条目不利于扫描性能并浪费磁盘空间。
+Sometimes, certain regions may contain many tombstone entries because of GC or other delete operations. Tombstone entries are bad for scan performance and waste disk space.
 
-因此，使用该<mark style="color:purple;">**`TableProperties`**</mark>功能，我们可以定期检查每个区域以查看其是否包含大量墓碑。如果是这样，我们将手动压缩区域范围以删除墓碑条目并释放磁盘空间。
+Therefore, using <mark style="color:purple;">**`TableProperties`**</mark>, TiKV can periodically check each region to see whether it contains many tombstones. If it does, TiKV manually compacts the region range to remove tombstones and release disk space.
 
-我们还用于**`CompactRange`**从一些错误中恢复 RocksDB，例如跨不同 TiKV 版本的表属性不兼容。
+TiKV also uses **`CompactRange`** to recover RocksDB from certain errors, such as table-property incompatibilities across different TiKV versions.
 
-### [事件监听器](https://github.com/facebook/rocksdb/wiki/EventListener)
+### [Event Listener](https://github.com/facebook/rocksdb/wiki/EventListener)
 
-`EventListener`允许我们监听一些特殊事件，如刷新、压缩或写入停顿条件更改。当特定事件被触发或完成时，RocksDB 将调用我们的回调，并提供有关该事件的一些信息。
+`EventListener` lets TiKV listen to special events such as flush, compaction, or write-stall condition changes. When a specific event is triggered or completed, RocksDB calls the callback and provides information about that event.
 
-TiKV 通过监听 compaction 事件来观察 region 大小的变化。如上所述，我们从表格属性中计算出每个区域的大致大小。大概的大小会被记录在内存中，这样如果没有任何变化，我们就不需要一次又一次地计算它。但是，在压缩期间，一些条目会被删除，因此应该更新一些区域的大致大小。这就是我们监听压缩事件并在必要时重新计算某些区域的近似大小的原因。
+TiKV observes region-size changes by listening to compaction events. As described above, TiKV computes the approximate size of each region from table properties. The approximate size is recorded in memory, so if nothing changes, TiKV does not need to recompute it repeatedly. However, during compaction, some entries are removed, so the approximate size of some regions should be updated. This is why TiKV listens to compaction events and recomputes the approximate size of certain regions when necessary.
 
-### [摄取外部文件](https://github.com/facebook/rocksdb/wiki/Creating-and-Ingesting-SST-files)
+### [Ingest External File](https://github.com/facebook/rocksdb/wiki/Creating-and-Ingesting-SST-files)
 
-RocksDB 允许我们在外部生成一个 SST 文件，然后将文件直接摄取到 RocksDB 中。此功能可能会节省大量 IO，因为 RocksDB 足够智能，可以在可能的情况下将文件摄取到底层，这可以减少写入放大，因为摄取的文件不需要一次又一次地压缩。
+RocksDB allows users to generate an SST file externally and then ingest that file directly into RocksDB. This feature can save a large amount of I/O, because RocksDB is smart enough to ingest the file into a lower level when possible. This reduces write amplification because the ingested file does not need to be compacted repeatedly.
 
-我们使用这个特性来处理 Raft 快照。例如，当我们想将副本添加到新服务器时。我们可以先从另一台服务器生成快照文件，然后将文件发送到新服务器。然后新服务器可以直接将该文件摄取到它的 RocksDB 中，这样可以节省大量工作！
+TiKV uses this feature to handle Raft snapshots. For example, when adding a replica to a new server, TiKV can first generate a snapshot file from another server and then send the file to the new server. The new server can then ingest the file directly into its RocksDB instance, saving a large amount of work.
 
-我们也利用这个特性将海量数据导入 TiKV。我们有一些工具可以从不同的数据源生成排序的 SST 文件，然后将这些文件摄取到不同的 TiKV 服务器中。与以通常的方式将键值写入 TiKV 集群相比，这非常快。
+TiKV also uses this feature to import massive datasets. Some tools can generate sorted SST files from different data sources and then ingest those files into different TiKV servers. This is much faster than writing key-value pairs into a TiKV cluster in the usual way.
 
 ### DeleteFilesInRange
 
-此前，TiKV 使用直截了当的方式来删除一个范围的数据，即扫描范围内的所有键，然后逐个删除。但是，在压缩墓碑之前，不会释放磁盘空间。更糟糕的是，由于新写入的墓碑，磁盘空间使用量实际上会暂时增加。
+Previously, TiKV used a straightforward method to delete data in a range: scan all keys in the range and delete them one by one. However, disk space is not released until the tombstones are compacted. Worse, because new tombstones are written, disk-space usage may temporarily increase.
 
-随着时间的推移，用户在 TiKV 中存储的数据越来越多，直到磁盘空间不足。然后用户会尝试删除一些表或添加更多存储，并期望磁盘空间使用量在短时间内减少。但是 TiKV 并没有通过这种方法达到预期。我们首先尝试通过使用`DeleteRange`RocksDB 中的特性来解决这个问题。但是， `DeleteRange`结果是不稳定的，不能足够快地释放磁盘空间。
+Over time, users store more and more data in TiKV until disk space becomes insufficient. Then users may try to delete some tables or add more storage, expecting disk-space usage to drop quickly. With the previous method, TiKV did not meet that expectation. TiKV first tried to solve this problem with RocksDB's `DeleteRange` feature. However, `DeleteRange` turned out to be unstable and did not release disk space quickly enough.
 
-释放磁盘空间的更快方法是直接删除一些文件，这将我们引向该`DeleteFilesInRange`功能。但是这个特性并不完美，它是相当危险的，因为它破坏了快照的一致性。如果您从 RocksDB 获取快照，使用`DeleteFilesInRange`删除一些文件，然后尝试读取该数据，您会发现其中一些丢失。所以我们应该谨慎使用这个特性。
+A faster way to release disk space is to delete some files directly, which led TiKV to use `DeleteFilesInRange`. However, this feature is not perfect and is quite dangerous because it breaks snapshot consistency. If you obtain a snapshot from RocksDB, use `DeleteFilesInRange` to delete some files, and then try to read that data, some data will be missing. Therefore, this feature must be used carefully.
 
-TiKV 用于`DeleteFilesInRange`销毁 tombstone 区域和 GC 丢弃的表。这两种情况都有一个先决条件，即不能再访问已删除的范围。
+TiKV uses `DeleteFilesInRange` to destroy tombstone regions and tables discarded by GC. Both cases have the same precondition: the deleted range must no longer be accessible.

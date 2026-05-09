@@ -1,83 +1,89 @@
 # 🧐 Bloom Filter
 
-* 空间效率高的概率型数据结构，用来检查一个元素是否在一个集合中
-* 对于一个元素检测是否存在的调用，BloomFilter会告诉调用者两个结果之一：可能存在或者一定不存在
+* A space-efficient probabilistic data structure used to check whether an element belongs to a set.
+* For a membership query, a Bloom Filter returns one of two results: the element may exist, or it definitely does not exist.
 
-在判断一个元素是否属于某个集合时，有可能会把不属于这个集合的元素误认为属于这个集合（**false positive**）。因此，Bloom Filter不适合那些“零错误”的应用场合。而在能容忍低错误率的应用场合下，Bloom Filter通过极少的错误换取了存储空间的极大节省。
+When checking whether an element belongs to a set, a Bloom Filter may treat an element that is not in the set as if it were in the set. This is called a **false positive**. Therefore, Bloom Filters are not suitable for applications that require zero errors. In applications that can tolerate a low error rate, Bloom Filters trade a small number of mistakes for a large reduction in storage space.
 
 ## **BitMap & Bloom Filter**
 
-为减少内存开销，仅仅针对知道是否存在，使用位图算法：
+If we only need to know whether an item exists, a bitmap can reduce memory overhead.
 
-如需求是要根据网页URL（字节数很大）判断网页是否在黑名单：
+For example, suppose we need to determine whether a web page URL, which may occupy many bytes, is in a blacklist.
 
-每个map值都使用1bit，这样大大降低了内存开销，具体做法是，我们使用一个Hash函数将URL映射到大小为n的bit数组中，并置相应位置为True
+Each map value uses only 1 bit, which greatly reduces memory overhead. The concrete method is to use a hash function to map the URL into a bit array of size `n`, and then set the corresponding bit to `true`.
 
 ![](https://s2.loli.net/2022/07/24/5YhNiEVmXLu2Qvs.png)
 
-可以在尽可能低的内存开销下，实现**O（1）**时间的判断URL是否存在黑名单中。
+This can determine whether the URL is in the blacklist in **O(1)** time with very low memory overhead.
 
-但不得不面对的一个问题就是，即使采取再好的哈希函数，都会出现哈希冲突的情况，在查询阶段出现哈希冲突意味着**查询错误，会返回一个错误的结果，而想尽可能的降低哈希冲突，我们需要位图大小比黑名单中URL数量大的多，我们考虑随机哈希的情况下，查询碰撞的概率是：黑名单URL数量/位图大小。所以要想查询准确率高，又带来了更高的内存开销，而可以有效改善这种情况的一种数据结构就是（Bloom Filter）**
+However, one unavoidable problem is hash collision. Even with a good hash function, collisions can still happen. During query, a hash collision means **an incorrect query result**. To reduce collisions as much as possible, the bitmap needs to be much larger than the number of blacklisted URLs. Under a random-hashing assumption, the probability of collision during query is:
 
-使用**多个**Hash函数对数据进行哈希操作（如下图使用了两个hash函数），这样得出多个位置为True，相比位图它在有限的空间内，尽可能的降低了查询失败的可能，这一点可以从信息熵的角度来看，每一个位置所包含的信息更加多了，所以比起位图来说，布隆过滤器对空间的利用率也变大了
+```text
+number of blacklisted URLs / bitmap size
+```
+
+Therefore, higher query accuracy also brings higher memory overhead. A data structure that can improve this tradeoff effectively is the **Bloom Filter**.
+
+A Bloom Filter uses **multiple** hash functions to hash the data. In the example below, two hash functions are used, so multiple positions are set to `true`. Compared with a bitmap, this reduces the probability of query failure as much as possible within limited space. From an information-entropy perspective, each position now carries more information, so the Bloom Filter uses space more efficiently than a plain bitmap.
 
 ![image-20210715164606827](https://s2.loli.net/2022/07/24/fPCbeqjgmAErS4V.png)
 
-## **集合表示和元素查询**
+## **Set Representation and Element Query**
 
-下面我们具体来看Bloom Filter是如何用位数组表示集合的。初始状态时，Bloom Filter是一个包含m位的位数组，每一位都置为0。
+Now look more concretely at how a Bloom Filter represents a set with a bit array. Initially, a Bloom Filter is a bit array with `m` bits, and every bit is set to `0`.
 
 ![img](https://s2.loli.net/2022/07/12/pJo4ygWAaXqTvxR.jpg)
 
-为了表达`S={x1, x2,…,xn}`这样一个n个元素的集合，Bloom Filter使用k个相互独立的哈希函数（Hash Function），它们分别将集合中的每个元素映射到{1,…,m}的范围中。对任意一个元素`x`，第`i`个哈希函数映射的位置`hi(x)`就会被置为1（1≤i≤k）。注意，如果一个位置多次被置为1，那么只有**第一次**会起作用，后面几次将没有任何效果。在下图中，_k=3_，且有两个哈希函数选中同一个位置（从左边数第五位）。
+To represent a set `S={x1, x2, ..., xn}` containing `n` elements, a Bloom Filter uses `k` independent hash functions. Each hash function maps every element in the set into the range `{1, ..., m}`. For any element `x`, the position mapped by the `i`-th hash function, `hi(x)`, is set to `1` (`1 <= i <= k`). Note that if a position is set to `1` multiple times, only the **first** write has an effect; later writes do not change anything. In the figure below, _k=3_, and two hash functions select the same position, the fifth bit from the left.
 
 ![img](https://s2.loli.net/2022/07/24/NWEUT5amSiZdc9f.jpg)
 
-在**插入**一个元素时，会使用k个hash函数，来计算出k个在bit array中的位置，然后，将bit array中这些位置的bit都置为1
+When **inserting** an element, the Bloom Filter applies `k` hash functions to compute `k` positions in the bit array, and then sets all those bits to `1`.
 
-在**判断**y是否属于这个集合时，我们**对y应用k次哈希函数**，如果**所有`hi(y)`的位置都是1（1≤i≤k）**，那么我们就认为y是集合中的元素，否则就认为y不是集合中的元素。下图中`y1`就不是集合中的元素。**`y2`或者属于这个集合，或者刚好是一个false positive**
+When **checking** whether `y` belongs to the set, we apply the `k` hash functions to `y`. If **all positions `hi(y)` are `1` (`1 <= i <= k`)**, we consider `y` to be in the set. Otherwise, we consider `y` not to be in the set. In the figure below, `y1` is not in the set. **`y2` may belong to the set, or it may just be a false positive.**
 
 ![img](https://s2.loli.net/2022/07/24/7Cld2BObSRMIT5r.jpg)
 
-不允许有**删除**操作，因为删除后，可能会造成原来存在的元素返回不存在，这个是不允许的
+Deletion is not allowed in a standard Bloom Filter. If we delete bits, an element that originally existed may later be reported as not existing, which is not acceptable.
 
-不允许删除的机制会导致其中的无效元素可能会越来越多，即实际已经在磁盘删除中的元素，但在`bloomfilter`中还认为可能存在，这会造成越来越多的false positive，在实际使用中，一般会废弃原来的`BloomFilter`，重新构建一个新的`BloomFilter`
+The no-deletion property means invalid elements may accumulate over time. For example, an element may have already been deleted from disk, while the `bloomfilter` still reports that it may exist. This creates more and more false positives. In practice, systems often discard the old `BloomFilter` and rebuild a new one.
 
-如果要布隆过滤器支持删除，那么怎么办呢？
+What if we need a Bloom Filter that supports deletion?
 
-有一个叫做 ``` `**`Counting Bloom Filter`**:
+One option is the **Counting Bloom Filter**.
 
-它用一个 counter 数组替换数组的比特位，这样一比特的空间就被扩大成了一个计数器, 用多占用几倍的存储空间的代价，给 Bloom Filter 增加了删除操作。
+It replaces the bit array with an array of counters. Each original bit is expanded into a counter, so the structure pays several times more storage space in exchange for delete support.
 
-但是还有更好的解决方案，那就是布谷鸟过滤器。
+There is also a better solution: the Cuckoo Filter.
 
-## **对比**
+## **Comparison**
 
-常用的数据结构，如`hashmap`，`set`，`bit array`都能用来测试一个元素是否存在于一个集合中
+Common data structures such as `hashmap`, `set`, and `bit array` can all be used to test whether an element exists in a set.
 
-* 对于`hashmap`，其本质上是一个**指针数组**，一个指针的开销是`sizeof(void *)`，在64bit的系统上是**64个bit**，如果采用开链法处理冲突的话，又需要额外的指针开销，而对于`BloomFilter`来讲，返回可能存在的情况中，如果允许有1%的错误率的话，每个元素大约需要10bit的存储空间，整个**存储空间的开销**大约是`hashmap`的15%左右
-* 对于`set`:
-  * 如果采用`hashmap`方式实现，情况同上
-  * 如果采用**平衡树**方式实现，**一个节点需要一个指针存储数据的位置，两个指针指向其子节点**，因此开销相对于`hashmap`来讲是更多的
-* 对于`bit array`，对于某个元素是否存在，**先对元素做hash，取模定位到具体的bit**，如果该bit为1，则返回元素存在，如果该bit为0，则返回此元素不存在。可以看出，在返回元素存在的时候，也是会有**误判**的，如果要获得和BloomFilter相同的误判率，则需要比BloomFilter**更大的存储空间**
+* For a `hashmap`, the underlying structure is essentially an **array of pointers**. One pointer costs `sizeof(void *)`; on a 64-bit system, that is **64 bits**. If separate chaining is used to handle collisions, extra pointer overhead is also needed. For a `BloomFilter`, if a 1% error rate is allowed when returning "may exist", each element needs roughly 10 bits of storage. The overall **storage-space cost** is about 15% of a `hashmap`.
+* For a `set`:
+  * If it is implemented with a `hashmap`, the situation is the same as above.
+  * If it is implemented with a **balanced tree**, **each node needs one pointer to store the data position and two pointers to point to its children**, so its overhead is larger than a `hashmap`.
+* For a `bit array`, to test whether an element exists, we first hash the element and take the modulo to locate a specific bit. If the bit is `1`, the element is reported as existing; if the bit is `0`, the element is reported as not existing. We can see that when a bit array reports that an element exists, it can also produce a **false positive**. To obtain the same false-positive rate as a Bloom Filter, a bit array needs **more storage space** than the Bloom Filter.
 
-**劣势**：
+**Disadvantages**:
 
-* 相对于`hashmap`和`set`，`BloomFilter`在返回元素可能存在的情况中，有一定的误判率，这时候，调用者在误判的时候，会做一些不必要的工作，而**对于`hashmap`和`set`，不会存在误判情况**
-* 对于`bit array`，`BloomFilter`在插入和查找元素是否存在时，需要做多次hash，而bit array只需要做一次hash，实际上，**bit array可以看做是`BloomFilter`的一种特殊情况**
+* Compared with `hashmap` and `set`, a `BloomFilter` has a false-positive rate when it returns "may exist". In that case, the caller may do unnecessary work because of the false positive. **For `hashmap` and `set`, there is no false-positive case.**
+* Compared with a `bit array`, a `BloomFilter` needs to compute multiple hashes during insertion and lookup, while a bit array only needs one hash. In fact, a **bit array can be viewed as a special case of a `BloomFilter`**.
 
-**以一个例子**具体描述使用BloomFilter的场景，以及在此场景下，BloomFilter的优势和劣势。
+Use one concrete example to describe when to use a Bloom Filter, and what its advantages and disadvantages are in that scenario.
 
-一组元素存在于磁盘中，数据量特别大，应用程序希望在元素不存在的时候尽量不读磁盘。
+A group of elements is stored on disk. The data volume is very large, and the application wants to avoid reading from disk whenever the element does not exist.
 
-* 此时，可以在内存中构建这些磁盘数据的BloomFilter，对于一次读数据的情况，分为以下几种情况：
-  * 请求的元素不在磁盘中，如果BloomFilter返回不存在，那么应用不需要走读盘逻辑，假设此概率为P1；**如果BloomFilter返回可能存在，那么属于误判情况，假设此概率为P2**
-  * 请求的元素在磁盘中，BloomFilter返回存在，假设此概率为P3
-* 如果使用hashmap或者set的数据结构，情况如下：
-  * 请求的数据不在磁盘中，应用不走读盘逻辑，此概率为P1+P2
-  * 请求的元素在磁盘中，应用走读盘逻辑，此概率为P3
+* At this point, we can build a Bloom Filter in memory for the data on disk. For one read request, the cases are:
+  * The requested element is not on disk. If the Bloom Filter returns "does not exist", the application does not need to execute the disk-read path. Let this probability be `P1`. **If the Bloom Filter returns "may exist", this is a false positive. Let this probability be `P2`.**
+  * The requested element is on disk, and the Bloom Filter returns "exists". Let this probability be `P3`.
+* If a `hashmap` or `set` is used instead, the cases are:
+  * The requested data is not on disk, so the application does not execute the disk-read path. This probability is `P1 + P2`.
+  * The requested element is on disk, so the application executes the disk-read path. This probability is `P3`.
 
-假设应用不读盘逻辑的开销为C1，走读盘逻辑的开销为C2，那么，BloomFilter 和 hashmap 的开销为
+Assume the cost of not reading from disk is `C1`, and the cost of reading from disk is `C2`. Then the costs of a Bloom Filter and a hashmap are:
 
 ```apl
 Cost(BloomFilter) = P1 * C1 + (P2 + P3) * C2
@@ -87,39 +93,39 @@ Delta = Cost(BloomFilter) - Cost(HashMap)
       = P2 * (C2 - C1)
 ```
 
-因此，BloomFilter 相当于以增加`P2 * (C2 - C1)`的时间开销，来获得相对于hashmap而言更少的空间开销。
+Therefore, a Bloom Filter uses an additional time cost of `P2 * (C2 - C1)` to obtain lower space overhead than a hashmap.
 
-既然**P2是影响BloomFilter性能开销的主要因素**，那么BloomFilter设计时如何降低概率P2（即false positive probability）呢
+Since **P2 is the main factor affecting Bloom Filter performance overhead**, how should a Bloom Filter be designed to reduce `P2`, namely the false-positive probability?
 
-## **参数取值**
+## **Parameter Selection**
 
-实际应用关注 false positive，因为和额外开销有关，实际应用中期望给定一个 false positive probability 和将要插入的元素的数量
+In practice, applications care about false positives because they are related to extra cost. Usually, the application expects to specify a false-positive probability and the number of elements that will be inserted.
 
-依然是上文的 m, n, k，false positive probability = p
+Using the same notation as above, `m`, `n`, and `k`, let the false-positive probability be `p`.
 
 **=> :**
 
-如果需要**最小化** false positive probability，则k的取值如下（①）
+If we need to **minimize** the false-positive probability, the value of `k` should be as follows (①):
 
 ```apl
-k = m * ln2 / n;  
+k = m * ln2 / n;
 ```
 
-而**p的取值**，和m，n又有如下关系（②）
+The value of **p** has the following relationship with `m` and `n` (②):
 
 ```apl
-m = - n * lnp / (ln2) ^ 2 
+m = - n * lnp / (ln2) ^ 2
 ```
 
-把①代入②，得出给定n和p，k的取值应该为
+Substituting ① into ②, we get the value of `k` for a given `n` and `p`:
 
 ```apl
 k = -lnp / ln2
 ```
 
-最后，也同样可以计算出m
+Finally, `m` can also be computed in the same way.
 
-## BloomFilter实现及优化
+## BloomFilter Implementation and Optimization
 
 ### **Basic version**
 
@@ -132,9 +138,9 @@ class BloomFilter {
     BloomFilter(const int32_t n, const double false_positive_p);
     void insert(const T &key);
     bool key_may_match(const T &key);
-    
+
     private:
-    std::vector<char> bits_; // 模仿bit array
+    std::vector<char> bits_; // Simulate a bit array.
     int32_t k_;
     int32_t m_;
     int32_t n_;
@@ -151,7 +157,7 @@ BoomFilter<T>::BoomFilter(const int32_t n, const double false_positive_p)
 }
 
 // insert:
-// 设置每个hash函数计算出来的bit为1
+// Set each bit computed by the hash functions to 1.
 template<typename T>
 void BloomFilter<T>::insert(const T &key) {
   uint32_t hash_val = 0xbc9f1d34;
@@ -159,11 +165,11 @@ void BloomFilter<T>::insert(const T &key) {
     hash_val = key.hash(hash_val);
     const uint32_t bit_pos = hash_val % m_;
     bits_[bit_pos/8] |= 1 << (bit_pos % 8);
-  }    
+  }
 }
-    
+
 // check
-// 计算每个hash函数对应的bit的值，如果全为1，则返回存在；否则，返回不存在
+// Check the bit corresponding to each hash function. If all are 1, return "exists"; otherwise, return "does not exist".
 template<typename T>
 bool BloomFilter<T>::key_may_match(const T &key) {
   uint32_t hash_val = 0xbc9f1d34;
@@ -178,21 +184,21 @@ bool BloomFilter<T>::key_may_match(const T &key) {
 }
 ```
 
-**整个BloomFilter包含三个操作：**
+**A BloomFilter contains three operations:**
 
-* 初始化：即上述代码中的构造函数
-* 插入：即上述代码中的insert
-* 判断是否存在：即上述代码中的key\_may\_match
+* Initialization: the constructor in the code above.
+* Insertion: `insert` in the code above.
+* Existence check: `key_may_match` in the code above.
 
 ### **Optimization**
 
-多次调用了`hash_func`函数，这对于计算比较长的字符串的hash的开销是比较大的
+The implementation calls `hash_func` multiple times, which is expensive when hashing long strings.
 
-多次调用了hash\_func函数，这对于计算比较长的字符串的hash的开销是比较大的
+The implementation calls `hash_func` multiple times, which is expensive when hashing long strings.
 
-可以采用**两次hash**的方式来替代上述的多次的计算:
+We can use **two hash computations** instead of the repeated hash computations above.
 
-例如`insert_optimized`:
+For example, `insert_optimized`:
 
 ```cpp
 template<typename T>
@@ -207,13 +213,13 @@ void BloomFilter<T>::insert2(const T &key) {
 }
 ```
 
-先用通常的hash函数计算一次，然后，使用移位操作计算一次，最后，k次计算的时候，不断累加两次的结果
+First, compute the normal hash once. Then compute another value with bit shifts. Finally, during the `k` iterations, keep accumulating the two results.
 
-优化后，最大的false positive probability增长，可以增加k来弥补，因为优化后的hash算法，在k增长时，带来的开销相对来讲不大
+After optimization, the maximum false-positive probability may increase. This can be compensated for by increasing `k`, because the optimized hash algorithm has relatively low overhead when `k` grows.
 
 > P.S.:
 >
-> int\_t 为一个结构的标注，可以理解为type/typedef的缩写，表示它是通过typedef定义的，而不是一种新的数据类型。因为跨平台，不同的平台会有不同的字长，所以利用[预编译](https://so.csdn.net/so/search?q=%E9%A2%84%E7%BC%96%E8%AF%91\&spm=1001.2101.3001.7020)和typedef可以最有效的维护代码
+> `int_t` is a structural type marker. It can be understood as an abbreviation for `type`/`typedef`, meaning that the type is defined through `typedef` rather than being a new data type. Because word length differs across platforms, using [preprocessing](https://so.csdn.net/so/search?q=%E9%A2%84%E7%BC%96%E8%AF%91\&spm=1001.2101.3001.7020) and `typedef` is an effective way to maintain cross-platform code.
 >
 > * `int8_t` : typedef signed char;
 > * `uint8_t` : typedef unsigned char;
@@ -224,29 +230,29 @@ void BloomFilter<T>::insert2(const T &key) {
 > * `int64_t` : typedef signed long long;
 > * `uint64_t` : typedef unsigned long long;
 >
-> **`size_t`与`ssize_t`**
+> **`size_t` and `ssize_t`**
 >
-> `size_t`主要用于计数，如`sizeof()`函数返回值类型即为`size_t`,在不同位的机器中所占的位数也不同
+> `size_t` is mainly used for counting. For example, the return type of `sizeof()` is `size_t`. Its width also differs across machines.
 >
-> `size_t`是无符号数，`ssize_t`是有符号数。
+> `size_t` is unsigned, while `ssize_t` is signed.
 >
-> 在32位机器中定义为：typedef unsigned int size\_t; （4个字节） 在64位机器中定义为：typedef unsigned long size\_t;（8个字节）
+> On a 32-bit machine, it is defined as: `typedef unsigned int size_t;` (4 bytes). On a 64-bit machine, it is defined as: `typedef unsigned long size_t;` (8 bytes).
 >
-> 由于size\_t是无符号数，因此，**当变量有可能为负数时，必须使用`ssize_t`**:
+> Since `size_t` is unsigned, **when a variable may be negative, `ssize_t` must be used**.
 >
-> 因为当有符号整型和无符号整型进行运算时，有符号整型会先自动转化成无符号
+> This is because when a signed integer and an unsigned integer participate in an operation, the signed integer is first automatically converted to an unsigned integer.
 >
-> **四种类型转换运算符**
+> **Four type-conversion operators**
 
-| 关键字                | 说明                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `static_cast`      | 用于**良性**转换，一般不会导致意外发生，风险很低： 原有的自动类型转换, void 指针和具体类型指针之间的转换, 有转换构造函数或者类型转换函数的类与其它类型之间的转换，不过**static\_cast 不能用于无关类型之间的转换**（两个具体类型指针之间的转换、int 和指针之间的转换），转换失败的话会抛出一个编译错误；                                                                                                                                                                                                                                                                                                                                 |
-| `const_cast`       | 用于 **const 与非 const**、**volatile 与非 volatile** 之间的转换。                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `reinterpret_cast` | 高度危险的转换，这种转换仅仅是对二进制位的重新解释，不会借助已有的转换规则对数据进行调整，但是可以实现最灵活的 C++ 类型转换。可以认为是 `static_cast` 的一种补充，一些 static\_cast 不能完成的转换，就可以用 reinterpret\_cast 来完成，例如**两个具体类型指针之间的转换、int 和指针之间的转换**（有些编译器只允许 int 转指针，不允许反过来）                                                                                                                                                                                                                                                                                               |
-| `dynamic_cast`     | 借助 `RTTI`，用于类型安全的向下转型（Downcasting）;与 `static_cast` 是相对的，`dynamic_cast` 是“动态转换”的意思，`static_cast` 是“静态转换”的意思。`dynamic_cast` 会在程序运行期间借助 `RTTI` 进行类型转换，这就要求基类必须包含虚函数，类向上转型是安全的（父类转子类），不做解释，向下转型不安全：每个类都会在内存中保存一份类型信息，编译器会将存在继承关系的类的类型信息使用指针“连接”起来，从而形成一个**继承链**：同一个类的不同对象指向同一个类型信息，有继承关系的类型信息组成一条链。当使用 `dynamic_cast` 对指针进行类型转换时，程序会先找到该**指针指向的对象**，再根据对象找到**当前类（指针指向的对象所属的类）的类型信息**，并从此节点开始**沿着继承链向上遍历**，如果找到了要转化的目标类型，那么说明这种转换是安全的，就能够转换成功，如果没有找到要转换的目标类型（直到继承链的顶点（最顶层的基类）还没有遇到），那么说明这种转换存在较大的风险，就不能转换。 |
+| Keyword            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `static_cast`      | Used for **benign** conversions. It generally does not cause surprises and has low risk. Examples include existing implicit conversions, conversion between `void` pointers and concrete typed pointers, and conversions between classes with converting constructors or conversion functions and other types. However, **`static_cast` cannot be used for conversions between unrelated types**, such as conversions between two concrete pointer types or between `int` and a pointer. If the conversion is invalid, compilation fails.                                                                                                                                                 |
+| `const_cast`       | Used for conversions between **const and non-const**, or between **volatile and non-volatile**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `reinterpret_cast` | A highly dangerous conversion. It only reinterprets binary bits and does not adjust the data using existing conversion rules, but it provides the most flexible C++ type conversion. It can be considered a supplement to `static_cast`. Some conversions that `static_cast` cannot perform can be done with `reinterpret_cast`, such as **conversions between two concrete pointer types or between `int` and a pointer**. Some compilers allow converting an `int` to a pointer but not the reverse.                                                                                                                                                                            |
+| `dynamic_cast`     | Uses `RTTI` for type-safe downcasting. It is the counterpart of `static_cast`: `dynamic_cast` means "dynamic conversion", while `static_cast` means "static conversion". `dynamic_cast` performs type conversion at runtime with `RTTI`, which requires the base class to contain virtual functions. Upcasting is safe. Downcasting is unsafe without a runtime check: each class stores type information in memory, and the compiler links type information for classes with inheritance relationships into an inheritance chain. When `dynamic_cast` converts a pointer, the program first finds the object pointed to by the pointer, then finds the current class type information of that object, and traverses upward along the inheritance chain. If the target type is found, the conversion is safe and succeeds. If the target type is not found before reaching the top of the inheritance chain, the conversion is risky and fails. |
 
-> 这四个关键字的语法格式都是一样的，具体为：
+> The syntax of these four keywords is the same:
 >
 > `xxx_cast<newType>(data)`
 >
-> `newType` 是要转换成的新类型，`data` 是被转换的数据
+> `newType` is the target type, and `data` is the data being converted.

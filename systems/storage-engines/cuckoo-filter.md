@@ -1,91 +1,91 @@
-# 🧐 Cuckoo Filter：Better Than Bloom
+# 🧐 Cuckoo Filter: Better Than Bloom
 
-布隆过滤器有缺点，比如不支持删除操作、查询效率弱，因为多个随机哈希函数探测的是bit数组中多个不同的点，所以会导致低CPU缓存命中率
+Bloom Filters have several drawbacks. For example, they do not support deletion, and lookup efficiency can be weaker because multiple random hash functions probe multiple different positions in the bit array, which can reduce CPU cache locality.
 
-**乐，我就是比你弔：**
+**Cuckoo Filters improve on these points:**
 
 ![img](https://s2.loli.net/2022/07/24/OSfnMs3leCuqTpU.png)
 
-`Cukoo`解决了这个问题：用**更低的空间开销**解决了布隆过滤器**不能删除元素**的问题
+`Cuckoo` solves this problem: it supports deletion, which Bloom Filters do not support, with **lower space overhead**.
 
-* supports adding and removing items dynamically （动态的添加和删除元素）
-* higher lookup performance, even when close to full （更高的查找性能，即使在接近满的情况下）
-* easier to implement than alternatives such as the quotient filter （比起商过滤器它更容易实现）
-* less space if the target false positive rate is less than 3% （如果要求误判率低于3%，它比布隆过滤器有更低的空间开销）
+* supports adding and removing items dynamically
+* higher lookup performance, even when close to full
+* easier to implement than alternatives such as the quotient filter
+* less space if the target false positive rate is less than 3%
 
-贴一个[_**CMU的佬写的C++实现👈**_](https://github.com/efficient/cuckoofilter)
+Here is a [_**C++ implementation by a CMU group**_](https://github.com/efficient/cuckoofilter).
 
 ## **Cuckoo Hash**
 
-最原始的布谷鸟哈希方法是使用两个哈希函数对一个`key`进行哈希，得到桶中的两个位置，此时
+The original Cuckoo Hashing method uses two hash functions to hash a `key`, producing two candidate bucket positions:
 
-* 如果两个位置都为为空则将`key`随机存入其中一个位置
-* 如果只有一个位置为空则存入为空的位置
-* 如果都不为空，则随机踢出一个元素，踢出的元素再重新计算哈希找到相应的位置
+* If both positions are empty, store the `key` in one of them randomly.
+* If only one position is empty, store the `key` in the empty position.
+* If neither position is empty, randomly evict one element. The evicted element is then hashed again to find its corresponding position.
 
-当然假如存在绝对的空间不足，那老是踢出也不是办法，所以一般会设置一个**踢出阈值**，如果在某次插入行为过程中连续踢出超过阈值，则进行扩容。
+Of course, if the table is truly short of space, repeatedly evicting elements is not a solution. Therefore, implementations usually set a **kick-out threshold**. If one insertion causes more consecutive evictions than the threshold allows, the table is expanded.
 
 ![image-20210727104910960](https://s2.loli.net/2022/07/24/4URBirfyup3SGVm.png)
 
-_**换言之：**_
+_**In other words:**_
 
 ![img](https://s2.loli.net/2022/07/24/h5TSCN4qmMRQ7jK.png)
 
-它有两个 hash 表，记为 T1，T2。
+There are two hash tables, denoted as `T1` and `T2`.
 
-两个 hash 函数，记为 h1，h2。
+There are two hash functions, denoted as `h1` and `h2`.
 
-当一个不存在的元素插入的时候，会先根据 h1 计算出其在 T1 表的位置，如果该位置为空则可以放进去。
+When inserting an element that does not yet exist, first compute its position in table `T1` using `h1`. If that position is empty, the element can be placed there.
 
-如果该位置不为空，则根据 h2 计算出其在 T2 表的位置，如果该位置为空则可以放进去。
+If that position is not empty, compute its position in table `T2` using `h2`. If that position is empty, the element can be placed there.
 
-如果该位置不为空，就把当前位置上的元素踢出去，然后把当前元素放进去就行了。
+If that position is also not empty, evict the element currently stored at that position, and place the current element there.
 
-也可以随机踢出两个位置中的一个，总之会有一个元素被踢出去。
+Another strategy is to randomly evict one of the two candidate positions. In any case, one element will be kicked out.
 
-被踢出去的元素怎么办呢？
+What happens to the evicted element?
 
 ![img](https://s2.loli.net/2022/07/24/ivVhZclT2Kqrjxu.png)
 
 ![img](https://s2.loli.net/2022/07/24/k9YiWG7tVD5nahw.png)
 
-这种类似于套娃的解决方式看是可行，但是总是有出现**循环踢出**导致放不进 x 的问题。
+This recursive-looking solution appears feasible, but there is always a risk of **cyclic eviction**, where the insertion of `x` cannot be completed.
 
-比如上图中的(b)
+For example, consider case (b) in the figure above.
 
-当遇到这种情况时候，说明布谷鸟 hash 已经到了极限情况，应该进行扩容，或者 hash 函数的优化。所以，你再次去看伪代码的时候，你会明白里面的 `MaxLoop` 的含义是什么了。
+When this situation occurs, it means the Cuckoo Hash table has reached a limiting case and should be expanded, or the hash functions should be improved. Therefore, when you look at the pseudocode again, the meaning of `MaxLoop` becomes clear.
 
-这个 `MaxLoop` 的含义就是为了避免相互踢出的这个过程执行次数太多，设置的一个阈值。
+`MaxLoop` is a threshold used to prevent the eviction process from running too many times.
 
 ## **Cuckoo Filter**
 
 ![1](https://s2.loli.net/2022/07/24/YeU32Z8WGgjxaqh.jpg)
 
-（a）(b)展示了一个基本的**布谷鸟哈希表的插入**操作，是由一个**桶数组**组成，每个插入项都有由**散列函数`h1(x)`和`h2(x)`确定的两个候选桶**，具体操作上文中已经描述。
+Figures (a) and (b) show a basic **Cuckoo Hash table insertion** operation. The structure consists of an **array of buckets**. Each inserted item has two candidate buckets determined by the **hash functions `h1(x)` and `h2(x)`**. The concrete process was described above.
 
-而基本的布谷鸟过滤器也是由两个或者多个哈希函数构成，布谷鸟过滤器的布谷鸟哈希表的基本单位称为**条目（entry）**。 **每个条目存储一个指纹（fingerprint）**。
+A basic Cuckoo Filter is also built from two or more hash functions. The basic unit stored in a Cuckoo Filter's Cuckoo Hash table is called an **entry**. **Each entry stores a fingerprint.**
 
-指纹指的是使用一个哈希函数生成的n位比特位，n的具体大小由所能接受的误判率来设置，论文中的例子使用的是\*\*`8 bits`\*\*的指纹大小。
+A fingerprint is an `n`-bit value generated by a hash function. The specific value of `n` is determined by the acceptable false-positive rate. The paper's example uses an **`8 bits`** fingerprint size.
 
-查询数据的时候，就是看看对应的位置上有没有对应的“指纹”信息：
+When querying data, the filter checks whether the corresponding position contains the corresponding fingerprint:
 
 ![img](https://s2.loli.net/2022/07/24/i57bxQrg8Ukhs16.png)
 
-删除数据的时候，也只是抹掉该位置上的“指纹”而已：
+When deleting data, the filter simply removes the fingerprint at that position:
 
 ![img](https://s2.loli.net/2022/07/24/e7lcZzRQypOBakj.png)
 
-由于是对元素进行 hash 计算，那么必然会出现“指纹”相同的情况，也就是会出现误判的情况。
+Because fingerprints are computed by hashing elements, different elements may have the same fingerprint. This is the source of false positives.
 
-没有存储原数据，所以牺牲了数据的准确性，但是只保存了几个 bit，因此提升了空间效率。
+The original data is not stored, so the structure sacrifices perfect accuracy. In exchange, it stores only a few bits per item and improves space efficiency.
 
-前面的(a)、(b)很简单，还是两个 hash 函数，但是没有用两个数组来存数据，就是基于一维数组的布谷鸟 hash ，核心还是踢来踢去，重点在于(c)，对数组进行了展开，从一维变成了二维：每一个下标，可以放 4 个元素了，空间利用率飙升！
+Figures (a) and (b) are straightforward: they still use two hash functions. However, they do not use two arrays to store data; instead, they use one-dimensional-array-based Cuckoo Hashing, whose core idea is still eviction. The important part is figure (c), where the array is expanded from one dimension to two dimensions: each index can now hold 4 elements, so space utilization increases sharply.
 
-\_**缺点**\_详见论文第六节or**本文下面**
+See Section 6 of the paper, or the discussion below, for the **disadvantages**.
 
 ### **Insert**
 
-插入是重点，与朴素的布谷鸟哈希不同。首先，我们回忆一下布谷鸟 hash，它存储的是插入元素的原始值，比如 x，x 会经过两个 hash 函数，如果我们记数组的长度为 L，那么就是这样的：
+Insertion is the key part, and it differs from plain Cuckoo Hashing. First, recall Cuckoo Hashing: it stores the original inserted value, such as `x`. The value `x` goes through two hash functions. If the array length is `L`, the positions are:
 
 `p1 = hash1(x) % L`
 
@@ -93,89 +93,89 @@ _**换言之：**_
 
 ***
 
-布谷鸟过滤器采取了两个并不独立的哈希函数:
+A Cuckoo Filter uses two hash functions that are not independent.
 
-先说指纹：具体的指纹是通过哈希函数取一定量的比特位:
+First, consider the fingerprint. A concrete fingerprint is obtained by taking a fixed number of bits from a hash function:
 
 `f = fingerprint(x)`
 
-下面是哈希函数：
+The hash functions are:
 
-`i1 = h1(x) = hash(x)` 通过某个哈希函数计算出来
+`i1 = h1(x) = hash(x)`, computed by a hash function.
 
-`i2 = h2(x) = i1 ⊕ hash(f)` 使用第一个索引和**指纹的哈希**做了一个异或操作
+`i2 = h2(x) = i1 ⊕ hash(f)`, computed by XORing the first index with the **hash of the fingerprint**.
 
-`i1`、`i2`即计算出来两个**桶的索引**。进行异或操作是因为异或操作的特性：同为0不同为1，且**0和任何数异或是这个数的本身**。异或运算确保了一个重要的性质：位置 i2 可以通过位置 i1 和 i1 中存储的“指纹”计算出来，即：**在桶中迁走一个键，我们直接用当前桶的索引`i`和存储在桶中的指纹计算它的备用桶**。
+`i1` and `i2` are the two computed **bucket indexes**. XOR is used because of its properties: equal bits produce `0`, different bits produce `1`, and **XORing any number with `0` returns the number itself**. XOR ensures an important property: position `i2` can be computed from position `i1` and the fingerprint stored at `i1`. In other words, **when moving a key out of a bucket, we can compute its alternate bucket directly from the current bucket index `i` and the fingerprint stored in that bucket**.
 
-**因为使用的异或运算，所以这两个位置具有对偶性。**
+**Because XOR is used, the two positions are symmetric.**
 
-只要保证 **hash(x’s fingerprint) !=0**，那么就可以确保 h2!=h1，也就可以确保，不会出现自己踢自己的死循环问题。
+As long as **`hash(x's fingerprint) != 0`**, we can guarantee `h2 != h1`, which prevents the self-kicking infinite-loop problem.
 
-**为什么不直接用索引1和指纹做异或操作**：因为指纹一般只是**key映射出来的少量bit位置**，那么假如不进行哈希操作，当指纹的比特位与整个桶数组相比很小时，那么备用位置使用“**i ⊕ 指纹**”，将被放置到离桶`i1`很近的位置，比如使用八位的指纹大小，最多只能改变`i1`的低八位，所以也就是两个候选通的位置最多相差256，不利于均匀分配。
+**Why not directly XOR index 1 with the fingerprint?** Because the fingerprint is usually only a small number of bits mapped from the key. If we do not hash the fingerprint first, and the fingerprint has far fewer bits than the bucket array index, then the alternate position computed as **`i ⊕ fingerprint`** will be very close to bucket `i1`. For example, with an 8-bit fingerprint, at most the lower 8 bits of `i1` can change, so the two candidate buckets can differ by at most 256 positions. This is bad for uniform distribution.
 
-所以，对“指纹”进行哈希处理可确保被踢出去的元素，可以重新定位到哈希表中完全不同的存储桶中，从而减少哈希冲突并提高表利用率。
+Therefore, hashing the fingerprint ensures that an evicted element can be relocated to a completely different bucket in the hash table, reducing collisions and improving table utilization.
 
-_**还有个问题：**_
+_**Another question:**_
 
-它没有对数组的长度进行取模，那么它怎么保证计算出来的下标一定是落在数组中的呢？
+The formula does not take a modulo with the array length. How does it guarantee that the computed index falls inside the array?
 
-这个就得说到布谷鸟过滤器的另外一个限制了：
+This relates to another Cuckoo Filter constraint:
 
-其**强制数组的长度必须是 2 的指数倍**：二进制一定是这样的：10000000...（n个0）。
+The **array length is forced to be a power of two**. In binary, the length has the form `10000000...` with `n` zeros.
 
-这个限制带来的好处就是，进行异或运算时，可以保证计算出来的下标一定是落在数组中的。
+The benefit of this restriction is that XOR operations can guarantee the computed index remains inside the array.
 
-这个限制带来的坏处就是：
+The drawback is that it is an additional constraint:
 
-> * 布谷鸟过滤器：我支持删除操作。
-> * 布隆过滤器：我不需要限制长度为 2 的指数倍。
-> * 布谷鸟过滤器：我查找性能比你高。
-> * 布隆过滤器：我不需要限制长度为 2 的指数倍。
-> * 布谷鸟过滤器：我空间利用率也高。
-> * 布隆过滤器：我不需要限制长度为 2 的指数倍。
-> * 布谷鸟过滤器：我烦死了，CNM！
+> * Cuckoo Filter: I support deletion.
+> * Bloom Filter: I do not need the length to be a power of two.
+> * Cuckoo Filter: I have higher lookup performance.
+> * Bloom Filter: I do not need the length to be a power of two.
+> * Cuckoo Filter: My space utilization is also high.
+> * Bloom Filter: I do not need the length to be a power of two.
+> * Cuckoo Filter: This is the tradeoff.
 
 ### **Search**
 
-给定一个项x，算法首先根据上述插入公式，计算x的指纹和两个候选桶。然后读取这两个桶：如果两个桶中的**任何现有指纹匹配**，则布谷鸟过滤器返回true，否则过滤器返回false。此时，只要不发生桶溢出，就可以确保没有假阴性
+Given an item `x`, the algorithm first computes the fingerprint of `x` and its two candidate buckets using the insertion formulas above. Then it reads the two buckets. If **any existing fingerprint in either bucket matches**, the Cuckoo Filter returns `true`; otherwise, it returns `false`. As long as bucket overflow does not occur, the filter has no false negatives.
 
 ### **Delete**
 
-标准布隆过滤器不能删除，因此删除单个项需要重建整个过滤器，而计数布隆过滤器需要更多的空间。
+A standard Bloom Filter cannot delete entries, so deleting a single item requires rebuilding the entire filter. A Counting Bloom Filter supports deletion but uses more space.
 
-布谷鸟过滤器就像计数布隆过滤器，可以通过从哈希表删除相应的指纹从而删除插入的项，其他具有类似删除过程的过滤器比布谷鸟过滤器更复杂。
+Like a Counting Bloom Filter, a Cuckoo Filter can delete an inserted item by removing the corresponding fingerprint from the hash table. Other filters with similar deletion procedures are more complicated than the Cuckoo Filter.
 
-具体删除的过程也很简单，检查给定项的两个候选桶；如果任何桶中的指纹匹配，则从该桶中删除匹配指纹的一份副本。
+The deletion process itself is simple: check the two candidate buckets for the given item. If the fingerprint in either bucket matches, delete one copy of the matching fingerprint from that bucket.
 
-## **缺点**
+## **Disadvantages**
 
-* \*\*删除不完美，存在误删的概率。\*\*删除的时候只是删除了一份指纹副本，并不能确定此指纹副本是要删除的key的指纹。同时这个问题也导致了假阳性的情况。
-* \*\*插入复杂度比较高。\*\*随着插入元素的增多，复杂度会越来越高，因为存在桶满，踢出的操作，所以需要重新计算，但综合来讲复杂度还是常数级别。
-* **存储空间的大小必须为2的指数**的限制让空间效率打了折扣。
-*   **同一个元素最多插入kb次**，（k指哈希函数的个数，b指的桶中能装指纹的个数也可以说是桶的尺寸大小（一个下标能放几个元素））如果布谷鸟过滤器支持删除，则必须存储同一项的多个副本。 插入同一项kb+1次将导致插入失败。 这类似于计数布隆过滤器，其中重复插入会导致计数器溢出。
+* **Deletion is not perfect; there is a probability of deleting the wrong entry.** Deletion removes one copy of a fingerprint, but it cannot prove that this fingerprint belongs to the key being deleted. This problem is also related to false positives.
+* **Insertion complexity is relatively high.** As the number of inserted elements increases, insertion becomes more expensive because buckets may become full and trigger eviction. Evicted items need to be recomputed and relocated. Overall, however, the complexity is still constant on average.
+* The requirement that **the storage size must be a power of two** reduces space efficiency.
+*   **The same element can be inserted at most `k * b` times**, where `k` is the number of hash functions and `b` is the number of fingerprints that can fit in one bucket, also called the bucket size, meaning how many elements one index can hold. If a Cuckoo Filter supports deletion, it must store multiple copies of the same item. Inserting the same item `k * b + 1` times will cause insertion failure. This is similar to a Counting Bloom Filter, where repeated insertion can cause counter overflow.
 
-    比如 2 个 hash 函数，一个二维数组，它的每个下标最多可以插入 4 个元素。那么对于同一个元素，最多支持插入 8 次。
+    For example, suppose there are 2 hash functions and a two-dimensional array, where each index can store at most 4 elements. Then the same element can be inserted at most 8 times.
 
-    例如下面这种情况：
+    Consider the following situation:
 
 
 
-    why 已经插入了 8 次了，如果再次插入一个 why，则会出现循环踢出的问题，直到最大循环次数，然后返回一个 false。
+    `why` has already been inserted 8 times. If we insert another `why`, cyclic eviction occurs until the maximum loop count is reached, and the insertion returns `false`.
 
-    怎么避免这个问题呢
+    How can this problem be avoided?
 
-    我们维护一个记录表，记录每个元素插入的次数就行了。
+    We can maintain a record table that tracks how many times each element has been inserted.
 
-    虽然逻辑简单，但是想想数据量大的情形，这个表的存储空间又怎么算呢？emmmmmm
+    The logic is simple, but for large datasets, the storage cost of this table becomes another problem.
 
 ![](https://s2.loli.net/2022/07/24/e9Gqcy4o7AbdXQk.png)
 
-**桶的尺寸**：
+**Bucket size**:
 
-是指每个桶能放的指纹个数，保持布谷鸟过滤器的总大小（桶数组）不变，但改变桶的大小（上述例子使用的是大小为4）会导致两个后果：
+Bucket size refers to the number of fingerprints that can be stored in each bucket. If the total Cuckoo Filter size, namely the bucket array, remains unchanged while the bucket size changes, as in the example above where bucket size is 4, two consequences follow:
 
-**(1)** **较大的桶可以提高表的利用率**(即b越大假阳性率越大) ，使用k=2个哈希函数时，当桶大小b=1（即直接映射哈希表）时，负载因子α为50%，但使用桶大小b=2、4或8时则分别会增加到84%、95%和98%。
+**(1)** **Larger buckets can improve table utilization**. That is, as `b` becomes larger, the false-positive rate also increases. With `k=2` hash functions, when the bucket size `b=1`, equivalent to a direct-mapped hash table, the load factor `α` is 50%. With bucket sizes `b=2`, `4`, or `8`, it increases to 84%, 95%, and 98%, respectively.
 
-**(2)** **较大的桶需要较长的指纹才能保持相同的假阳性率**(即b越大f越大)。 使用较大的桶时，每次查找都会检查更多的条目，从而有更大的概率产生指纹冲突。
+**(2)** **Larger buckets require longer fingerprints to maintain the same false-positive rate**. That is, as `b` becomes larger, `f` also needs to become larger. With larger buckets, each lookup checks more entries, increasing the probability of fingerprint collision.
 
-所以要基于以上寻找一个最合适的桶大小
+Therefore, the bucket size should be chosen based on these tradeoffs.
