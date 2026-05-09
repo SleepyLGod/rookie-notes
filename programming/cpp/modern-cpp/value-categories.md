@@ -1,40 +1,41 @@
 # Value Categories and Move Semantics
 
-### 右值
+### Rvalues
 
-C++11 中为了引入强大的右值引用，将右值的概念进行了进一步的划分，分为：纯右值、将亡值。
+C++11 refined the concept of rvalues in order to introduce powerful rvalue references. Rvalues are further divided into prvalues and xvalues.
 
-**纯右值** (prvalue, pure rvalue)，纯粹的右值，要么是纯粹的字面量，例如 `10`, `true`； 要么是求值结果相当于字面量或匿名临时对象，例如 `1+2`。非引用返回的临时变量、运算表达式产生的临时变量、 原始字面量、Lambda 表达式都属于纯右值。
+**Prvalue** means "pure rvalue." It is either a literal such as `10` or `true`, or an expression whose evaluation result is equivalent to a literal or an unnamed temporary object, such as `1 + 2`. Temporaries returned by non-reference return types, temporaries produced by arithmetic expressions, ordinary literals, and lambda expressions are all prvalues.
 
-需要注意的是，字面量除了字符串字面量以外，均为纯右值。而字符串字面量是一个左值，类型为 `const char` 数组。例如：
+One detail is important: literals are prvalues except for string literals. A string literal is an lvalue whose type is an array of `const char`. For example:
 
 ```cpp
 #include <type_traits>
 
 int main() {
-    // 正确，"01234" 类型为 const char [6]，因此是左值
+    // valid: "01234" has type const char [6], so it is an lvalue
     const char (&left)[6] = "01234";
 
-    // 断言正确，确实是 const char [6] 类型，注意 decltype(expr) 在 expr 是左值
-    // 且非无括号包裹的 id 表达式与类成员表达式时，会返回左值引用
+    // assertion succeeds: the type is indeed const char [6].
+    // Note that decltype(expr) returns an lvalue reference when expr is an lvalue
+    // and is not an unparenthesized id-expression or class-member access.
     static_assert(std::is_same<decltype("01234"), const char(&)[6]>::value, "");
 
-    // 错误，"01234" 是左值，不可被右值引用
+    // invalid: "01234" is an lvalue and cannot bind to an rvalue reference
     // const char (&&right)[6] = "01234";
 }
 ```
 
-但是注意，数组可以被隐式转换成相对应的指针类型，而转换表达式的结果（如果不是左值引用）则一定是个右值（右值引用为将亡值，否则为纯右值）。例如：
+However, arrays can be implicitly converted to the corresponding pointer type. The result of a conversion expression, if it is not an lvalue reference, is an rvalue: an xvalue if it is an rvalue reference, otherwise a prvalue. For example:
 
 ```cpp
-const char*   p   = "01234";  // 正确，"01234" 被隐式转换为 const char*
-const char*&& pr  = "01234";  // 正确，"01234" 被隐式转换为 const char*，该转换的结果是纯右值
-// const char*& pl = "01234"; // 错误，此处不存在 const char* 类型的左值
+const char*   p   = "01234";  // valid: "01234" is implicitly converted to const char*
+const char*&& pr  = "01234";  // valid: the conversion result is a const char* prvalue
+// const char*& pl = "01234"; // invalid: there is no const char* lvalue here
 ```
 
-**将亡值**(xvalue, expiring value)，是 C++11 为了引入右值引用而提出的概念（因此在传统 C++ 中， 纯右值和右值是同一个概念），也就是即将被销毁、却能够被移动的值。
+**Xvalue** means "expiring value." It is a concept introduced by C++11 together with rvalue references. In traditional C++, prvalue and rvalue were effectively the same concept. An xvalue is a value that is near the end of its lifetime but can still be moved from.
 
-将亡值可能稍有些难以理解，我们来看这样的代码：
+Xvalues can be difficult to understand, so consider this code:
 
 ```cpp
 std::vector<int> foo() {
@@ -45,52 +46,52 @@ std::vector<int> foo() {
 std::vector<int> v = foo();
 ```
 
-在这样的代码中，就传统的理解而言，函数 `foo` 的返回值 `temp` 在内部创建然后被赋值给 `v`， 然而 `v` 获得这个对象时，会将整个 `temp` 拷贝一份，然后把 `temp` 销毁，如果这个 `temp` 非常大， 这将造成大量额外的开销（这也就是传统 C++ 一直被诟病的问题）。
+Under a traditional mental model, the return value `temp` is created inside `foo` and then assigned to `v`. When `v` obtains the object, the whole `temp` would be copied and then `temp` would be destroyed. If `temp` is large, this creates substantial extra cost, which is one of the long-standing complaints about older C++ styles.
 
-在最后一行中，`v` 是左值、 `foo()` 返回的值就是右值（也是纯右值）。
+In the last line, `v` is an lvalue, and the value returned by `foo()` is an rvalue, specifically a prvalue in the expression model.
 
-但是，`v` 可以被别的变量捕获到， 而 `foo()` 产生的那个返回值作为一个临时值，一旦被 `v` 复制后，将立即被销毁，无法获取、也不能修改。&#x20;
+However, `v` can be accessed by other variables, while the return value produced by `foo()` is a temporary. Once it has been used to initialize `v`, the temporary is immediately destroyed and cannot be accessed or modified directly.&#x20;
 
-而将亡值就定义了这样一种行为：**临时的值、能够被识别、同时又能够被移动**。
+The xvalue category captures this behavior: **a temporary-like value that can be identified and moved from**.
 
-在 C++11 之后，编译器为我们做了一些工作，此处的左值 `temp` 会被进行此隐式右值转换， 等价于 `static_cast<std::vector<int> &&>(temp)`，进而此处的 `v` 会将 `foo` 局部返回的值进行移动。 也就是后面我们将会提到的移动语义。
+After C++11, the compiler helps here. In a return statement like this, the local object `temp` can be treated as a movable value, conceptually similar to `static_cast<std::vector<int>&&>(temp)`, so `v` can be initialized by moving the local return value from `foo`. This is part of the move semantics discussed below.
 
-要拿到一个将亡值，就需要用到**右值引用：`T &&`**。&#x20;
+To obtain an xvalue explicitly, we use an **rvalue reference: `T&&`**.&#x20;
 
-右值引用的声明让这个临时值的生命周期得以延长、只要变量还活着，那么将亡值将继续存活。
+Binding a temporary to an rvalue reference can extend the temporary's lifetime; as long as the reference variable remains alive, the temporary remains alive.
 
-C++11 提供了 `std::move` 这个方法将**左值参数无条件的转换为右值**， 有了它我们就能够方便的获得一个右值临时对象，例如：
+C++11 provides `std::move`, which **unconditionally casts its argument to an rvalue expression**. With it, we can conveniently obtain a movable expression from an lvalue:
 
 ```cpp
 void reference(std::string& str) {
-    std::cout << "left" << std::end;
+    std::cout << "lvalue" << std::endl;
 }
 void reference(std::string&& str) {
-    std::cout << "右值" << std::endl;
+    std::cout << "rvalue" << std::endl;
 }
 int main() {
-    std::string lv1 = "string,"; // lv1 是一个左值
-    // std::string&& r1 = lv1; // 非法, 右值引用不能引用左值
-    std::string&& rv1 = std::move(lv1); // 合法, std::move可以将左值转移为右值
+    std::string lv1 = "string,"; // lv1 is an lvalue
+    // std::string&& r1 = lv1; // invalid: an rvalue reference cannot bind to an lvalue
+    std::string&& rv1 = std::move(lv1); // valid: std::move casts an lvalue to an rvalue expression
     std::cout << rv1 << std::endl; // string,
 
-    const std::string& lv2 = lv1 + lv1; // 合法, 常量左值引用能够延长临时变量的生命周期
-    // lv2 += "Test"; // 非法, 常量引用无法被修改
+    const std::string& lv2 = lv1 + lv1; // valid: a const lvalue reference can extend a temporary's lifetime
+    // lv2 += "Test"; // invalid: a const reference cannot be modified
     std::cout << lv2 << std::endl; // string,string,
 
-    std::string&& rv2 = lv1 + lv2; // 合法, 右值引用延长临时对象生命周期
-    rv2 += "Test"; // 合法, 非常量引用能够修改临时变量
+    std::string&& rv2 = lv1 + lv2; // valid: an rvalue reference extends the temporary object's lifetime
+    rv2 += "Test"; // valid: a non-const reference can modify the temporary
     std::cout << rv2 << std::endl; // string,string,string,Test
 
-    reference(rv2); // 输出左值
+    reference(rv2); // prints lvalue
 
     return 0;
 } 
 ```
 
-传统 C++ 通过拷贝构造函数和赋值操作符为类对象设计了拷贝/复制的概念，但为了实现对资源的移动操作， 调用者必须使用先复制、再析构的方式，否则就需要自己实现移动对象的接口。 试想，搬家的时候是把家里的东西直接搬到新家去，而不是将所有东西复制一份（重买）再放到新家、 再把原来的东西全部扔掉（销毁），这是非常反人类的一件事情。
+Traditional C++ models object copying through copy constructors and assignment operators. To transfer resources, callers often had to copy first and then destroy the old object, or manually implement a custom transfer interface. Conceptually, moving house should mean taking the existing belongings to the new place, not buying duplicates for the new place and then throwing away everything in the old one.
 
-传统的 C++ 没有区分『**移动**』和『**拷贝**』的概念，造成了大量的数据拷贝，浪费时间和空间。 右值引用的出现恰好就解决了这两个概念的混淆问题，例如：
+Traditional C++ did not clearly separate **move** and **copy** operations, which led to unnecessary data copies and wasted time and space. Rvalue references solve this conceptual confusion. For example:
 
 ```cpp
 #include <iostream>
@@ -98,25 +99,25 @@ class A {
 public:
     int *pointer;
     A():pointer(new int(1)) {
-        std::cout << "构造" << pointer << std::endl;
+        std::cout << "construct " << pointer << std::endl;
     }
     A(A& a):pointer(new int(*a.pointer)) {
-        std::cout << "拷贝" << pointer << std::endl;
-    } // 无意义的对象拷贝
+        std::cout << "copy " << pointer << std::endl;
+    } // unnecessary object copy
     A(A&& a):pointer(a.pointer) {
         a.pointer = nullptr;
-        std::cout << "移动" << pointer << std::endl;
+        std::cout << "move " << pointer << std::endl;
     }
     ~A(){
-        std::cout << "析构" << pointer << std::endl;
+        std::cout << "destruct " << pointer << std::endl;
         delete pointer;
     }
 };
-// 防止编译器优化
+// prevent the compiler from optimizing the example away
 A return_rvalue(bool test) {
     A a, b;
-    if(test) return a; // 等价于 static_cast<A&&>(a);
-    else return b;     // 等价于 static_cast<A&&>(b);
+    if(test) return a; // conceptually similar to static_cast<A&&>(a);
+    else return b;     // conceptually similar to static_cast<A&&>(b);
 }
 int main() {
     A obj = return_rvalue(false);
@@ -127,12 +128,12 @@ int main() {
 }
 ```
 
-在上面的代码中：
+In the code above:
 
-1. 首先会在 `return_rvalue` 内部构造两个 `A` 对象，于是获得两个构造函数的输出；
-2. 函数返回后，产生一个将亡值，被 `A` 的移动构造（`A(A&&)`）引用，从而延长生命周期，并将这个右值中的指针拿到，保存到了 `obj` 中，而将亡值的指针被设置为 `nullptr`，防止了这块内存区域被销毁。
+1. Two `A` objects are first constructed inside `return_rvalue`, so two constructor messages are printed.
+2. When the function returns, it produces an xvalue-like result that can bind to `A`'s move constructor (`A(A&&)`). The pointer from the returned object is transferred into `obj`, while the source object's pointer is set to `nullptr`, preventing that memory from being deleted by the moved-from object.
 
-从而避免了无意义的拷贝构造，加强了性能。再来看看涉及标准库的例子：
+This avoids an unnecessary copy construction and improves performance. Now look at an example involving the standard library:
 
 ```cpp
 #include <iostream> // std::cout
@@ -145,91 +146,91 @@ int main() {
     std::string str = "Hello world.";
     std::vector<std::string> v;
 
-    // 将使用 push_back(const T&), 即产生拷贝行为
+    // uses push_back(const T&), which copies
     v.push_back(str);
-    // 将输出 "str: Hello world."
+    // prints "str: Hello world."
     std::cout << "str: " << str << std::endl;
 
-    // 将使用 push_back(const T&&), 不会出现拷贝行为
-    // 而整个字符串会被移动到 vector 中，所以有时候 std::move 会用来减少拷贝出现的开销
-    // 这步操作后, str 中的值会变为空
+    // uses push_back(T&&), which moves rather than copies
+    // the string can be moved into the vector, so std::move is often used to reduce copy cost
+    // after this operation, str remains valid, but its value is unspecified
     v.push_back(std::move(str));
-    // 将输出 "str: "
+    // commonly prints "str: ", but the standard does not require it to be empty
     std::cout << "str: " << str << std::endl;
 
     return 0;
 }
 ```
 
-#### 完美转发
+#### Perfect Forwarding
 
-前面我们提到了，一个声明的右值引用其实是一个左值。这就为我们进行参数转发（传递）造成了问题：
+As mentioned above, a named rvalue reference is itself an lvalue expression. This creates a problem for parameter forwarding:
 
 ```cpp
 void reference(int& v) {
-    std::cout << "左值" << std::endl;
+    std::cout << "lvalue" << std::endl;
 }
 void reference(int&& v) {
-    std::cout << "右值" << std::endl;
+    std::cout << "rvalue" << std::endl;
 }
 template <typename T>
 void pass(T&& v) {
-    std::cout << "普通传参:";
-    reference(v); // 始终调用 reference(int&)
+    std::cout << "ordinary forwarding:";
+    reference(v); // always calls reference(int&)
 }
 int main() {
-    std::cout << "传递右值:" << std::endl;
-    pass(1); // 1是右值, 但输出是左值
+    std::cout << "passing rvalue:" << std::endl;
+    pass(1); // 1 is an rvalue, but the output is lvalue
 
-    std::cout << "传递左值:" << std::endl;
+    std::cout << "passing lvalue:" << std::endl;
     int l = 1;
-    pass(l); // l 是左值, 输出左值
+    pass(l); // l is an lvalue, output is lvalue
 
     return 0;
 }
 
 ```
 
-对于 `pass(1)` 来说，虽然传递的是右值，但由于 `v` 是一个引用，所以同时也是左值。 因此 `reference(v)` 会调用 `reference(int&)`，输出『左值』。 而对于`pass(l)`而言，`l`是一个左值，为什么会成功传递给 `pass(T&&)` 呢？
+For `pass(1)`, the argument is an rvalue, but the parameter `v` is a named reference, so the expression `v` is an lvalue. Therefore `reference(v)` calls `reference(int&)` and prints "lvalue." For `pass(l)`, `l` is an lvalue, so why can it be passed successfully to `pass(T&&)`?
 
-这是基于**引用坍缩规则**的：在传统 C++ 中，我们不能够对一个引用类型继续进行引用， 但 C++ 由于右值引用的出现而放宽了这一做法，从而产生了引用坍缩规则，允许我们对引用进行引用， 既能左引用，又能右引用。但是却遵循如下规则：
+This is based on **reference collapsing rules**. In older C++, references to references were not directly part of everyday source syntax. With rvalue references and template deduction, C++ defines reference collapsing rules that allow references to combine with other references. The result follows these rules:
 
-| 函数形参类型 | 实参参数类型 | 推导后函数形参类型 |
+| Function parameter type | Argument reference type | Deduced function parameter type |
 | :----: | :----: | :-------: |
-|   T&   |   左引用  |     T&    |
-|   T&   |   右引用  |     T&    |
-|   T&&  |   左引用  |     T&    |
-|   T&&  |   右引用  |    T&&    |
+|   T&   |   lvalue reference  |     T&    |
+|   T&   |   rvalue reference  |     T&    |
+|   T&&  |   lvalue reference  |     T&    |
+|   T&&  |   rvalue reference  |    T&&    |
 
-因此，模板函数中使用 `T&&` 不一定能进行右值引用，当传入左值时，此函数的引用将被推导为左值。 更准确的讲，**无论模板参数是什么类型的引用，当且仅当实参类型为右引用时，模板参数才能被推导为右引用类型**。 这才使得 `v` 作为左值的成功传递。
+Therefore, using `T&&` in a template function does not necessarily mean an rvalue reference after deduction. When an lvalue is passed, the parameter type collapses to an lvalue reference. More precisely, **regardless of the reference form in the template parameter, the deduced result becomes an rvalue reference only when the argument is an rvalue reference; otherwise it collapses to an lvalue reference**. This is why `v` can be passed successfully when the original argument is an lvalue.
 
-完美转发就是基于上述规律产生的。所谓完美转发，就是为了让我们在传递参数的时候， 保持原来的参数类型（左引用保持左引用，右引用保持右引用）。 为了解决这个问题，我们应该使用 `std::forward` 来进行参数的转发（传递）：
+Perfect forwarding is built on these rules. It means preserving the original value category while forwarding parameters: lvalues stay lvalues, and rvalues stay rvalues. To solve this problem, use `std::forward` when forwarding parameters:
 
 ```cpp
 #include <iostream>
 #include <utility>
 void reference(int& v) {
-    std::cout << "左值引用" << std::endl;
+    std::cout << "lvalue reference" << std::endl;
 }
 void reference(int&& v) {
-    std::cout << "右值引用" << std::endl;
+    std::cout << "rvalue reference" << std::endl;
 }
 template <typename T>
 void pass(T&& v) {
-    std::cout << "              普通传参: ";
+    std::cout << "       ordinary forwarding: ";
     reference(v);
-    std::cout << "       std::move 传参: ";
+    std::cout << "        std::move forwarding: ";
     reference(std::move(v));
-    std::cout << "    std::forward 传参: ";
+    std::cout << "     std::forward forwarding: ";
     reference(std::forward<T>(v));
-    std::cout << "static_cast<T&&> 传参: ";
+    std::cout << "static_cast<T&&> forwarding: ";
     reference(static_cast<T&&>(v));
 }
 int main() {
-    std::cout << "传递右值:" << std::endl;
+    std::cout << "passing rvalue:" << std::endl;
     pass(1);
 
-    std::cout << "传递左值:" << std::endl;
+    std::cout << "passing lvalue:" << std::endl;
     int v = 1;
     pass(v);
 
@@ -237,29 +238,29 @@ int main() {
 }
 ```
 
-输出结果为：
+The output is:
 
 ```cpp
-传递右值:
-              普通传参: 左值引用
-       std::move 传参: 右值引用
-    std::forward 传参: 右值引用
-static_cast<T&&> 传参: 右值引用
-传递左值:
-              普通传参: 左值引用
-       std::move 传参: 右值引用
-    std::forward 传参: 左值引用
-static_cast<T&&> 传参: 左值引用
+passing rvalue:
+       ordinary forwarding: lvalue reference
+        std::move forwarding: rvalue reference
+     std::forward forwarding: rvalue reference
+static_cast<T&&> forwarding: rvalue reference
+passing lvalue:
+       ordinary forwarding: lvalue reference
+        std::move forwarding: rvalue reference
+     std::forward forwarding: lvalue reference
+static_cast<T&&> forwarding: lvalue reference
 
 ```
 
-无论传递参数为左值还是右值，普通传参都会将参数作为左值进行转发， 所以 `std::move` 总会接受到一个左值，从而转发调用了`reference(int&&)` 输出右值引用。
+Whether the original argument is an lvalue or an rvalue, ordinary forwarding passes the named parameter as an lvalue. `std::move` always casts that named parameter to an rvalue expression, so it calls `reference(int&&)` and prints "rvalue reference."
 
-唯独 `std::forward` 即没有造成任何多余的拷贝，同时**完美转发**(传递)了函数的实参给了内部调用的其他函数。
+Only `std::forward` avoids extra copying while **perfectly forwarding** the function argument to the internal call.
 
-`std::forward` 和 `std::move` 一样，没有做任何事情，`std::move` 单纯的将左值转化为右值， `std::forward` 也只是单纯的将参数做了一个类型的转换，从现象上来看， `std::forward<T>(v)` 和 `static_cast<T&&>(v)` 是完全一样的。
+Like `std::move`, `std::forward` does not move data by itself. `std::move` simply casts an expression to an rvalue. `std::forward` also performs a cast, but the target type depends on template deduction. In the examples above, `std::forward<T>(v)` behaves like `static_cast<T&&>(v)`.
 
-读者可能会好奇，为何一条语句能够针对两种类型的返回对应的值， 我们再简单看一看 `std::forward` 的具体实现机制，`std::forward` 包含两个重载：
+A natural question is how one expression can produce the appropriate value category for both cases. To see this, look briefly at the implementation mechanism of `std::forward`, which has two overloads:
 
 ```cpp
 template<typename _Tp>
@@ -275,8 +276,8 @@ constexpr _Tp&& forward(typename std::remove_reference<_Tp>::type&& __t) noexcep
 }
 ```
 
-在这份实现中，`std::remove_reference` 的功能是消除类型中的引用， `std::is_lvalue_reference` 则用于检查类型推导是否正确，在 `std::forward` 的第二个实现中 检查了接收到的值确实是一个左值，进而体现了坍缩规则。
+In this implementation, `std::remove_reference` removes references from a type, and `std::is_lvalue_reference` checks whether type deduction produced the expected form. The second overload of `std::forward` rejects an invalid attempt to forward an rvalue as an lvalue reference, reflecting the reference-collapsing rules.
 
-当 `std::forward` 接受左值时，`_Tp` 被推导为左值，所以返回值为左值；而当其接受右值时， `_Tp` 被推导为 右值引用，则基于坍缩规则，返回值便成为了 `&& + &&` 的右值。 可见 `std::forward` 的原理在于巧妙的利用了模板类型推导中产生的差异。
+When `std::forward` receives an lvalue in a forwarding context, `_Tp` is deduced in a way that makes the return expression an lvalue. When it receives an rvalue, `_Tp` is deduced so that, after reference collapsing, the return expression is an rvalue. The key idea is that `std::forward` deliberately exploits the differences produced by template type deduction.
 
-这时我们能回答这样一个问题：为什么在使用循环语句的过程中，`auto&&` 是最安全的方式？ 因为当 `auto` 被推导为不同的左右引用时，与 `&&` 的坍缩组合是完美转发。
+This also answers a common question: why is `auto&&` often the safest form in generic loop code? Because when `auto` is deduced from different lvalue or rvalue expressions, combining it with `&&` gives the reference-collapsing behavior needed for perfect forwarding.

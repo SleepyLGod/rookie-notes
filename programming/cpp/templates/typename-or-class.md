@@ -1,63 +1,63 @@
 ---
-description: 整合了几篇官方文档的翻译，内容很好我很菜
+description: Notes adapted from several official and reference explanations
 ---
 
-# 😅 typename or class?
+# `typename` or `class`?
 
-typename 用来说明一个`qualified name`是一个类型。比如：
+`typename` is used to state that a `qualified name` denotes a type. For example:
 
 ```cpp
 template<class C> void f(C& rc) { 
-        Typename C::iterator i = rc.begin(); 
+        typename C::iterator i = rc.begin();
         //   ... 
 } 
 ```
 
-编译器不知道C的定义，所以不知道`C::iterator`是什么东西。因此必须有**typename**来告诉编译器。
+The compiler does not know the definition of `C` while parsing the template, so it does not know what `C::iterator` denotes. Therefore **`typename`** is required to tell the compiler that it is a type.
 
-**`template<typename T, template<typename T> class S>`**的S实际是模板参数
+In **`template<typename T, template<typename T> class S>`**, `S` is itself a template parameter.
 
-C++规定模板参数只能是class模板，所以这里的class换成typename是不行的。比如：
+C++ uses `class` in the template-template parameter syntax here, so replacing this `class` with `typename` is not valid in older standards. For example:
 
 ```cpp
 // The implementation of class A
 class A { 
   int a;
 } 
-// Another implementation   of   class   A 
+// Another possible implementation of class A
 class A { 
   typedef int a; 
 } 
 ```
 
-In the second definition, "`typename A::a i`" means the **`A::a` is a type**, not a data member.
+In the second definition, `typename A::a i` means that **`A::a` is a type**, not a data member.
 
-And "`i`" is **an instance of type `A::a`**
+And `i` is **an instance of type `A::a`**.
 
-**在模板定义时的class和typename是没有区别的**，因为最初发明模板时决定使用class以减少一个关键字，但后来发现还是不得不加上typename关键字，原因如上。
+**In template type-parameter declarations, `class` and `typename` are equivalent.** When templates were first designed, `class` was reused to avoid adding a new keyword. Later, however, C++ still needed the `typename` keyword for cases like the one above.
 
-**class可以用来定义类，也可用作模板参数类型，而typename只能用作参数类型**
+**`class` can define classes and can also introduce template type parameters, while `typename` is used to introduce type parameters or disambiguate dependent type names.**
 
 ```cpp
 template<class T> class Widget; // uses "class"
 template<typename T> class Widget; // uses "typename"
 ```
 
-**在声明一个 template type parameter（模板类型参数）的时候，class 和 typename 意味着完全相同的东西。**
+**When declaring a template type parameter, `class` and `typename` mean exactly the same thing.**
 
-一些程序员更喜欢在所有的时间都用 class，因为它更容易输入。
+Some programmers prefer to always use `class` because it is shorter to type.
 
-其他人（包括我本人）更喜欢 typename，因为它暗示着这个参数不必要是一个 class type（类类型）。
+Others prefer `typename` because it suggests that the parameter does not have to be a class type.
 
-少数开发者在任何类型都被允许的时候使用 typename，而把 class 保留给仅接受 user-defined types（用户定义类型）的场合。
+A few developers use `typename` whenever any type is allowed and reserve `class` for cases where only user-defined types are intended.
 
-但是从 C++ 的观点看，class 和 typename 在声明一个 template parameter（模板参数）时意味着完全相同的东西。
+From the C++ language's point of view, however, `class` and `typename` mean exactly the same thing when declaring a template type parameter.
 
-然而，C++ 并不总是把 class 和 typename 视为等同的东西。**有时你必须使用 typename**。
+However, C++ does not always treat `class` and `typename` as equivalent. **Sometimes you must use `typename`.**
 
-为了理解这一点，我们不得不讨论你会在一个 template（模板）中涉及到的两种名字。
+To understand why, we need to discuss two kinds of names that appear inside templates.
 
-**假设**我们有一个函数的模板，它能取得一个 STL-compatible container（STL 兼容容器）中持有的能赋值给 ints 的对象。进一步假设这个函数只是简单地打印它的第二个元素的值。它是一个用糊涂的方法实现的糊涂的函数，而且就像我下面写的，它甚至不能编译，但是请将这些事先放在一边——有一种方法能发现我的愚蠢：
+**Suppose** we have a function template that accepts an STL-compatible container whose elements can be assigned to `int`. Suppose further that the function simply prints the value of the second element. This is a poorly designed function implemented in a clumsy way, and as written below it does not even compile. Put that aside for the moment; the example is useful for exposing the issue:
 
 ```cpp
 template<typename C> // print 2nd element in
@@ -73,18 +73,18 @@ void print2nd(const C& container) // container;
 }
 ```
 
-我突出了这个函数中的两个 `local variables`，iter 和 value。
+There are two `local variables` in this function: `iter` and `value`.
 
-*   **iter** 的类型是 C::const\_iterator，一个依赖于 template parameter C 的类型。一个 template中的依赖于一个 template parameter的名字被称为 **dependent names**。
+*   The type of **`iter`** is `C::const_iterator`, a type that depends on template parameter `C`. A name inside a template that depends on a template parameter is called a **dependent name**.
 
-    当一个 dependent names 嵌套在一个 class的内部时，我称它为 **nested dependent name**（嵌套依赖名字）。
+    When a dependent name is nested inside a class or class-like scope, it is a **nested dependent name**.
 
-    C::const\_iterator 是一个 nested dependent name。实际上，它是一个 **nested dependent type name**（嵌套依赖类型名），也就是说，一个涉及到一个 type的 nested dependent name（嵌套依赖名字）。
-*   `print2nd` 中的另一个 局部变量 **value** 具有 int 类型。int 是一个不依赖于任何 template parameter的名字。这样的名字以 non-dependent names闻名。（我想不通为什么他们不称它为 independent names（无依赖名字）。如果，像我一样，你发现术语 "non-dependent" 是一个令人厌恶的东西，你就和我产生了共鸣，但是 "non-dependent" 就是这类名字的术语，所以，像我一样，转转眼睛放弃你的自我主张。）
+    `C::const_iterator` is a nested dependent name. More specifically, it is a **nested dependent type name**, meaning a nested dependent name that denotes a type.
+*   The other local variable, **`value`**, has type `int`. `int` does not depend on any template parameter. Such names are called **non-dependent names**.
 
-    **nested dependent name会导致解析困难**。
+    **Nested dependent names create parsing difficulties.**
 
-    例如，假设我们更加愚蠢地以这种方法开始 `print2nd`：
+    For example, suppose we start `print2nd` in an even worse way:
 
 ```cpp
 template<typename C>
@@ -94,23 +94,23 @@ void print2nd(const C& container) {
 }
 ```
 
-这看上去好像是我们将 x 声明为一个指向 C::const\_iterator 的 local variable。
+This appears to declare `x` as a local variable that is a pointer to `C::const_iterator`.
 
-但是它看上去如此仅仅是因为我们知道 C::const\_iterator 是一个 type。
+But it only looks that way because we assume `C::const_iterator` is a type.
 
-**但是如果 C::const\_iterator 不是一个 type呢？**
+**What if `C::const_iterator` is not a type?**
 
-如果 C 有一个静态数值变量，碰巧就叫做 const\_iterator 呢？再如果 x 碰巧是一个全局变量的名字呢？
+What if `C` has a static data member named `const_iterator`? What if `x` is the name of a global variable?
 
-在这种情况下，上面的代码就不是声明一个局部变量，而是成为 C::const\_iterator 乘以 x！当然，这听起来有些愚蠢，但它是可能的，而编写 C++ 解析器的人必须考虑所有可能的输入，甚至是愚蠢的。
+In that case, the code above is not a local-variable declaration. It becomes `C::const_iterator * x`, a multiplication expression. That sounds silly, but it is possible, and C++ parser writers must account for all valid inputs, including surprising ones.
 
-直到 C 成为已知之前，没有任何办法知道 C::const\_iterator 到底是不是一个 type，而当 template `print2nd` 被解析的时候，C 还不是已知的。
+Until `C` is known, there is no way to know whether `C::const_iterator` is a type. When the template `print2nd` is parsed, `C` is not yet known.
 
-C++ 有一条规则解决这个歧义：**如果解析器在一个 template（模板）中遇到一个 nested dependent name（嵌套依赖名字），它假定那个名字不是一个 type（类型），除非你用其它方式告诉它。**
+C++ resolves this ambiguity with a rule: **when the parser encounters a nested dependent name inside a template, it assumes that the name is not a type unless you tell it otherwise.**
 
-缺省情况下，nested dependent name不是 types。（对于这条规则有一个例外，我待会儿告诉你。）
+By default, nested dependent names are not assumed to be types. There is one exception to this rule, described below.
 
-记住这个，再看看 `print2nd` 的开头：
+With that in mind, look again at the beginning of `print2nd`:
 
 ```cpp
 template<typename C>
@@ -120,9 +120,9 @@ void print2nd(const C& container) {
     	... // not be a type
 ```
 
-这为什么不是合法的 C++ 现在应该很清楚了：
+Now it should be clear why this is not valid C++:
 
-iter 的声明仅仅在 C::const\_iterator 是一个 type时才有意义，但是我们没有告诉 C++ 它是，而 C++ 就假定它不是。要想转变这个形势，我们必须告诉 C++ C::const\_iterator 是一个 type。我们将 typename 放在紧挨着它的前面来做到这一点：
+The declaration of `iter` only makes sense if `C::const_iterator` is a type. But we did not tell C++ that it is, so C++ assumes that it is not. To change that, we must tell C++ that `C::const_iterator` is a type by placing `typename` immediately before it:
 
 ```cpp
 template<typename C> // this is valid C++
@@ -134,45 +134,45 @@ void print2nd(const C& container) {
 }
 ```
 
-通用的规则很简单：**在你涉及到一个在 template中的 nested dependent type name（的任何时候，你必须把单词 typename 放在紧挨着它的前面。**（重申一下，我待会儿要描述一个例外。）
+The general rule is simple: **whenever you refer to a nested dependent type name inside a template, put the word `typename` immediately before it.** Again, there is an exception described below.
 
-\*\*typename 应该仅仅被用于标识 nested dependent type name；\*\*其它名字不应该用它。
+**`typename` should only be used to identify nested dependent type names;** other names should not be prefixed with it.
 
-例如，这是一个取得一个 container和这个 container中的一个 iterator的 function template：
+For example, here is a function template that takes a container and an iterator into that container:
 
 ```cpp
 template<typename C> // typename allowed (as is "class")
 void f(const C& container, /* typename not allowed */ typename C::iterator iter /* typename required */);
 ```
 
-C 不是一个 nested dependent type name（嵌套依赖类型名）（它不是嵌套在依赖于一个 template parameter（模板参数）的什么东西内部的），所以在声明 container 时它不必被 typename 前置;
+`C` is not a nested dependent type name. It is not nested inside something dependent on a template parameter, so it must not be prefixed with `typename` when declaring `container`.
 
-但是 C::iterator 是一个 nested dependent type name（嵌套依赖类型名），所以它必需被 typename 前置。
+But `C::iterator` is a nested dependent type name, so it must be prefixed with `typename`.
 
-"typename must precede nested dependent type names"（“typename 必须前置于嵌套依赖类型名”）规则的 **例外是 typename 不必前置于在一个 list of base classes（基类列表）中的nested dependent type name（嵌套依赖类型名） ，或者在一个 member initialization list（成员初始化列表）中作为一个 base classes identifier（基类标识符）的 nested dependent type name**。例如：
+The exception to the rule that "`typename` must precede nested dependent type names" is this: **`typename` must not be used before a nested dependent type name in a base-class list, or before a nested dependent type name used as a base-class identifier in a member-initializer list**. For example:
 
 ```cpp
 template<typename T>
 class Derived: public Base<T>::Nested {
-// base class list: typename not
+// base class list: typename is not
 public: // allowed
     explicit Derived(int x)
-    : Base<T>::Nested(x) // base class identifier in mem
+    : Base<T>::Nested(x) // base class identifier in a member
     {
-        // init. list: typename not allowed
+        // initializer list: typename is not allowed
         
-        typename Base<T>::Nested temp; // use of nested dependent type
-        ... // name not in a base class list or
-    } // as a base class identifier in a
-    ... // mem. init. list: typename required
+        typename Base<T>::Nested temp; // nested dependent type name used
+        ... // outside a base class list and not as
+    } // a base class identifier in a member
+    ... // initializer list: typename is required
 };
 ```
 
-这样的矛盾很令人讨厌，但是一旦你在经历中获得一点经验，你几乎不会在意它。
+This inconsistency is annoying, but after some experience you rarely notice it.
 
-让我们来看最后一个 typename 的例子，因为它在你看到的真实代码中具有代表性。
+Consider one final `typename` example, because it is representative of real code.
 
-假设我们在写一个取得一个 iterator（迭代器）的 function template（函数模板），而且我们要做一个 iterator（迭代器）指向的 object（对象）的局部拷贝 temp，我们可以这样做：
+Suppose we are writing a function template that takes an iterator, and we want to make a local copy `temp` of the object pointed to by the iterator. We can write:
 
 ```cpp
 template<typename IterT>
@@ -182,13 +182,13 @@ void workWithIterator(IterT iter) {
 }
 ```
 
-不要让 **`std::iterator_traits<IterT>::value_type`** 吓倒你。那仅仅是一个 standard traits class（标准特性类）的使用，用 C++ 的说法就是 "**the type of thing pointed to by objects of type IterT**"（“被类型为 IterT 的对象所指向的东西的类型”）。这个语句声明了一个**与 IterT objects 所指向的东西类型相同的**局部变量 temp，而且用 iter 所指向的对象对 temp 进行了**初始化**。
+Do not be intimidated by **`std::iterator_traits<IterT>::value_type`**. It is just a use of a standard traits class. In C++ terms, it means "**the type of thing pointed to by objects of type `IterT`**." This statement declares a local variable `temp` whose type is the same as the type pointed to by `IterT` objects, and initializes `temp` with the object pointed to by `iter`.
 
-如果 IterT 是 `vector<int>::iterator`，temp 就是 int 类型。
+If `IterT` is `vector<int>::iterator`, `temp` has type `int`.
 
-如果 IterT 是 `list<string>::iterator`，temp 就是 string 类型。因为 `std::iterator_traits<IterT>::value_type` 是一个 nested dependent type name（嵌套依赖类型名）（value\_type 嵌套在`iterator_traits<IterT>`内部，而且 IterT 是一个 template parameter（模板参数）），我们必须让它被 typename 前置。
+If `IterT` is `list<string>::iterator`, `temp` has type `string`. Because `std::iterator_traits<IterT>::value_type` is a nested dependent type name, since `value_type` is nested inside `iterator_traits<IterT>` and `IterT` is a template parameter, it must be prefixed with `typename`.
 
-如果你觉得读 `std::iterator_traits<IterT>::value_type` 令人讨厌，就想象那个与它相同的东西来代表它。如果你像大多数程序员，对多次输入它感到恐惧，那么你就需要创建一个 typedef。对于像 `value_type` 这样的 traits member names（特性成员名），**一个通用的惯例是 typedef name 与 traits member name 相同**，所以这样的一个 local typedef 通常定义成这样：
+If reading `std::iterator_traits<IterT>::value_type` is unpleasant, introduce a shorter name for it. If, like most programmers, you do not want to type it repeatedly, create a `typedef`. For traits member names such as `value_type`, **a common convention is to give the typedef the same name as the traits member**, so a local typedef is often written like this:
 
 ```cpp
 template<typename IterT>
@@ -199,20 +199,20 @@ void workWithIterator(IterT iter) {
 }
 ```
 
-很多程序员最初发现 "typedef typename" 并列不太和谐，但它是涉及 nested dependent type names（嵌套依赖类型名）规则的一个合理的附带结果。你会相当快地习惯它。你毕竟有着强大的动机。你输入 `typename std::iterator_traits<IterT>::value_type` 需要多少时间？
+Many programmers initially find the phrase `typedef typename` awkward, but it is a natural consequence of the nested-dependent-type-name rule. You get used to it quickly, especially because typing `typename std::iterator_traits<IterT>::value_type` repeatedly is much worse.
 
-作为结束语，我应该提及编译器与编译器之间对围绕 typename 的规则的执行情况的不同。
+As a final note, compilers have historically differed in how strictly they enforce the rules around `typename`.
 
-一些编译器接受必需 typename 时它却缺失的代码；
+Some compilers accept code where a required `typename` is missing.
 
-一些编译器接受不许 typename 时它却存在的代码；
+Some compilers accept code where `typename` is present even though it is not allowed.
 
-还有少数的（通常是老旧的）会拒绝 typename 出现在它必需出现的地方。
+A few, usually older compilers, reject `typename` even where it is required.
 
-这就意味着 typename 和 nested dependent type names（嵌套依赖类型名）的交互作用会导致一些轻微的可移植性问题。
+This means the interaction between `typename` and nested dependent type names can cause minor portability issues.
 
 **Things to Remember**&#x20;
 
-**1. template parameters（模板参数）时，class 和 typename 是可互换的。**&#x20;
+**1. In template type-parameter declarations, `class` and `typename` are interchangeable.**&#x20;
 
-**2. typename 去标识 nested dependent type names，在 base class lists 中或在一个 member initialization list 中作为一个 base class identifier 时除外。**
+**2. Use `typename` to identify nested dependent type names, except in base-class lists and when the name is used as a base-class identifier in a member-initializer list.**

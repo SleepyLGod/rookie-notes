@@ -2,23 +2,23 @@
 description: C++ API
 ---
 
-# 😇 Lock V1
+# Lock V1
 
-## **互斥锁（Mutex）**
+## **Mutex**
 
-为了避免多个线程在某一时刻同时操作一个共享资源
+Mutexes prevent multiple threads from operating on the same shared resource at the same time.
 
-例如线程池中的有多个空闲线程和一个任务队列, 任何一个线程都要使用互斥锁互斥访问任务队列，以避免多个线程同时访问任务队列以发生错乱。
+For example, a thread pool may contain multiple idle worker threads and one task queue. Any worker that accesses the task queue should use a mutex so that multiple threads do not modify or read the queue concurrently and corrupt its state.
 
-在某一时刻，只有一个线程可以获取互斥锁，在释放互斥锁之前其他线程都不能获取该互斥锁。如果其他线程想要获取这个互斥锁，那么这个线程只能以阻塞方式进行等待。
+At any moment, only one thread can acquire a mutex. Before that thread releases the mutex, no other thread can acquire it. If another thread tries to acquire the same mutex, it waits in a blocking manner.
 
-构造`std::mutex`的实例创建互斥元，调用成员函数`lock()`来锁定它，调用`unlock()`来解锁
+Constructing an instance of `std::mutex` creates a mutex object. Calling `lock()` locks it, and calling `unlock()` unlocks it.
 
-不过一般不推荐这种做法，标准C++库提供了`std::lock_guard`类模板，实现了互斥元的`RAII`惯用语法。`std::mutex`和`std::lock _ guard`
+However, directly calling `lock()` and `unlock()` is generally not recommended. The standard C++ library provides the `std::lock_guard` class template, which implements the `RAII` idiom for mutex ownership.
 
 ```cpp
 #include <mutex>
-#include <list> // 互斥元保护列表
+#include <list> // the mutex protects the list
 
 std::list<int> this_list;
 std::mutex this_mutex;
@@ -29,14 +29,14 @@ void add_to_list (int value) {
 }
 ```
 
-这里注意死锁：多个线程争夺共享资源导致每个线程都不能取得自己所需的全部资源，从而程序无法向下执行
+Be careful about deadlocks: multiple threads may compete for shared resources in a way that prevents every thread from obtaining all the resources it needs, so the program cannot make progress.
 
-* 互斥（资源同一时刻只能被一个进程使用）
-* 请求并保持（进程在请资源时，不释放自己已经占有的资源）
-* 不剥夺（进程已经获得的资源，在进程使用完前，不能强制剥夺）
-* 循环等待（进程间形成环状的资源循环等待关系）
+* Mutual exclusion: a resource can be used by only one thread at a time.
+* Hold and wait: a thread requests more resources while still holding resources it already owns.
+* No preemption: resources already acquired by a thread cannot be forcibly taken away before the thread releases them.
+* Circular wait: threads form a cycle in which each waits for a resource held by the next thread.
 
-#### **直接操作 mutex，即直接调用 mutex 的 lock / unlock 函数**
+#### **Directly Operating on a Mutex with `lock` / `unlock`**
 
 ```cpp
 #include <iostream>
@@ -60,7 +60,7 @@ int main() {
     const std::size_t SIZE = 4;
     // create a group of threads
     std::vector<std::thread> v;
-    v.reverse(SIZE);
+    v.reserve(SIZE);
     for (std::size_t i = 0; i < SIZE; ++i) {
         v.emplace_back(&counter);
     }
@@ -75,7 +75,7 @@ int main() {
 
 #### **lock\_guard**
 
-使用 `lock_guard` 自动加锁、解锁。原理是 RAII，和智能指针类似。
+Use `lock_guard` to lock and unlock automatically. The principle is RAII, similar to how smart pointers manage resources.
 
 ```cpp
 #include <iostream>
@@ -87,7 +87,7 @@ std::mutex mutex_2;
 int count_2 = 0;
 
 void counter() {
-    // lock_guard 在构造函数里加锁，在析构函数里解锁。
+    // lock_guard locks in its constructor and unlocks in its destructor.
     std::lock_guard<std::mutex> lock(mutex_2);
     int i = ++count_2;
     ……
@@ -96,7 +96,7 @@ void counter() {
 int main() {
     const std::size_t SIZE = 4;
     std::vector<std::thread> v;
-    v.reverse(SIZE);
+    v.reserve(SIZE);
     for (std::size_t i = 0; i < SIZE; ++i) {
         v.emplace_back(&counter);
     }
@@ -112,9 +112,9 @@ int main() {
 
 #### **unique\_lock**
 
-使用 `unique_lock` 自动加锁、解锁。 `unique_lock` 与 `lock_guard` 原理相同，但是提供了更多功能（比如可以结合条件变量使用）。 注意：`mutex::scoped_lock` 其实就是 `unique_lock` 的 `typedef`!
+Use `unique_lock` to lock and unlock automatically. `unique_lock` follows the same RAII principle as `lock_guard`, but it provides more functionality, such as delayed locking, manual unlock/relock, move ownership, and condition-variable support. In older Boost APIs, `mutex::scoped_lock` is essentially a typedef-style wrapper around a unique-lock type; in standard C++, use `std::unique_lock`.
 
-`counter` 函数体：
+`counter` function body:
 
 ```cpp
 void counter() {
@@ -126,16 +126,16 @@ void counter() {
 
 #### **std::recursive\_mutex**
 
-就像互斥锁（`mutex`）一样，递归互斥锁（`recursive_mutex`）是可锁定的对象，但它**允许同一线程获得对互斥锁对象的多级所有权（多次lock）**。
+Like a regular `mutex`, `recursive_mutex` is a lockable object, but it **allows the same thread to acquire multiple ownership levels of the mutex object**, meaning the same thread can lock it multiple times.
 
-这允许从已经锁定它的线程锁定（或尝试锁定）互斥对象，从而获得对互斥对象的新所有权级别：
+This allows a thread that already owns the mutex to lock, or attempt to lock, the same mutex again, thereby acquiring another ownership level:
 
-**互斥对象实际上将保持对该线程的锁定，直到调用其成员 unlock 的次数与此所有权级别的次数相同**。
+**The mutex remains owned by that thread until `unlock()` has been called the same number of times as the successful lock acquisitions**.
 
-1. 调用线程从成功调用 lock 或 try\_lock 开始占有recursive\_mutex， 期间线程可以进行对 lock 或 try\_lock的附加调用，所有权在线程调用 unlock 匹配次数时结束。
-2. 线程占有recursive\_mutex时，若其他线程要求recursive\_mutex所有权，调用lock将被阻塞，调用try\_lock将返回false.
-3. 可锁定recursive\_mutex的最大次数未指定的，但到达该数后，对 lock 的调用将抛出 std::system\_error 而对 try\_lock 的调用返回false;
-4. 若recursive\_mutex在仍被线程占有时被销毁，则程序行为未定义。recursive\_mutex满足 mutex 和 标准布局类型的所有要求。
+1. The calling thread starts owning a `recursive_mutex` after a successful call to `lock()` or `try_lock()`. During ownership, the same thread may make additional `lock()` or `try_lock()` calls. Ownership ends only after matching `unlock()` calls.
+2. While one thread owns a `recursive_mutex`, another thread calling `lock()` blocks, and another thread calling `try_lock()` returns `false`.
+3. The maximum number of times a `recursive_mutex` can be locked is unspecified. After that limit is reached, `lock()` throws `std::system_error`, and `try_lock()` returns `false`.
+4. Destroying a `recursive_mutex` while it is still owned by a thread causes undefined behavior. `recursive_mutex` satisfies the requirements of a mutex type and a standard-layout type.
 
 ```cpp
 #include <iostream>
@@ -172,34 +172,34 @@ int main () {
 
 #### **std::timed\_mutex**
 
-定时互斥锁是一个可时间锁定的对象，旨在通知何时关键代码需要独占访问，就像常规互斥锁一样，但还支持定时尝试锁定请求。
+`std::timed_mutex` is a timed lockable object. Like a regular mutex, it provides exclusive access to critical code, but it also supports timed attempts to acquire the lock.
 
-| lock             | 调用线程将锁定timed\_mutex，并在必要时进行阻塞（其行为与 mutex 完全相同） |
+| lock             | The calling thread locks the `timed_mutex` and blocks if necessary, behaving like `mutex` |
 | ---------------- | ---------------------------------------------- |
-| try\_lock        | 调用线程将锁定timed\_mutex，并在必要时进行阻塞（其行为与 mutex 完全相同） |
-| try\_lock\_for   | 尝试锁定 timed\_mutex， 最多阻塞 rel\_time 时间           |
-| try\_lock\_until | 尝试锁定 timed\_mutex，最多阻塞到 abs\_time 时间点          |
-| unlock           | 解锁 timed\_mutex，释放对其的所有权（其行为与 mutex 相同）        |
+| try\_lock        | Attempts to lock the `timed_mutex` without blocking; returns immediately on failure |
+| try\_lock\_for   | Attempts to lock the `timed_mutex`, blocking for at most `rel_time` |
+| try\_lock\_until | Attempts to lock the `timed_mutex`, blocking until at most the `abs_time` time point |
+| unlock           | Unlocks the `timed_mutex` and releases ownership, behaving like `mutex` |
 
 #### **std::recursive\_timed\_mutex**
 
-递归定时互斥锁将 `recursive_timed` 和 `timed_mutex` 的功能结合到一个类中：
+`std::recursive_timed_mutex` combines the features of `recursive_mutex` and `timed_mutex` in one class:
 
-* 它既支持通过单个线程获取多个锁定级别
-* 又支持定时的 try\_lock 请求。
+* It supports multiple ownership levels by a single thread.
+* It also supports timed `try_lock` requests.
 
-成员函数与 `timed_mutex` 相同。
+Its member functions are the same style as `timed_mutex`.
 
-#### **once\_flag、call\_once使用**
+#### **Using `once_flag` and `call_once`**
 
-在多线程中，有一种场景是**某个任务只需要执行一次**，可以用C++11中的`std::call_once`函数配合`std::once_flag`来实现。
+In multithreaded code, one common scenario is that **a task should be executed exactly once**. This can be implemented with C++11's `std::call_once` and `std::once_flag`.
 
-**多个线程同时调用某个函数**，**`std::call_once`可以保证多个线程对该函数只调用一次**
+When **multiple threads call a function concurrently**, **`std::call_once` guarantees that the target function is called only once**.
 
-实现**线程安全的单例模式**
+This can be used to implement a **thread-safe singleton**.
 
 ```cpp
-// h文件
+// header file
 #pragma once
 #include <thread>
 #include <iostream>
@@ -217,10 +217,10 @@ public:
 ```
 
 ```cpp
-// cpp文件
+// cpp file
 Task* Task::task;
 Task::Task() {
-	std::cout << "构造函数" << std::endl;
+	std::cout << "constructor" << std::endl;
 }
 
 Task* Task::getInstance() {
@@ -236,20 +236,20 @@ void Task::fun() {
 }
 ```
 
-## **条件锁**
+## **Condition Variable**
 
-条件锁就是所谓的条件变量, 不是用来管理互斥量的，它的作用是用来同步线程，它的用法相当于编程中常见的flag标志（A、B两个人约定flag=true为行动号角，默认flag为false,A不断的检查flag的值,只要B将flag修改为true，A就开始行动）
+The so-called "condition lock" is usually a condition variable. It is not used to manage a mutex directly; its purpose is thread synchronization. Its usage is similar to a common flag in programming: two actors agree that `flag = true` is the signal to proceed. The default value is `false`; A keeps checking the flag, and once B changes it to `true`, A starts acting.
 
-某一个线程因为某个条件未满足时，可以使用条件变量使改程序处于阻塞状态。
+When a thread cannot proceed because a condition is not satisfied, it can use a condition variable to block.
 
-一旦条件满足，则以“信号量”的方式唤醒一个因为该条件而被阻塞的线程。
+Once the condition is satisfied, one of the threads blocked on that condition can be woken up in a signal-like manner.
 
-最为常见就是在线程池中，起初没有任务时任务队列为空，此时线程池中的线程因为“任务队列为空”这个条件处于阻塞状态。一旦有任务进来，就会以信号量的方式唤醒一个线程来处理这个任务。
+The most common example is a thread pool. Initially, when there is no task, the task queue is empty, so worker threads block because the "task queue is empty" condition is true. Once a task arrives, one thread is notified to process it.
 
-类型：
+Types:
 
-* `std::condition_variable`（只和`std::mutex`一起工作）
-* `std::condition_variable_any`（符合类似互斥元的最低标准的任何东西一起工作）
+* `std::condition_variable`: works only with `std::mutex`.
+* `std::condition_variable_any`: works with any lock type that satisfies the minimal mutex-like requirements.
 
 ```cpp
 // std::condition_variable waiting for data
@@ -273,9 +273,9 @@ void data_preparing_thread () {
 
 void data_processing_thread () {
     while (true) {
-        std::unique_lock<std::mutex> lk(mut); //这里使用unique_lock是为了后面方便解锁
-        data.con.wait(lk, {
-            []return !data_queue.empty();
+        std::unique_lock<std::mutex> lk(mut); // use unique_lock so it can be unlocked later
+        data_con.wait(lk, [] {
+            return !data_queue.empty();
         });
         data_chunck data = data_queue.front();
         data_queue.pop();
@@ -309,7 +309,7 @@ void function_1() {
 		std::unique_lock<std::mutex> locker(mu);
 		q.push_back(count);
 		locker.unlock();
-		condi.notify_one();			// 通知一个等待线程激活   condi.notify_all()激活所有线程
+		condi.notify_one();			// wake one waiting thread; condi.notify_all() wakes all waiting threads
 		count--;
 		std::this_thread::sleep_for(std::chrono::seconds(1));
 	}
@@ -319,8 +319,8 @@ void function_2() {
 	int data = 100;
 	while (data > 1) {
 		std::unique_lock<std::mutex> locker(mu);
-		condi.wait(locker,			// 解锁locker,并进入休眠  收到notify时又重新加锁
-			[]() { return !q.empty(); });   // 如果q不为空 线程才会被激活
+		condi.wait(locker,			// unlock locker and sleep; relock after notification
+			[]() { return !q.empty(); });   // the thread proceeds only when q is not empty
 		data = q.front();
 		q.pop_front();
 		locker.unlock();
@@ -339,13 +339,13 @@ int main() {
 }
 ```
 
-`cond.notify_one()`: 随机唤醒一个等待的线程
+`cond.notify_one()`: wakes one waiting thread.
 
-`cond.notify_all()`: 唤醒所有等待的线程
+`cond.notify_all()`: wakes all waiting threads.
 
-`wait()`的实现: 检查条件，并在满足时返回。
+`wait()` behavior: check the condition and return when it is satisfied.
 
-两个重载：
+Two overloads:
 
 ```cpp
 void wait( std::unique_lock<std::mutex>& lock );                  //  (1)	(since C++11)
@@ -354,46 +354,46 @@ template< class Predicate >
 void wait( std::unique_lock<std::mutex>& lock, Predicate pred );  //  (2)	(since C++11)
 ```
 
-如果条件不满足，`wait()`解锁互斥元，并将该线程置于阻塞或等待状态。
+If the condition is not satisfied, `wait()` unlocks the mutex and puts the thread into a blocked or waiting state.
 
-当来自数据准备线程中对`notify_one()`的调用通知条件变量时，线程从睡眠状态中苏醒（解除其阻塞），重新获得互斥元上的锁，并再次检查条件，如果条件已经满足，就从`wait()`返回值，互斥元仍被锁定。如果条件不满足，该线程解锁互斥元，并恢复等待。
+When a data-preparation thread calls `notify_one()` on the condition variable, the waiting thread wakes from sleep, reacquires the mutex lock, and checks the condition again. If the condition is satisfied, `wait()` returns while the mutex is still locked. If the condition is not satisfied, the thread unlocks the mutex and waits again.
 
-*   `void wait( std::unique_lockstd::mutex& lock )`
+*   `void wait( std::unique_lock<std::mutex>& lock )`
 
-    先unlock之前获得的mutex，然后阻塞当前的执行线程。
+    First unlocks the previously acquired mutex, then blocks the current execution thread.
 
-    把当前线程添加到等待线程列表中，该线程会持续 block 直到被 notify\_all() 或 notify\_one() 唤醒。
+    It adds the current thread to the waiting-thread list. The thread remains blocked until it is woken by `notify_all()` or `notify_one()`.
 
-    被唤醒后，该thread会重新获取mutex，获取到mutex后执行后面的动作。
+    After waking, the thread reacquires the mutex. Once the mutex is acquired, it continues with the following actions.
 
-    线程block时候也可能被意外或者错误唤醒。
-*   `template< class Predicate > void wait( std::unique_lockstd::mutex& lock, Predicate pred );`
+    A blocked thread can also wake spuriously.
+*   `template< class Predicate > void wait( std::unique_lock<std::mutex>& lock, Predicate pred );`
 
-    该重载设置了第二个参数 Predicate， 只有当pred为false时，wait才会阻塞当前线程。
+    This overload adds the second parameter `Predicate`. The current thread blocks only while `pred` evaluates to `false`.
 
-    该情况下，线程被唤醒后，先重新判断pred的值。
+    In this case, after the thread wakes, it checks `pred` again first.
 
-    如果pred为false，则会释放mutex并重新阻塞在wait。
+    If `pred` is still `false`, it releases the mutex and blocks in `wait` again.
 
-    因此，该mutex必须有pred的权限。该重载消除了意外唤醒的影响。
+    Therefore the predicate must be checked while protected by the same mutex. This overload removes the effect of spurious wakeups from user code.
 
-如果等待线程只打算等待一次，那么当条件为`true`时它就不会再等待这个条件变量了，
+If a waiting thread only needs to wait once, then after the condition becomes `true` it will no longer wait on this condition variable.
 
-条件变量未必是同步机制的最佳选择。如果等待的条件是一个特定数据块的可用性时，这尤其正确。在这个场景中，使用期值（future）更合适。使用future等待一次性事件。
+A condition variable is not always the best synchronization mechanism. This is especially true when the condition being waited for is the availability of one specific data block. In that scenario, a future is often more appropriate. Use `future` for one-shot events.
 
-## **自旋锁**
+## **Spinlock**
 
-假设我们有一个两个处理器core1和core2计算机，现在在这台计算机上运行的程序中有两个线程：T1和T2分别在处理器core1和core2上运行，两个线程之间共享着一个资源。
+Suppose we have a computer with two processor cores, `core1` and `core2`. A program running on this machine has two threads, `T1` and `T2`, running on `core1` and `core2` respectively. The two threads share one resource.
 
-首先我们说明互斥锁的工作原理，互斥锁是是一种sleep-waiting的锁。假设线程T1获取互斥锁并且正在core1上运行时，此时线程T2也想要获取互斥锁（pthread\_mutex\_lock），但是由于T1正在使用互斥锁使得T2被阻塞。当T2处于阻塞状态时，T2被放入到等待队列中去，处理器core2会去处理其他任务而不必一直等待（忙等）。也就是说处理器不会因为线程阻塞而空闲着，它去处理其他事务去了。
+First consider how a mutex works. A mutex is a sleep-waiting lock. Suppose thread `T1` acquires the mutex and is running on `core1`. At the same time, thread `T2` also wants to acquire the mutex through `pthread_mutex_lock`, but because `T1` is using the mutex, `T2` is blocked. When `T2` is blocked, it is placed into a wait queue, and processor `core2` can handle other work instead of busy-waiting. In other words, the processor does not stay idle merely because the thread is blocked; it can run other tasks.
 
-而自旋锁就不同了，自旋锁是一种busy-waiting的锁。也就是说，如果T1正在使用自旋锁，而T2也去申请这个自旋锁，此时T2肯定得不到这个自旋锁。
+A spinlock is different. A spinlock is a busy-waiting lock. If `T1` is using a spinlock and `T2` tries to acquire it, `T2` cannot acquire it immediately.
 
-与互斥锁相反的是，此时运行T2的处理器core2会一直不断地循环检查锁是否可用（自旋锁请求），直到获取到这个自旋锁为止。
+Unlike with a mutex, the processor running `T2`, `core2`, repeatedly checks whether the lock is available until the spinlock is acquired.
 
-从“自旋锁”的名字也可以看出来，如果一个线程想要获取一个被使用的自旋锁，那么它会一致占用CPU请求这个自旋锁使得CPU不能去做其他的事情，直到获取这个锁为止，这就是“自旋”的含义。
+The name "spinlock" reflects this behavior. If a thread wants to acquire a spinlock that is already held, it continuously consumes CPU while requesting the lock, preventing that CPU from doing other work until the lock is acquired. This is the meaning of "spinning."
 
-当发生阻塞时，互斥锁可以让CPU去处理其他的任务；而自旋锁让CPU一直不断循环请求获取这个锁。通过两个含义的对比可以我们知道“自旋锁”是比较耗费CPU的。
+When blocking occurs, a mutex can let the CPU run other work, while a spinlock keeps the CPU looping and trying to acquire the lock. From this comparison, it is clear that spinlocks can be expensive in CPU time.
 
 ```cpp
 // use std::atomic_flag
@@ -403,7 +403,7 @@ class spinlock_mutex {
     spinlock_mutex(): flag(ATOMIC_FLAG_INIT) {
     }
     void lock() {
-        while (flag.test_and_set(std::memory_order_aquire));
+        while (flag.test_and_set(std::memory_order_acquire));
     }
     void unlock() {
         flag.clear(std::memory_order_release);
@@ -411,17 +411,17 @@ class spinlock_mutex {
 }
 ```
 
-## **读写锁**
+## **Read-Write Lock**
 
-我们允许在数据库上同时执行多个“读”操作，但是某一时刻只能在数据库上有一个“写”操作来更新数据。这就是一个简单的读者-写者模型。
+We may allow multiple read operations on a database at the same time, while allowing only one write operation at any moment to update the data. This is a simple reader-writer model.
 
-头文件：`boost/thread/shared_mutex.cpp` 类型：`boost::shared_lock`
+Header: `boost/thread/shared_mutex.hpp`. Type: `boost::shared_lock`.
 
-提供两种访问权限的控制：共享性（shared）和排他性（exclusive）。
+It provides two access modes: shared and exclusive.
 
-通过`lock / try_lock`获取排他性访问权限，通过`lock_shared / try_lock_shared`获取共享性访问权限。
+Use `lock` / `try_lock` to acquire exclusive access, and `lock_shared` / `try_lock_shared` to acquire shared access.
 
-这样的设置对于区分不同线程的读写操作特别有用。`shared_mutex`是`c++17`中引入的，使用时需要注意编译器版本。
+This setup is useful for distinguishing read and write operations across threads. `std::shared_mutex` was introduced in `C++17`, so pay attention to compiler and standard-version support.
 
 ```cpp
 #include <iostream>

@@ -1,12 +1,12 @@
 # Callables and Lambdas
 
-### 泛型Lambda
+### Generic Lambda
 
-`auto` 关键字不能够用在参数表里，这是因为这样的写法会与模板的功能产生冲突。 但是 Lambda 表达式并不是普通函数，所以在没有明确指明参数表类型的情况下，Lambda 表达式并不能够模板化。&#x20;
+In C++11, the `auto` keyword could not be used in a function parameter list, because such syntax would conflict with the role of templates. However, a Lambda expression is not an ordinary function. Without an explicit parameter type, a C++11 Lambda expression could not be templated in the same way.
 
-幸运的是，这种麻烦只存在于 C++11 中，
+Fortunately, this limitation only exists in C++11.
 
-从 C++14 开始，Lambda 函数的形式参数可以使用 `auto` 关键字来产生意义上的泛型：
+Starting from C++14, Lambda function parameters can use the `auto` keyword, which gives Lambda expressions generic behavior:
 
 ```cpp
 auto add = [](auto x, auto y) {
@@ -15,37 +15,37 @@ auto add = [](auto x, auto y) {
 add(1, 2);
 ```
 
-### 函数对象包装器
+### Function object wrapper
 
 #### std::function
 
-Lambda 表达式的本质是一个和**函数对象类型相似**的**类**类型（称为闭包类型）的对象（称为闭包对象）
+The essence of a Lambda expression is an object, called a closure object, whose class type is similar to a **function object type**. That class type is called the closure type.
 
-当 Lambda 表达式的捕获列表为空时，闭包对象还能够转换为函数指针值进行传递，例如
+When the capture list of a Lambda expression is empty, the closure object can also be converted to a function pointer value and passed around. For example:
 
 ```cpp
 #include <iostream>
 
-using foo = void(int); // 定义函数类型, using 的使用见上一节中的别名语法
-void functional(foo f) { // 参数列表中定义的函数类型 foo 被视为退化后的函数指针类型 foo*
-    f(1); // 通过函数指针调用函数
+using foo = void(int); // Define a function type. See the alias syntax in the previous section for using.
+void functional(foo f) { // The function type foo in the parameter list is treated as the decayed function pointer type foo*.
+    f(1); // Call the function through the function pointer.
 }
 
 int main() {
     auto f = [](int value) {
         std::cout << value << std::endl;
     };
-    functional(f); // 传递闭包对象，隐式转换为 foo* 类型的函数指针值
-    f(1); // lambda 表达式调用
+    functional(f); // Pass the closure object, implicitly converted to a function pointer value of type foo*.
+    f(1); // Call the Lambda expression directly.
     return 0;
 }
 ```
 
-上面的代码给出了两种不同的调用形式，一种是将 Lambda 作为函数类型传递进行调用， 而另一种则是直接调用 Lambda 表达式
+The code above shows two different calling forms: one passes the Lambda as a function type and calls it through that interface, while the other calls the Lambda expression directly.
 
-在 **C++11** 中，统一了这些概念，将**能够被调用的对象的类型**， 统一称之为**可调用类型**。而这种类型，便是通过 `std::function` 引入的。
+In **C++11**, these concepts were unified under the idea of **callable types**, meaning the types of objects that can be invoked. `std::function` is the standard wrapper introduced for this purpose.
 
-C++11 `std::function` 是一种**通用、多态的函数封装**， 它的实例可以对任何可以调用的目标实体进行存储、复制和调用操作， 它也是对 C++ 中现有的可调用实体的一种类型安全的包裹（相对来说，函数指针的调用不是类型安全的）， 换句话说，就是**函数的容器**。当我们有了函数的容器之后便能够更加方便的将函数、函数指针作为对象进行处理。 例如：
+C++11 `std::function` is a **general-purpose, polymorphic function wrapper**. Its instances can store, copy, and call any callable target entity. It is also a type-safe wrapper around existing callable entities in C++; by comparison, raw function-pointer calls are less expressive and easier to misuse. In other words, `std::function` is a **container for functions**. Once we have such a container, functions and function pointers can be handled more conveniently as objects. For example:
 
 ```cpp
 #include<functional>
@@ -63,21 +63,21 @@ int main() {
 }
 ```
 
-#### std::bind 和 std::placeholder
+#### std::bind and std::placeholder
 
-`std::bind` 是用来**绑定函数调用的参数**的:
+`std::bind` is used to **bind arguments for a function call**.
 
-&#x20;它解决的需求是：我们有时候可能并不一定能够一次性获得调用某个函数的全部参数，通过这个函数， 我们可以将部分调用参数提前绑定到函数身上成为一个新的对象，然后在参数齐全后，完成调用。 例如：
+The problem it solves is this: sometimes we cannot obtain all arguments needed to call a function at once. With `std::bind`, we can bind some arguments to the function in advance, produce a new callable object, and complete the call later when the remaining arguments are available. For example:
 
 ```cpp
 int foo(int a, int b, int c) {...}
 int main() {
-    // 将参数1,2绑定到函数 foo 上，
-    // 但使用 std::placeholders::_1 来对第一个参数进行占位
+    // Bind arguments 1 and 2 to function foo,
+    // but use std::placeholders::_1 as a placeholder for the first argument.
     auto bindFoo = std::bind(foo, std::placeholders::_1, 1,2);
-    // 这时调用 bindFoo 时，只需要提供第一个参数即可
+    // Now, when calling bindFoo, only the first argument needs to be provided.
     bindFoo(1);
 }
 ```
 
-**提示：**注意 `auto` 关键字的妙用。有时候我们可能不太熟悉一个函数的返回值类型， 但是我们却可以通过 `auto` 的使用来规避这一问题的出现。
+**Tip:** pay attention to the usefulness of the `auto` keyword. Sometimes we may not be familiar with a function's return type, but `auto` lets us avoid spelling that type manually.

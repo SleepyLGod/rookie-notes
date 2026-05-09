@@ -1,64 +1,64 @@
 # 😃 Memory Region
 
-我们假设一种场景，同时也顺便温习一下RDMA WRITE操作的流程：
+Assume the following scenario, which also reviews the RDMA WRITE flow:
 
-如下图所示，A节点想要通过IB协议向B节点的内存中写入一段数据，上层应用给本节点的RDMA网卡下发了一个WQE，WQE中包含了源内存地址、目的内存地址、数据长度和秘钥等信息，然后硬件会从内存中取出数据，组包发送到对端网卡。B节点的网卡收到数据后，解析到其中的目的内存地址，把数据写入到本节点的内存中。
+As shown below, node A wants to write a piece of data into the memory of node B through the IB protocol. The upper-layer application posts a WQE to the local RDMA NIC. The WQE contains information such as source memory address, destination memory address, data length, and key. Hardware then fetches data from memory, assembles packets, and sends them to the peer NIC. After node B's NIC receives the data, it parses the destination memory address and writes the data into the memory of node B.
 
 <figure><img src="https://pic4.zhimg.com/v2-5a8bae1c63fa44ab66b2d06d136acdd7_b.jpg" alt=""><figcaption></figcaption></figure>
 
-那么问题来了，APP提供的地址都是虚拟地址（Virtual Address，下文称VA），经过MMU的转换才能得到真实的物理地址（Physical Address，下文称PA），我们的**RDMA网卡是如何得到PA从而去内存中拿到数据的呢**？就算网卡知道上哪去取数据，**如果用户恶意指定了一个非法的VA，那网卡岂不是有可能被“指使”去读写关键内存**？
+The question is: addresses provided by applications are virtual addresses, or VAs below. They must be translated by the MMU before real physical addresses, or PAs below, are obtained. **How does the RDMA NIC obtain the PA so it can fetch data from memory?** Even if the NIC knows where to fetch data, **if a malicious user specifies an illegal VA, could the NIC be "instructed" to read or write critical memory?**
 
-为了解决上面的问题，IB协议提出了MR的概念。
+To solve these problems, the IB protocol introduces the concept of MR.
 
-### MR是什么
+### What Is MR?
 
-MR全称为Memory Region，指的是由RDMA软件层在内存中规划出的一片区域，用于存放收发的数据。IB协议中，用户在申请完用于存放数据的内存区域之后，都需要通过调用IB框架提供的API注册MR，才能让RDMA网卡访问这片内存区域。由下图可以看到，MR就是一片特殊的内存而已：
+MR stands for Memory Region. It refers to a region planned out in memory by the RDMA software layer and used to store sent and received data. In the IB protocol, after users allocate a memory region for storing data, they must call the API provided by the IB framework to register the MR before the RDMA NIC can access this memory region. As the following figure shows, an MR is simply a special memory region:
 
 <figure><img src="https://pic4.zhimg.com/v2-55517804b2d8dcb43bfa13578638e4eb_b.jpg" alt=""><figcaption></figcaption></figure>
 
-在对IB协议进行相关描述时，我们通常称RDMA硬件为**HCA（Host Channel Adapter， 宿主通道适配器）**，IB协议中对其的定义是“处理器和I/O单元中能够产生和消耗数据包的IB设备”，为了与协议保持一致，我们在包括本文及之后的文章中都称硬件部分为HCA。
+When describing the IB protocol, RDMA hardware is usually called **HCA (Host Channel Adapter)**. The IB protocol defines it as an IB device in a processor or I/O unit that can produce and consume packets. To stay consistent with the protocol, this note and later notes call the hardware component HCA.
 
-### 为什么要注册MR
+### Why Register MR?
 
-下面我们来看一下MR是如何解决本文开篇提出的两个问题的：
+Now look at how MR solves the two problems raised at the beginning of this note.
 
-#### 1. 注册MR以实现虚拟地址与物理地址转换
+#### 1. Register MR to Translate Virtual Addresses to Physical Addresses
 
-我们都知道APP只能看到虚拟地址，而且会在WQE中直接把VA传递给HCA（既包括本端的源VA，也包括对端的目的VA）。现在的CPU都有MMU和页表这一“利器”来进行VA和PA之间的转换，而HCA要么直接连接到总线上，要么通过IOMMU/SMMU做地址转换后连接到总线上，它是“看不懂”APP提供的VA所对应的真实物理内存地址的。
+Applications can only see virtual addresses, and they directly pass VAs to the HCA inside WQEs. This includes the local source VA and the remote destination VA. Modern CPUs have MMUs and page tables to translate between VA and PA. An HCA either connects directly to the bus or connects to the bus after address translation through an IOMMU/SMMU. It cannot directly understand the real physical memory address corresponding to the VA provided by the application.
 
-所以注册MR的过程中，硬件会在内存中创建并填写一个VA to PA的映射表，这样需要的时候就能通过查表把VA转换成PA了。我们还是提供一个具体的例子来讲一下这个过程：
+Therefore, during MR registration, hardware creates and fills a VA-to-PA mapping table in memory. When needed, it can translate VA to PA by looking up this table. Here is a concrete example:
 
 <figure><img src="https://pic3.zhimg.com/v2-f0c015985e54c7d0420882698b7f8702_b.jpg" alt=""><figcaption></figcaption></figure>
 
-现在假设左边的节点向右边的节点发起了RDMA WRITE操作，即直接向右节点的内存区域中写入数据。假设图中两端都已经完成了注册MR的动作，MR即对应图中的“数据Buffer”，同时也创建好了VA->PA的映射表。
+Assume the node on the left initiates an RDMA WRITE operation to the node on the right, meaning it directly writes data into the memory region of the right node. Assume both endpoints in the figure have already registered MRs. The MRs correspond to the "data Buffer" in the figure, and the VA->PA mapping tables have also been created.
 
-* 首先本端APP会下发一个WQE给HCA，告知HCA，用于存放待发送数据的本地Buffer的虚拟地址，以及即将写入的对端数据Buffer的虚拟地址。
-* 本端HCA查询VA->PA映射表，得知待发数据的物理地址，然后从内存中拿到数据，组装数据包并发送出去。
-* 对端HCA收到了数据包，从中解析出了目的VA。
-* 对端HCA通过存储在本地内存中的VA->PA映射表，查到真实的物理地址，核对权限无误后，将数据存放到内存中。
+* First, the local application posts a WQE to the HCA, telling the HCA the virtual address of the local buffer that stores the data to be sent, and the virtual address of the peer data buffer to be written.
+* The local HCA queries the VA->PA mapping table, obtains the physical address of the data to be sent, fetches the data from memory, assembles packets, and sends them out.
+* The peer HCA receives the packets and parses the destination VA from them.
+* The peer HCA uses the VA->PA mapping table stored in local memory to find the real physical address. After verifying permissions, it places the data into memory.
 
-再次强调一下，对于右侧节点来说，**无论是地址转换还是写入内存，完全不用其CPU的参与**。
+Emphasize again: for the node on the right, **both address translation and memory writing are completed without CPU participation**.
 
-#### 2. MR可以控制HCA访问内存的权限
+#### 2. MR Controls HCA Memory-Access Permissions
 
-因为HCA访问的内存地址来自于用户，如果用户传入了一个非法的地址（比如系统内存或者其他进程使用的内存），HCA对其进行读写可能造成信息泄露或者内存覆盖。所以我们需要一种机制来确保HCA只能访问已被授权的、安全的内存地址。IB协议中，APP在为数据交互做准备的阶段，需要执行注册MR的动作。
+Because memory addresses accessed by the HCA come from users, if a user passes an illegal address, such as system memory or memory used by another process, HCA reads or writes may cause information leakage or memory corruption. Therefore, a mechanism is needed to ensure that the HCA can only access authorized and safe memory addresses. In the IB protocol, the application must register MRs during the preparation phase for data exchange.
 
-而用户注册MR的动作会产生两把钥匙——L\_KEY（Local Key）和R\_KEY（Remote Key），说是钥匙，它们的实体其实就是一串序列而已。它们将分别用于保障对于本端和远端内存区域的访问权限。下面两张图分别是描述L\_Key和R\_Key的作用的示意图：
+Registering an MR produces two keys: L_Key (Local Key) and R_Key (Remote Key). They are called keys, but their concrete representation is just a sequence of bits. They are used to protect access permissions for local and remote memory regions respectively. The following two figures describe the roles of L_Key and R_Key:
 
 <figure><img src="https://pic3.zhimg.com/v2-a3ed0705600b6303396229bd1e81db7e_b.jpg" alt=""><figcaption></figcaption></figure>
 
 <figure><img src="https://pic1.zhimg.com/v2-3ceba9b81100b02569caf8f8f4a87624_b.jpg" alt=""><figcaption></figcaption></figure>
 
-这里大家可能会有疑问，本端是如何知道对端节点的可用VA和对应的R\_Key的？其实两端的节点在真正的RDMA通信之前，都会通过某些方式先建立一条链路（可能是Socket连接，也可能是CM连接）并通过这条链路交换一些RDMA通信所必须的信息（VA，Key，QPN等），我们称这一过程叫做“建链”和“握手”。我将在后面的文章中详细介绍。
+Readers may ask: how does the local side know the available VA and corresponding R_Key of the peer node? In practice, before real RDMA communication, the two endpoint nodes establish a link through some method, such as a socket connection or CM connection, and exchange information required for RDMA communication over that link, including VA, Key, QPN, and so on. This process is called connection setup and handshake. Later notes will explain it in detail.
 
-除了上面两个点之外，注册MR还有个重要的作用：
+Besides the two points above, registering an MR has another important role.
 
-#### 3. MR可以避免换页
+#### 3. MR Prevents Paging
 
-因为物理内存是有限的，所以操作系统通过换页机制来暂时把某个进程不用的内存内容保存到硬盘中。当该进程需要使用时，再通过缺页中断把硬盘中的内容搬移回内存，这一过程几乎必然导致VA-PA的映射关系发生改变。
+Physical memory is limited, so the operating system uses paging to temporarily save memory contents that a process is not using to disk. When the process needs them again, a page-fault interrupt brings the contents back from disk to memory. This process almost inevitably changes the VA-PA mapping relationship.
 
-由于HCA经常会绕过CPU对用户提供的VA所指向的物理内存区域进行读写，如果前后的VA-PA映射关系发生改变，那么我们在前文提到的VA->PA映射表将失去意义，HCA将无法找到正确的物理地址。
+Because the HCA often bypasses the CPU and reads or writes the physical memory region pointed to by the user-provided VA, if the VA-PA mapping relationship changes, the VA->PA mapping table described above becomes meaningless. The HCA can no longer find the correct physical address.
 
-为了防止换页所导致的VA-PA映射关系发生改变，注册MR时会"Pin"住这块内存（亦称“锁页”），即锁定VA-PA的映射关系。也就是说，MR这块内存区域会长期存在于物理内存中不被换页，直到完成通信之后，用户主动注销这片MR。
+To prevent paging from changing the VA-PA mapping relationship, MR registration "pins" this memory region, also called page locking, which locks the VA-PA mapping relationship. In other words, the memory region corresponding to the MR stays in physical memory and is not paged out until communication is complete and the user actively deregisters this MR.
 
-好了，至此我们介绍完了MR的概念和作用，下一篇文章我将给大家介绍一下PD（Protection Domain，保护域）的概念。
+At this point, the concept and role of MR have been introduced. The next note introduces PD (Protection Domain).

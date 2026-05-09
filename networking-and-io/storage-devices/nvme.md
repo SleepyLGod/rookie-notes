@@ -1,14 +1,14 @@
 # 😆 NVMe
 
-### **一. NVMe 协议**
+### **1. NVMe Protocol**
 
-NVMe协议是在PCIe SSD开始大量出现在市场上后，因为各个厂家的私有协议不具有兼容性，无法和现有操作系统无缝衔接，INTEL为了**统一接口协议建立生态**，而在2011年发布了NVMe协议。
+The NVMe protocol was released in 2011 after PCIe SSDs began appearing in large numbers on the market. At that time, vendors used private protocols that were not mutually compatible and could not integrate seamlessly with existing operating systems. Intel introduced NVMe to **standardize the interface protocol and build an ecosystem**.
 
 ![](http://pic.doit.com.cn/2018/01/1.png)
 
-NVMe采用了**多命令队列** (最大65536个命令队列)，每个命令可变数据长度(512B到2MB)，同时数据在host端内存支持**Physical Region Page**和**Scatter Gather List**。
+NVMe uses **multiple command queues**, supporting up to 65,536 command queues. Each command can have variable data length, from 512 B to 2 MB. On the host-memory side, data can be described using **Physical Region Page** and **Scatter Gather List** structures.
 
-NVMe协议支持命令间的**乱序**执行，也支持命令内数据块的乱序传输，同时支持命令队列间的可变权重处理。
+The NVMe protocol supports **out-of-order** execution between commands. It also supports out-of-order transfer of data blocks within a command, and variable-weight scheduling across command queues.
 
 ![](http://pic.doit.com.cn/2018/01/2.png)
 
@@ -16,170 +16,166 @@ NVMe协议支持命令间的**乱序**执行，也支持命令内数据块的乱
 
 ![](http://pic.doit.com.cn/2018/01/4.png)
 
-和基于传统ATA(基于PC时代硬盘的接口协议)的**SATA**协议相比，NVME协议做了很多针对多核host以及NAND存储介质的协议优化。
+Compared with the traditional ATA-based **SATA** protocol, which was designed around PC-era disk interfaces, NVMe makes many protocol-level optimizations for multi-core hosts and NAND storage media.
 
 ![](http://pic.doit.com.cn/2018/01/%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE\_20180110102920.png)
 
-因为PCIE接口的高带宽，NVMe协议带来SSD访问的高效率，但也同时带来了SSD控制器端NMVe协议栈实现的难度和挑战。这个挑战主要是
+Because PCIe provides high interface bandwidth, NVMe improves SSD access efficiency. At the same time, it makes the NVMe protocol-stack implementation on the SSD controller side more difficult. The main challenges are:
 
-1\)多权重命令队列的管理和命令抓取，
+1. Managing and fetching commands from multiple weighted command queues.
+2. Parsing, decomposing, and dispatching commands.
+3. Transferring data.
 
-2\)命令的解析分解，分发，
+Before discussing possible solutions, first look at the basic architecture of an SSD controller.
 
-3\)数据的传输。
+### **2. SSD Controller**
 
-在开始讨论解决方法之前，我们先了解一下SSD控制器的基本架构。
-
-### **二. SSD控制器**
-
-典型的SSD控制器架构如下：
+A typical SSD controller architecture is shown below:
 
 ![](http://pic.doit.com.cn/2018/01/5.png)
 
-● **主机接口控制器：**
+**Host interface controller**
 
-主机接口负责进行主机与固态盘之间的通信和数据传输，接受和解析I/O请求，并维护一条或者多条请求队列。
+The host interface is responsible for communication and data transfer between the host and the SSD. It receives and parses I/O requests, and maintains one or more request queues.
 
-目前主流使用的物理接口包括SATA、SAS、PCIe、M.2等。
+Mainstream physical interfaces include SATA, SAS, PCIe, and M.2.
 
-其中，SATA是低成本的硬盘接口，SATA 3.0的理论带宽是600MB/s；
+SATA is a low-cost disk interface. SATA 3.0 has a theoretical bandwidth of 600 MB/s.
 
-SAS向下兼容SATA，能提供更高的传输速率、可靠性和可用性，SAS3.0的理论带宽是1.2GB/s；
+SAS is backward compatible with SATA and provides higher transfer rate, reliability, and availability. SAS 3.0 has a theoretical bandwidth of 1.2 GB/s.
 
-PCIe 是连接高速外围设备和主机处理器的主要总线。SATA/SAS 设备通常通过主机控制器或 HBA 接入系统，这些控制器本身可能挂在 PCIe 上，但 SATA/SAS 协议并不等同于 PCIe。PCIe SSD 直接走 PCIe 通道，缩短了主机处理器到存储介质的路径和响应延时，也能提供更大的带宽，PCIe 3.0×4 和 x8 的理论带宽分别约为 4GB/s 和 8GB/s；
+PCIe is the main bus for connecting high-speed peripheral devices and host processors. SATA/SAS devices usually connect to the system through a host controller or HBA, and those controllers may themselves sit on PCIe, but the SATA/SAS protocols are not equivalent to PCIe. PCIe SSDs directly use PCIe lanes, shortening the path and response latency from the host processor to the storage medium while also providing greater bandwidth. PCIe 3.0 x4 and x8 have theoretical bandwidths of roughly 4 GB/s and 8 GB/s respectively.
 
-M.2是新一代接口标准，分为支持PCIe通道和SATA通道两种，它具有更灵活的物理规范，在传输带宽、容量和轻薄特性等方面优于SATA接口。消费级固态盘主要采用SATA接口和M.2接口，企业级固态盘主要采用SAS接口和PCIe接口。这些物理接口采取的逻辑接口协议一般是AHCI或者NVMe，它们规定了主机与存储设备之间通信和传输数据的方式。AHCI协议主要是针对高延时的SATA接口的机械硬盘而设计的，虽然能够应用于SATA接口的固态盘，但是成为了高性能固态盘的瓶颈；NVMe协议是2011年由英特尔等公司领头，为闪存存储和PCIe接口量身定制的非易失性存储器标准，不仅具有跨平台的兼容性(目前Windows、Linux和VMware等主流平台都已经支持)，而且相比于AHCI协议，具有更低的延时、更高的IOPS和更低的功耗。比如，AHCI只能支持一条最大深度为32的命令队列，而NVMe最多支持64000条最大深度为64000的命令队列，能充分利用固态盘内的并行性。因此，NVMe协议能够更好地发挥出固态盘的高性能优势，得到了越来越广泛的应用。
+M.2 is a newer interface standard. It supports both PCIe lanes and SATA channels, and has more flexible physical specifications. It is better than the SATA interface in transfer bandwidth, capacity, and thin-and-light device design. Consumer SSDs mainly use SATA and M.2 interfaces, while enterprise SSDs mainly use SAS and PCIe interfaces. The logical interface protocols used by these physical interfaces are usually AHCI or NVMe. These protocols define how the host communicates with the storage device and transfers data. AHCI was designed mainly for high-latency mechanical disks using the SATA interface. Although it can be used with SATA SSDs, it becomes a bottleneck for high-performance SSDs. NVMe is a non-volatile memory standard led by Intel and other companies in 2011, tailored for flash storage and PCIe interfaces. It is cross-platform compatible, with mainstream support in Windows, Linux, VMware, and other platforms, and compared with AHCI it offers lower latency, higher IOPS, and lower power consumption. For example, AHCI supports only one command queue with a maximum depth of 32, while NVMe can support up to 64,000 command queues with a maximum depth of 64,000, fully exploiting SSD internal parallelism. Therefore, NVMe better exposes high SSD performance and has been adopted increasingly widely.
 
-**● 多核处理器：**
+**Multi-core processor**
 
-固态盘的管理需要处理诸多复杂的任务，比如主机接口协议、调度算法、FTL算法和缓存算法等，因此需要强有力的多核处理器来提高这些任务的处理效率，从而降低软件延时。比如，可以使用一个计算核心处理主机接口协议，而使用多个计算核心处理繁重的FTL算法。
+SSD management involves many complex tasks, such as host-interface protocols, scheduling algorithms, FTL algorithms, and caching algorithms. Therefore, powerful multi-core processors are needed to improve task-processing efficiency and reduce software latency. For example, one compute core can process the host-interface protocol, while multiple compute cores handle the heavier FTL algorithm work.
 
-**● 缓存芯片：**
+**Cache chip**
 
-固态盘内置有缓存芯片，一般是DRAM，用于缓存用户数据和软件算法的元数据。缓存既能加快数据访问的速度，提高固态盘的性能，也能够减少对闪存的写入，延长固态盘的寿命。缓存用户数据的部分称之为数据缓存，缓存地址映射表的部分称之为映射缓存。为了防止突然掉电导致RAM中的数据丢失，固态盘一般会内置备用电容，并采用适当的数据保护技术，用于保证在突然掉电的情况下，将RAM中关键的脏数据刷回闪存。
+An SSD includes an internal cache chip, usually DRAM, for caching user data and metadata used by software algorithms. Cache can accelerate data access, improve SSD performance, reduce flash writes, and extend SSD lifetime. The part used for caching user data is called the data cache, while the part used for caching the address mapping table is called the mapping cache. To prevent sudden power loss from losing data in RAM, SSDs usually include backup capacitors and suitable data-protection techniques, ensuring that critical dirty data in RAM can be flushed back to flash when power is unexpectedly lost.
 
-**● 中央控制器：**
+**Central controller**
 
-中央控制器是整个固态盘控制器的核心，负责配置固态盘的工作模式，管理各个模块之间的通信和数据流。中央控制器内置有小容量的高速SRAM缓存，用于临时缓存数据。
+The central controller is the core of the SSD controller. It configures the SSD operating mode and manages communication and data flow between modules. The central controller contains a small high-speed SRAM cache for temporary data caching.
 
-**● 纠错码引擎：**
+**Error-correction-code engine**
 
-纠错码引擎对要写入闪存的数据进行编码，所增加的纠错码冗余会被写到闪存页的额外存储区中；当需要从闪存中读取数据时，纠错码引擎会对数据和它的纠错码冗余进行解码。如果发生的比特错误数在纠错能力范围内，数据中的错误就会被纠正，从而得到正确的数据；否则，如果没有其它的数据恢复手段，存储的数据就会丢失。编码和解码位于访问闪存的关键路径上，因此纠错码引擎通常采用专用的硬件实现，以提高编码和解码的效率。为了降低硬件开销和解码延时，纠错码引擎会将数据划分为固定大小(一般是1KB、2KB或者4KB)的片段，作为编码和解码的单位。一个数据段和它的纠错码冗余称之为一个码字，数据片段的长度与码字长度的比值称之为纠错码的码率。码率越低，纠错码的纠错能力越强，但是开销也越大，比如冗余的存储开销和解码延时都会变大。为了增加编解码的并行性，纠错码引擎一般包含多个编码器和解码器。固态盘常用的纠错码算法包括BCH码和LDPC码，后者因为纠错能力更强而成为了优先的选择。
+The error-correction-code engine encodes data before it is written into flash, and the added correction-code redundancy is written into the flash page's extra storage area. When data is read from flash, the engine decodes both the data and its correction-code redundancy. If the number of bit errors is within the correction capability, the errors are corrected and the correct data is obtained. Otherwise, if there is no other data-recovery method, the stored data is lost. Encoding and decoding are on the critical path of flash access, so the error-correction-code engine is usually implemented as dedicated hardware to improve encoding and decoding efficiency. To reduce hardware overhead and decoding latency, the engine divides data into fixed-size fragments, usually 1 KB, 2 KB, or 4 KB, as encoding and decoding units. A data segment and its correction-code redundancy form a codeword. The ratio between the data-fragment length and the codeword length is the code rate. A lower code rate gives stronger correction capability, but also higher cost, such as redundant storage overhead and decoding latency. To increase encoding and decoding parallelism, the engine usually contains multiple encoders and decoders. Common SSD error-correction-code algorithms include BCH and LDPC. LDPC has become preferred because of its stronger correction capability.
 
-**● 通道控制器：**
+**Channel controller**
 
-为了提高性能，固态盘将数量众多的闪存芯片安置在多个通道上，每个通道上的多个芯片共享一条I/O总线。每个通道包含一个独立的通道控制器，主要负责与中央控制器和本通道上的闪存芯片进行通信，并维护多条操作闪存的命令队列(比如为每个芯片维护一条单独的队列，外加一条总的高优先级队列)，将命令发往目标芯片进行执行。所以，固态盘内部具有四个层次的并行结构：通道，芯片，晶圆，分组。高效地利用并行性是保证固态盘高性能的关键。
+To improve performance, SSDs place many flash chips across multiple channels. Multiple chips on each channel share one I/O bus. Each channel has an independent channel controller. It is mainly responsible for communicating with the central controller and the flash chips on the channel, maintaining multiple flash-operation command queues, such as one queue per chip plus a high-priority global queue, and sending commands to target chips for execution. Therefore, the SSD has four internal levels of parallelism: channels, chips, dies, and groups. Efficiently using this parallelism is key to high SSD performance.
 
-**● 闪存芯片：**
+**Flash chips**
 
-闪存芯片上既存储用户数据，也存储需要持久化的元数据，比如地址映射表。
+Flash chips store both user data and metadata that must be persisted, such as the address mapping table.
 
-固态盘提供的物理存储容量会比用户可见的容量要多(一般多7% \~ 28%)，多余部分称之为过量供应(Over-provisioning, OP)空间，主要用于提高软件算法(比如垃圾回收操作)的效率和补偿因闪存坏块产生的容量损失。有的固态盘还会在闪存芯片之间组建RAID5，以加强存储的可靠性。
+The physical storage capacity provided by an SSD is larger than the user-visible capacity, usually by 7% to 28%. The extra capacity is called over-provisioning (OP) space. It is mainly used to improve software algorithms such as garbage collection and to compensate for capacity loss caused by flash bad blocks. Some SSDs also build RAID 5 across flash chips to improve storage reliability.
 
-**● DMA引擎:**
+**DMA engine**
 
-DMA引擎负责控制在两个RAM之间进行快速的数据传输，比如在中央控制器的SRAM和缓存芯片之间。
+The DMA engine controls fast data transfer between two RAM regions, such as between the central controller's SRAM and the cache chip.
 
-不同的固态盘可能在模块设计上会有所不同，比如在每个通道控制器内配置一对纠错码的编码器和解码器，而不是配置一个集中的纠错码引擎;也可能会包含更多的模块，比如电源管理模块、RAID引擎、数据压缩引擎和加密引擎等等。但是，以上模块的介绍能够说明固态盘内部的主要架构。
+Different SSDs may vary in module design. For example, a pair of error-correction-code encoders and decoders may be placed inside each channel controller instead of using one centralized engine. Some SSDs may also include more modules, such as power management, RAID engines, data compression engines, and encryption engines. However, the modules described above explain the main internal architecture of an SSD.
 
-### **三.  NVMe主机接口控制器的实现**
+### **3. NVMe Host Interface Controller Implementation**
 
-一般来说NMVe主机接口控制器包括以下几个部分：
+Generally, an NVMe host interface controller includes the following parts:
 
-Admin命令和completion队列处理模块，IO命令队列处理模块，IO completion队列处理模块，IO写数据处理模块，IO读数据处理模块，中断处理模块。
+Admin command and completion queue processing module, I/O command queue processing module, I/O completion queue processing module, I/O write-data processing module, I/O read-data processing module, and interrupt processing module.
 
 ![](http://pic.doit.com.cn/2018/01/%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE\_20180110103110.png)
 
-回到NVMe协议栈面临的挑战：1)多权重命令队列的管理和命令抓取，2)命令的解析，分解，分发，3)数据的传输。
+Returning to the challenges faced by the NVMe protocol stack: 1. managing and fetching commands from multiple weighted command queues; 2. parsing, decomposing, and dispatching commands; 3. transferring data.
 
-**命令队列的管理**
+**Command queue management**
 
 ![](http://pic.doit.com.cn/2018/01/6.png)
 
-NVMe协议的命令队列分成两种，admin命令队列和IO命令队列。
+NVMe command queues are divided into two types: admin command queues and I/O command queues.
 
-Admin命令队列负责协议的初始化和管理，不负责用户数据传输，对带宽和响应速度没有要求，一般可以用负责前端协议处理的CPU固件来处理，即固件来处理admin命令队列的doorbell，从hostmemory抓取命令，并解析命令;根据命令字段，返回或抓取admin命令的数据段;然后发回completion队列的completion字段。
+The admin command queue is responsible for protocol initialization and management. It is not responsible for user-data transfer and has no strict bandwidth or response-time requirement. It can usually be handled by CPU firmware responsible for front-end protocol processing. In this model, firmware processes the doorbell of the admin command queue, fetches commands from host memory, parses the commands, returns or fetches the data segment for admin commands according to command fields, and then sends completion entries back to the completion queue.
 
-IO命令队列用于数据传输，而且支持多达65536个命令队列(一般根据hostcore的情况命令队列从16-256不等)，数据传输对命令队列的处理要求比较高，SSD控制器的接口控制器需要高效处理命令在各个不同权重的命令队列的抓取、解析和分发。对主机接口控制器的设计挑战比较大。对IO命令队列一般有三种设计思路：
+I/O command queues are used for data transfer and support up to 65,536 command queues. In practice, the number of command queues is often between 16 and 256 depending on the number of host cores. Data transfer imposes high requirements on command-queue processing. The SSD controller's interface controller must efficiently fetch, parse, and dispatch commands from command queues with different weights. This creates a major design challenge for the host interface controller. There are usually three design approaches for I/O command queues:
 
-1\)硬件逻辑处理
+1. Hardware logic processing.
+2. Parallel firmware processing on multiple CPU cores.
+3. Hardware logic plus CPU firmware processing.
 
-2\)多核CPU并行固件处理
-
-3\)硬件逻辑+CPU固件处理
-
-我们可以比较一下三种思路的优缺点
+We can compare the advantages and disadvantages of these three approaches:
 
 ![](http://pic.doit.com.cn/2018/01/%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE\_20180110104356.png)
 
-因为NVMe协议的复杂性，不建议采用纯硬件逻辑处理。思路2)和思路3)比较有可行性。
+Because the NVMe protocol is complex, pure hardware logic processing is not recommended. Approaches 2 and 3 are more feasible.
 
-命令队列的管理要解决几个难度较大问题：多权重队列的轮询次序和优先级问题、命令字段的解析分解、IO读写命令 PRP list处理、IO读写命令Scatter Gather list处理。
+Command queue management must solve several difficult problems: polling order and priority across multiple weighted queues, command-field parsing and decomposition, PRP-list processing for I/O read/write commands, and Scatter Gather List processing for I/O read/write commands.
 
-**1) 多权重队列的轮询次序和优先级问题**
+**1. Polling order and priority across multiple weighted queues**
 
 ![](http://pic.doit.com.cn/2018/01/7.png)
 
-IO命令队列的轮询和命令的抓取需要doorbell寄存器的持续轮询，命令抓取也需要频繁启动PCIE IP，不太适合CPU固件完成，会严重影响命令的处理效率，每个命令字段固定为64B，建议由硬件逻辑处理，但要处理不同权重的命令轮询，需要非常复杂的硬件逻辑，对设计难度考验极大。
+Polling I/O command queues and fetching commands require continuous polling of doorbell registers. Command fetching also requires frequent activation of the PCIe IP block. This is not well suited for CPU firmware, because it would seriously affect command-processing efficiency. Each command field is fixed at 64 B, so hardware logic is recommended for this part. However, handling command polling across different weights requires very complex hardware logic and creates a demanding design challenge.
 
-**2) 命令字段的解析分解**
+**2. Command-field parsing and decomposition**
 
-NVMe IO 命令的字段如下。
+The fields of an NVMe I/O command are shown below.
 
 ![](http://pic.doit.com.cn/2018/01/8.png)
 
 ![](http://pic.doit.com.cn/2018/01/9.png)
 
-每个IO命令都由64B组成，DWORD0-9字段有固定定义，其他字段根据不同IO命令，有不同意义。而且随着协议发展，还可能一些新的命令和参数会引入。所以对协议的解析需要CPU固件来完成，这样可以增加灵活性。
+Each I/O command consists of 64 B. DWORD 0-9 have fixed definitions, while the remaining fields have different meanings for different I/O commands. As the protocol evolves, new commands and parameters may also be introduced. Therefore, protocol parsing should be completed by CPU firmware to preserve flexibility.
 
-IO命令对应的数据块在主机侧内存中的存放方式有两种：PRP list 和SGL
+The data blocks corresponding to an I/O command can be stored in host memory in two forms: PRP list and SGL.
 
-PRP list如下图
+PRP list:
 
 ![PRP list](http://pic.doit.com.cn/2018/01/10.png)
 
-Physical Region Page
+Physical Region Page.
 
-SGL 如下图：
+SGL:
 
 ![SGL](http://pic.doit.com.cn/2018/01/11.png)
 
-Scatter Gather List
+Scatter Gather List.
 
-数据在主机侧的内存中，一般以4KB为单位颗粒存放，但颗粒之间物理地址并不连续，而且起始颗粒的offset并不是4KB对齐的。如下图
+Data in host memory is generally stored in 4 KB granules, but the physical addresses of those granules are not necessarily contiguous, and the offset of the starting granule is not necessarily 4 KB aligned, as shown below.
 
 ![](http://pic.doit.com.cn/2018/01/%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE\_20180110104724.png)
 
-主机控制器在启动PCIE DMA访问主机内存时要注意4K不对齐带来的细节问题，起始块的非4K对其和块大小，结尾块的块大小，这些块需要非4K的PCIE DMA传输。在处理主机内存访问时，CPU固件处理能带来足够的灵活性，但考虑到主机数据传输带宽性能的高要求，需要硬件做协助或者由硬件处理。比如在PCIE DMA加入PIPE-LINE机制，充分利用PCIE带宽。
+When the host controller starts PCIe DMA access to host memory, it must handle the details caused by 4 KB misalignment: the starting block may not be 4 KB aligned, the starting block size may be partial, and the ending block size may also be partial. These blocks require non-4 KB PCIe DMA transfers. CPU firmware provides enough flexibility for host-memory access processing, but because host data transfer has high bandwidth requirements, hardware assistance or direct hardware processing is needed. For example, a pipeline mechanism can be added to PCIe DMA to fully utilize PCIe bandwidth.
 
-因为每个IO命令的数据传输大小从512B 到256MB不等，对于SSD中央控制器(FTL管理模块)来说，管理的NAND测数据单元一般是4KB。
+Because each I/O command can transfer data ranging from 512 B to 256 MB, while the SSD central controller, or FTL management module, usually manages NAND-side data in 4 KB units, data decomposition is required.
 
 ![](http://pic.doit.com.cn/2018/01/%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE\_20180110104906.png)
 
-如果主机测IO数据块大于4KB，每个IO数据块的传输都涉及到数据块分解的问题，即需要把主机端数据块分解成FTL管理模块的4KB颗粒单位。从模块化分层设计的角度，数据分割功能不太适合放到FTL管理模块完成，而应该由主机控制模块完成，NVMe协议部分对FTL控制模块是透明的。同样，主机侧协议也应该对FTL管理模块透明。
+If the host-side I/O data block is larger than 4 KB, each I/O data block transfer involves data-block decomposition. The host-side data block must be decomposed into 4 KB granules required by the FTL management module. From a modular layered-design perspective, data segmentation is not suitable for the FTL management module. It should be completed by the host controller module, so the NVMe protocol portion remains transparent to the FTL control module. Similarly, the host-side protocol should also be transparent to the FTL management module.
 
-对于4KB模式LBA，因为数据的offset是4KB对齐的，主机侧数据分解较简单。
+For 4 KB LBA mode, because the data offset is 4 KB aligned, host-side data decomposition is simple.
 
-对于LBA非4KB模式(512B，1KB，2KB)，主机测数据块分解为FTL控制模块需要的4KB单位情况较为复杂，case也比较多。每个IO命令的SLBA(Start Logic Address)不一定是4KB对齐的，Logic Block Number也不一定4KB的倍数。所以数据块分解后的起始第一个块和最后一个块有可能不是完整4KB，主机侧数据分解后的4K块数量要同时考虑Logic Block Number 和SLBA不对齐的情况。例如一个12KB(12KB/4KB=3)的主机侧数据块，分解后在FTL NAND侧可能会分布到4个FTL NAND侧4KB数据块。
+For non-4 KB LBA modes such as 512 B, 1 KB, and 2 KB, decomposing host-side data blocks into the 4 KB units required by the FTL control module is more complex, with many cases. The SLBA (Start Logic Address) of each I/O command is not necessarily 4 KB aligned, and the Logic Block Number is not necessarily a multiple of 4 KB. Therefore, the first and last blocks after data decomposition may not be complete 4 KB blocks. The number of decomposed 4 KB blocks on the host side must consider both Logic Block Number and SLBA misalignment. For example, a 12 KB host-side data block, where 12 KB / 4 KB = 3, may be distributed across four 4 KB FTL NAND-side data blocks after decomposition.
 
 ![](http://pic.doit.com.cn/2018/01/%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE\_20180110105117.png)
 
-Host内存4KB不对齐，SLBA=4KB对齐，Logic Block Number=4KB整数倍
+Host memory is not 4 KB aligned, SLBA is 4 KB aligned, and Logic Block Number is a multiple of 4 KB.
 
 ![](http://pic.doit.com.cn/2018/01/%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE\_20180110105435.png)
 
-Host内存4KB不对齐，SLBA 4KB不对齐，Logic Block Number=4KB整数倍
+Host memory is not 4 KB aligned, SLBA is not 4 KB aligned, and Logic Block Number is a multiple of 4 KB.
 
-从上面两张图可以看出，数据块在主机侧内存是否4KB对齐，SLBA是否4KB对齐，Logic Block Number是否是4KB的倍数，会组成很多复杂的情况。比如：数据块主机侧内存4KB不对齐，那么FTL侧看到的4KB在主机侧内存会分布在两个主机侧内存块里。
+From the two figures above, whether the data block is 4 KB aligned in host memory, whether SLBA is 4 KB aligned, and whether Logic Block Number is a multiple of 4 KB combine into many complex cases. For example, if the data block is not 4 KB aligned in host memory, then a 4 KB block visible to the FTL side may be distributed across two host-memory blocks.
 
 ![](http://pic.doit.com.cn/2018/01/%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE\_20180110105758.png)
 
-读者有兴趣可以把所有组合整理处来，每种情况数据的分解情况都有不同。
+Interested readers can enumerate all combinations. Each case has a different data-decomposition pattern.
 
 ![](http://pic.doit.com.cn/2018/01/%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE\_20180110105902.png)
 
-如果分解后的IO数据块小于4KB(如：512B,1KB,1.5KB,2KB… ….)，对写IO数据，则涉及到不完整部分数据和FTL 4KB数据块中其他原有背景数据拼接的问题。
+If the decomposed I/O data block is smaller than 4 KB, such as 512 B, 1 KB, 1.5 KB, or 2 KB, then for write I/O it involves stitching the incomplete data portion together with the existing background data in the FTL's 4 KB data block.
 
 ![](http://pic.doit.com.cn/2018/01/%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE\_20180110110046.png)
 
-NVMe协议是命令控制通路和数据通路分离的，支持多个命令队列，而且支持命令之间的执行和数据传输乱序，命令内分解后的4KB数据块乱序，所以关于命令之间和命令内控制流数据流的控制也是个很好的话题，技术上也有很多难度，就不在这篇文档赘述。下一篇重点谈这个话题。
+NVMe separates the command-control path from the data path. It supports multiple command queues, out-of-order execution and data transfer between commands, and out-of-order execution of decomposed 4 KB data blocks inside a command. Therefore, controlling command-level and intra-command control flow and data flow is an important topic with many technical difficulties. This document does not expand on it further. The next note focuses on that topic.

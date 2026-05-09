@@ -1,101 +1,101 @@
 # 😋 Elements
 
-RDMA技术中经常使用缩略语，很容易让刚接触的人一头雾水，本篇的目的是讲解RDMA中最基本的元素及其含义。
+RDMA uses many abbreviations, which can easily confuse newcomers. This note explains the most basic RDMA elements and their meanings.
 
-我将常见的缩略语对照表写在前面，阅读的时候如果忘记了可以翻到前面查阅。
+I place the abbreviation table at the beginning. If you forget a term while reading, you can come back here and check it.
 
 <figure><img src="https://pic1.zhimg.com/v2-b6723caa5b291ee161d94fd8fd8ce09c_b.jpg" alt=""><figcaption></figcaption></figure>
 
 ### WQ <a href="#h_141267386_0" id="h_141267386_0"></a>
 
-Work Queue简称WQ，是RDMA技术中最重要的概念之一。WQ是一个储存工作请求的队列，为了讲清楚WQ是什么，我们先介绍这个队列中的元素WQE（Work Queue Element，工作队列元素）。
+WQ stands for Work Queue and is one of the most important concepts in RDMA. A WQ is a queue that stores work requests. To explain what WQ means, first introduce the element inside this queue: WQE (Work Queue Element).
 
 #### WQE <a href="#h_141267386_1" id="h_141267386_1"></a>
 
-WQE可以认为是一种“任务说明”，这个工作请求是软件下发给硬件的，这份说明中包含了软件所希望硬件去做的任务以及有关这个任务的详细信息。比如，某一份任务是这样的：“我想把位于地址0x12345678的长度为10字节的数据发送给对面的节点”，硬件接到任务之后，就会通过DMA去内存中取数据，组装数据包，然后发送。
+A WQE can be understood as a "task description". This work request is posted by software to hardware. The description contains the task that software wants hardware to execute and the detailed information related to that task. For example, one task may say: "I want to send 10 bytes of data located at address `0x12345678` to the peer node." After hardware receives this task, it fetches data from memory through DMA, assembles a packet, and sends it.
 
-WQE的含义应该比较明确了，那么我们最开始提到的WQ是什么呢？它就是用来存放“任务书”的“文件夹”，WQ里面可以容纳很多WQE。有数据结构基础的读者应该都了解，队列是一种先进先出的数据结构，在计算机系统中非常常见，我们可以用下图表示上文中描述的WQ和WQE的关系：
+The meaning of WQE should now be clear. So what is the WQ mentioned at the beginning? It is the "folder" used to store these task descriptions. A WQ can contain many WQEs. Readers with data-structure background know that a queue is a first-in-first-out data structure and is very common in computer systems. The relationship between WQ and WQE can be shown as follows:
 
 <figure><img src="https://pic3.zhimg.com/v2-40c7e57f2760323c6b6665306e8f8896_b.png" alt=""><figcaption></figcaption></figure>
 
-WQ这个队列总是由软件向其中增加WQE（入队），硬件从中取出WQE，这就是软件给硬件“下发任务”的过程。为什么用队列而不是栈？因为进行“存”和“取“操作的分别是软件和硬件，并且需要保证用户的请求按照顺序被处理在RDMA技术中，所有的通信请求都要按照上图这种方式告知硬件，这种方式常被称为“Post”。
+Software always adds WQEs into the WQ, meaning enqueue, and hardware removes WQEs from it. This is the process by which software "posts tasks" to hardware. Why use a queue rather than a stack? Because software and hardware are responsible for storing and fetching respectively, and user requests need to be processed in order. In RDMA, all communication requests are delivered to hardware in this way. This action is usually called "Post".
 
 #### QP <a href="#h_141267386_2" id="h_141267386_2"></a>
 
-Queue Pair简称QP，就是“一对”WQ的意思。
+QP stands for Queue Pair, meaning a "pair" of WQs.
 
-#### SQ和RQ <a href="#h_141267386_3" id="h_141267386_3"></a>
+#### SQ and RQ <a href="#h_141267386_3" id="h_141267386_3"></a>
 
-任何通信过程都要有收发两端，QP就是一个发送工作队列和一个接受工作队列的组合，这两个队列分别称为SQ（Send Queue）和RQ（Receive Queue）。我们再把上面的图丰富一下，左边是发送端，右边是接收端：
+Every communication process has a sender and a receiver. A QP is a combination of one send work queue and one receive work queue. These two queues are called SQ (Send Queue) and RQ (Receive Queue). Enriching the previous figure, the sender is on the left and the receiver is on the right:
 
 <figure><img src="https://pic2.zhimg.com/v2-0dafce0772299d6930905373e0664929_b.jpg" alt=""><figcaption></figcaption></figure>
 
-WQ怎么不见了？SQ和RQ都是WQ，WQ只是表示一种可以存储WQE的单元，SQ和RQ才是实例。
+Where did WQ go? SQ and RQ are both WQs. WQ only represents a kind of unit that can store WQEs, while SQ and RQ are concrete instances.
 
-SQ专门用来存放发送任务，RQ专门用来存放接收任务。在一次SEND-RECV流程中，发送端需要把表示一次发送任务的WQE放到SQ里面。同样的，接收端软件需要给硬件下发一个表示接收任务的WQE，这样硬件才知道收到数据之后放到内存中的哪个位置。上文我们提到的Post操作，对于SQ来说称为Post Send，对于RQ来说称为Post Receive。
+SQ is used specifically to store send tasks, and RQ is used specifically to store receive tasks. In one SEND-RECV flow, the sender needs to place a WQE representing one send task into the SQ. Similarly, receiver-side software needs to post a WQE representing one receive task to hardware, so hardware knows where in memory to place the data after it is received. The Post operation mentioned above is called Post Send for SQ and Post Receive for RQ.
 
-需要注意的是，在RDMA技术中**通信的基本单元是QP**，而不是节点。如下图所示，对于每个节点来说，每个进程都可以使用若干个QP，而每个本地QP可以“关联”一个远端的QP。我们用“节点A给节点B发送数据”并不足以完整的描述一次RDMA通信，而应该是类似于“节点A上的QP3给节点C上的QP4发送数据”。
+One important point is that in RDMA, **the basic communication unit is the QP**, not the node. As shown below, for each node, each process can use several QPs, and each local QP can be associated with a remote QP. Saying "node A sends data to node B" is not enough to describe one RDMA communication precisely. A more accurate statement is like "QP3 on node A sends data to QP4 on node C".
 
 <figure><img src="https://pic2.zhimg.com/v2-71b3b17ef8aec45d74ef9e4a42a69201_b.jpg" alt=""><figcaption></figcaption></figure>
 
-每个节点的每个QP都有一个唯一的编号，称为QPN（Queue Pair Number），通过QPN可以唯一确定一个节点上的QP。
+Each QP on each node has a unique identifier called QPN (Queue Pair Number). A QPN uniquely identifies a QP on one node.
 
 #### SRQ <a href="#h_141267386_4" id="h_141267386_4"></a>
 
-Shared Receive Queue简称SRQ，意为共享接收队列。概念很好理解，就是一种几个QP共享同一个RQ时，我们称其为SRQ。以后我们会了解到，使用RQ的情况要远远小于使用SQ，而每个队列都是要消耗内存资源的。当我们需要使用大量的QP时，可以通过SRQ来节省内存。如下图所示，QP2\~QP4一起使用同一个RQ：
+SRQ stands for Shared Receive Queue. The concept is easy to understand: when several QPs share the same RQ, we call that queue an SRQ. Later notes will show that RQs are used much less frequently than SQs, while every queue consumes memory resources. When many QPs are needed, SRQ can save memory. As shown below, QP2 through QP4 use the same RQ:
 
 <figure><img src="https://pic3.zhimg.com/v2-4a21f2b1333877b4b0d97a1ca91d4096_b.jpg" alt=""><figcaption></figcaption></figure>
 
 ### CQ <a href="#h_141267386_5" id="h_141267386_5"></a>
 
-Completion Queue简称CQ，意为完成队列。跟WQ一样，我们先介绍CQ这个队列当中的元素——CQE（Completion Queue Element）。可以认为CQE跟WQE是相反的概念，如果WQE是软件下发给硬件的“任务书”的话，那么CQE就是硬件完成任务之后返回给软件的“任务报告”。CQE中描述了某个任务是被正确无误的执行，还是遇到了错误，如果遇到了错误，那么错误的原因是什么。
+CQ stands for Completion Queue. As with WQ, first introduce the element inside this queue: CQE (Completion Queue Element). CQE can be understood as the opposite of WQE. If a WQE is a "task description" posted by software to hardware, then a CQE is a "task report" returned by hardware to software after completing the task. A CQE describes whether a task was executed correctly or encountered an error, and if there was an error, what caused it.
 
-而CQ就是承载CQE的容器——一个先进先出的队列。我们把表示WQ和WQE关系的图倒过来画，就得到了CQ和CQE的关系：
+CQ is the container that carries CQEs: a first-in-first-out queue. If we reverse the previous WQ/WQE diagram, we get the relationship between CQ and CQE:
 
 <figure><img src="https://pic4.zhimg.com/v2-31f9a407ab66381fbc557d8acc5573cb_b.png" alt=""><figcaption></figcaption></figure>
 
-每个CQE都包含某个WQE的完成信息，他们的关系如下图所示：
+Each CQE contains completion information for a certain WQE. Their relationship is shown below:
 
 <figure><img src="https://pic2.zhimg.com/v2-701fa8eacb10c90c45b0241c75254a01_b.jpg" alt=""><figcaption></figcaption></figure>
 
-下面我们把CQ和WQ（QP）放在一起，看一下一次SEND-RECV操作中，软硬件的互动（图中序号顺序不表示实际时序）：
+Now put CQ and WQ, or QP, together and look at the software/hardware interaction during one SEND-RECV operation. The sequence numbers in the figure do not necessarily represent the actual timing:
 
-> 2022/5/23：下图及后面的列表顺序有修改，将原来第2条的“接收端硬件从RQ中拿到任务书，准备接收数据”移动到“接收端收到数据，进行校验后回复ACK报文给发送端”之后，并且修改了描述，现在为第6条。\
-> 这里我犯了错误的点是RQ和SQ不同，是一个“被动接收”的过程，只有收到Send报文（或者带立即数的Write报文）时硬件才会消耗RQ WQE。感谢 [@连接改变世界](https://www.zhihu.com/people/67ff85d690d09e9f6741c579512fe9a9) 的指正。
+> 2022/5/23: The figure below and the following list order were modified. The original second item, "receiver-side hardware obtains the task description from RQ and prepares to receive data", was moved after "the receiver receives data, verifies it, and replies to the sender with an ACK packet", and the description was updated. It is now item 6.\
+> My mistake was treating RQ like SQ. RQ is a "passive receive" process: hardware consumes an RQ WQE only after receiving a Send packet, or a Write packet with immediate data. Thanks to [@connection-changes-the-world](https://www.zhihu.com/people/67ff85d690d09e9f6741c579512fe9a9) for the correction.
 
 <figure><img src="https://pic4.zhimg.com/v2-a8d38721903672037b27cc7e49ecee03_b.jpg" alt=""><figcaption></figcaption></figure>
 
-1. 接收端APP以WQE的形式下发一次RECV任务到RQ。
-2. 发送端APP以WQE的形式下发一次SEND任务到SQ。
-3. 发送端硬件从SQ中拿到任务书，从内存中拿到待发送数据，组装数据包。
-4. 发送端网卡将数据包通过物理链路发送给接收端网卡。
-5. 接收端收到数据，进行校验后回复ACK报文给发送端。
-6. 接收端硬件从RQ中取出一个任务书（WQE）。
-7. 接收端硬件将数据放到WQE中指定的位置，然后生成“任务报告”CQE，放置到CQ中。
-8. 接收端APP取得任务完成信息。
-9. 发送端网卡收到ACK后，生成CQE，放置到CQ中。
-10. 发送端APP取得任务完成信息。
+1. The receiver-side application posts one RECV task to the RQ in the form of a WQE.
+2. The sender-side application posts one SEND task to the SQ in the form of a WQE.
+3. Sender-side hardware obtains the task description from the SQ, fetches the data to be sent from memory, and assembles a packet.
+4. The sender-side NIC sends the packet over the physical link to the receiver-side NIC.
+5. The receiver receives the data, verifies it, and replies to the sender with an ACK packet.
+6. Receiver-side hardware takes one task description, or WQE, from the RQ.
+7. Receiver-side hardware places the data into the location specified by the WQE, then generates a "task report", or CQE, and places it into the CQ.
+8. The receiver-side application obtains the task-completion information.
+9. After the sender-side NIC receives the ACK, it generates a CQE and places it into the CQ.
+10. The sender-side application obtains the task-completion information.
 
-**NOTE: 需要注意的一点是，上图中的例子是可靠服务类型的交互流程，如果是不可靠服务，那么不会有步骤6的ACK回复，而且步骤9以及之后的步骤会在步骤5之后立即触发。关于服务类型以及可靠与不可靠，我们将在**[**《RDMA基本服务类型》**](https://zhuanlan.zhihu.com/p/144099636)**一文中讲解。**
+**NOTE: The example in the figure above is an interaction flow for a reliable service type. If it is an unreliable service, there is no ACK reply in step 6, and step 9 and later steps are triggered immediately after step 5. Service types and reliable/unreliable behavior are explained in** [**RDMA Basic Service Types**](https://zhuanlan.zhihu.com/p/144099636)**.**
 
-至此，通过WQ和CQ这两种媒介，两端软硬件共同完成了一次收发过程。
+At this point, through the two media WQ and CQ, the software and hardware on both sides jointly complete one send/receive process.
 
-### WR和WC <a href="#h_141267386_6" id="h_141267386_6"></a>
+### WR and WC <a href="#h_141267386_6" id="h_141267386_6"></a>
 
-说完了几个Queue之后，其实还有两个文章开头提到的概念没有解释，那就是WR和WC（不是Water Closet的缩写）。
+After explaining several queues, two concepts mentioned at the beginning remain: WR and WC. WC here is not short for Water Closet.
 
-WR全称为Work Request，意为工作请求；WC全称Work Completion，意为工作完成。这两者其实是WQE和CQE在用户层的“映射”。因为APP是通过调用协议栈接口来完成RDMA通信的，WQE和CQE本身并不对用户可见，是驱动中的概念。用户真正通过API下发的是WR，收到的是WC。
+WR stands for Work Request, and WC stands for Work Completion. They are essentially the user-layer "mappings" of WQE and CQE. Applications complete RDMA communication by calling protocol-stack interfaces. WQE and CQE themselves are not visible to the user; they are driver-level concepts. What users actually post through APIs is WR, and what users receive is WC.
 
-WR/WC和WQE/CQE是相同的概念在不同层次的实体，他们都是“任务书”和“任务报告”。于是我们把前文的两个图又加了点内容：
+WR/WC and WQE/CQE are the same concepts represented at different layers. They are still "task descriptions" and "task reports". Therefore, add some content to the previous two figures:
 
 <figure><img src="https://pic2.zhimg.com/v2-00b87c111a8e1701f96fbfb78e078b29_b.jpg" alt=""><figcaption></figcaption></figure>
 
-### 总结 <a href="#h_141267386_7" id="h_141267386_7"></a>
+### Summary <a href="#h_141267386_7" id="h_141267386_7"></a>
 
-好了，我们用IB协议3.2.1中的Figure 11这张图总结一下本篇文章的内容：
+Finally, summarize this note with Figure 11 from Section 3.2.1 of the IB protocol:
 
 <figure><img src="https://pic4.zhimg.com/v2-2107a9bf8230c45ad73aa5ff0b8626ff_b.jpg" alt=""><figcaption></figcaption></figure>
 
-用户态的WR，由驱动转化成了WQE填写到了WQ中，WQ可以是负责发送的SQ，也可以是负责接收的RQ。硬件会从各个WQ中取出WQE，并根据WQE中的要求完成发送或者接收任务。任务完成后，会给这个任务生成一个CQE填写到CQ中。驱动会从CQ中取出CQE，并转换成WC返回给用户。
+The userspace WR is converted by the driver into a WQE and filled into a WQ. The WQ can be an SQ responsible for sending or an RQ responsible for receiving. Hardware takes WQEs from different WQs and completes send or receive tasks according to the requirements in the WQEs. After a task is complete, hardware generates a CQE for the task and fills it into the CQ. The driver takes the CQE from the CQ, converts it into a WC, and returns it to the user.
 
-基础概念就介绍到这里，下一篇将介绍RDMA的几种常见操作类型。
+That is all for the basic concepts. The next note introduces several common RDMA operation types.

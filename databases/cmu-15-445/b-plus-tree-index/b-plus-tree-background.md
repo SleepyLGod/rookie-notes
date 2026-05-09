@@ -4,189 +4,189 @@
 
 # 😌 Pre: B & B+
 
-#### 1 B树 <a href="#item-1" id="item-1"></a>
+#### 1 B-Tree <a href="#item-1" id="item-1"></a>
 
-在介绍B+树之前， 先简单的介绍一下B树，这两种数据结构既有相似之处，也有他们的区别，最后，我们也会对比一下这两种数据结构的区别。
+Before introducing B+ trees, first briefly introduce B-trees. These two data structures have similarities as well as differences. At the end, we also compare the differences between them.
 
-**1.1 B树概念**
+**1.1 B-tree Concept**
 
-B树也称B-树,它是一颗多路平衡查找树。二叉树我想大家都不陌生，其实，B树和后面讲到的B+树也是从最简单的二叉树变换而来的，并没有什么神秘的地方，下面我们来看看B树的定义。
+A B-tree, also written as B-Tree, is a multi-way balanced search tree. Everyone is probably familiar with binary trees. In fact, B-trees and the B+ trees discussed later are also derived from the simplest binary-tree ideas, so there is nothing mysterious about them. First look at the definition of a B-tree.
 
-* 每个节点最多有m-1个**关键字**（可以存有的键值对）。
-* 根节点最少可以只有1个**关键字**。
-* 非根节点至少有m/2个**关键字**。
-* 每个节点中的关键字都按照从小到大的顺序排列，每个关键字的左子树中的所有关键字都小于它，而右子树中的所有关键字都大于它。
-* 所有叶子节点都位于同一层，或者说根节点到每个叶子节点的长度都相同。
-* 每个节点都存有索引和数据，也就是对应的key和value。
+* Each node has at most `m-1` **keys**, meaning key-value pairs that can be stored.
+* The root node may have as few as 1 **key**.
+* A non-root node has at least `m/2` **keys**.
+* Keys inside each node are sorted in increasing order. For each key, all keys in its left subtree are smaller than it, while all keys in its right subtree are larger than it.
+* All leaf nodes are at the same level; equivalently, the path length from the root to every leaf node is the same.
+* Each node stores both index and data, meaning the corresponding key and value.
 
-所以，根节点的**关键字**数量范围：`1 <= k <= m-1`，非根节点的**关键字**数量范围：`m/2 <= k <= m-1`。
+Therefore, the number of **keys** in the root node satisfies `1 <= k <= m-1`, while the number of **keys** in a non-root node satisfies `m/2 <= k <= m-1`.
 
-另外，我们需要注意一个概念，描述一颗B树时需要指定它的阶数，阶数表示了一个节点最多有多少个孩子节点，一般用字母m表示阶数。
+Also note one concept: when describing a B-tree, we need to specify its order. The order indicates the maximum number of child nodes that a node can have, and it is usually represented by the letter `m`.
 
-我们再举个例子来说明一下上面的概念，比如这里有一个5阶的B树，根节点数量范围：1 <= k <= 4，非根节点数量范围：2 <= k <= 4。
+Use an example to illustrate the concepts above. Suppose this is a B-tree of order 5. The number of keys in the root node is in the range `1 <= k <= 4`, and the number of keys in a non-root node is in the range `2 <= k <= 4`.
 
-下面，我们通过一个插入的例子，讲解一下B树的插入过程，接着，再讲解一下删除关键字的过程。
+Next, use an insertion example to explain the B-tree insertion process, and then explain key deletion.
 
-**1.2 B树插入**
+**1.2 B-tree Insertion**
 
-插入的时候，我们需要记住一个规则：**判断当前结点key的个数是否小于等于m-1，如果满足，直接插入即可，如果不满足，将节点的中间的key将这个节点分为左右两部分，中间的节点放到父节点中即可。**
+During insertion, remember one rule: **check whether the number of keys in the current node is less than or equal to `m-1`. If so, insert directly. If not, split the node into left and right parts using the middle key, and move the middle key into the parent node.**
 
-例子：在5阶B树中，结点最多有4个key,最少有2个key（注意：下面的节点统一用一个节点表示key和value）。
+Example: in a B-tree of order 5, each node can have at most 4 keys and at least 2 keys. Note that the diagrams below use one node to represent both key and value.
 
-* 插入18，70，50,40
+* Insert 18, 70, 50, 40
 
 ![](<../../../.gitbook/assets/image (19).png>)
 
-* 插入22
+* Insert 22
 
 ![](<../../../.gitbook/assets/image (8).png>)
 
-插入22时，发现这个节点的关键字已经大于4了，所以需要进行分裂，分裂的规则在上面已经讲了，分裂之后，如下。
+When inserting 22, the number of keys in this node becomes greater than 4, so the node must split. The split rule was described above. After splitting, the tree becomes:
 
 <figure><img src="../../../.gitbook/assets/image (14).png" alt=""><figcaption></figcaption></figure>
 
-* 接着插入23，25，39
+* Continue inserting 23, 25, 39
 
 <figure><img src="../../../.gitbook/assets/image (3).png" alt=""><figcaption></figcaption></figure>
 
-分裂，得到下面的。
+After splitting, we get:
 
 <figure><img src="../../../.gitbook/assets/image (26).png" alt=""><figcaption></figcaption></figure>
 
-更过的插入的过程就不多介绍了，相信有这个例子你已经知道怎么进行插入操作了。
+More insertion steps are not introduced here. With this example, the insertion process should already be clear.
 
-**1.3 B树的删除操作**
+**1.3 B-tree Deletion**
 
-B树的删除操作相对于插入操作是相对复杂一些的，但是，你知道记住几种情况，一样可以很轻松的掌握的。
+B-tree deletion is more complex than insertion, but if you remember a few cases, it is still easy to master.
 
-* 现在有一个初始状态是下面这样的B树，然后进行删除操作。
+* Start with a B-tree in the following initial state, then perform deletion.
 
 <figure><img src="../../../.gitbook/assets/image (33).png" alt=""><figcaption></figcaption></figure>
 
-* 删除15，这种情况是删除叶子节点的元素，如果删除之后，节点数还是大于`m/2`，这种情况只要直接删除即可。
+* Delete 15. This case deletes an element from a leaf node. If the number of keys after deletion is still greater than `m/2`, we can delete it directly.
 
 <figure><img src="../../../.gitbook/assets/image (36).png" alt=""><figcaption></figcaption></figure>
 
 <figure><img src="../../../.gitbook/assets/image (38).png" alt=""><figcaption></figcaption></figure>
 
-* 接着，我们把22删除，这种情况的规则：22是非叶子节点，**对于非叶子节点的删除，我们需要用后继key（元素）覆盖要删除的key，然后在后继key所在的子支中删除该后继key**。对于删除22，需要将后继元素24移到被删除的22所在的节点。
+* Next, delete 22. The rule for this case is: 22 is in a non-leaf node. **For deletion from a non-leaf node, use the successor key to overwrite the key being deleted, and then delete that successor key from the child branch where it is located**. To delete 22, move successor element 24 into the node where 22 was deleted.
 
 <figure><img src="../../../.gitbook/assets/image (23).png" alt=""><figcaption></figcaption></figure>
 
 <figure><img src="../../../.gitbook/assets/image (9).png" alt=""><figcaption></figcaption></figure>
 
-此时发现26所在的节点只有一个元素，小于2个（m/2），这个节点不符合要求，这时候的规则（向兄弟节点借元素）：**如果删除叶子节点，如果删除元素后元素个数少于（m/2），并且它的兄弟节点的元素大于（m/2），也就是说兄弟节点的元素比最少值m/2还多，将先将父节点的元素移到该节点，然后将兄弟节点的元素再移动到父节点**。这样就满足要求了。
+At this point, the node containing 26 has only one element, fewer than 2 (`m/2`), so this node violates the requirement. The rule here is to borrow an element from a sibling node: **if deleting from a leaf node causes the number of elements to be less than `m/2`, and a sibling node has more than `m/2` elements, meaning the sibling has more than the minimum, first move an element from the parent node into this node, and then move an element from the sibling node into the parent node**. This restores the requirement.
 
-我们看看操作过程就更加明白了。
+The process is clearer from the following diagrams.
 
 <figure><img src="../../../.gitbook/assets/image (12).png" alt=""><figcaption></figcaption></figure>
 
 <figure><img src="../../../.gitbook/assets/image (4).png" alt=""><figcaption></figcaption></figure>
 
-* 接着删除28，**删除叶子节点**，删除后不满足要求，所以，我们需要考虑向兄弟节点借元素，但是，兄弟节点也没有多的节点（2个），借不了，怎么办呢？如果遇到这种情况，**首先，还是将先将父节点的元素移到该节点，然后，将当前节点及它的兄弟节点中的key合并，形成一个新的节点**。
+* Next delete 28. This is **deletion from a leaf node**. After deletion, the requirement is not satisfied. We need to consider borrowing from a sibling node, but the sibling node also does not have extra keys; it has only 2. What should we do? In this case, **first move an element from the parent node into this node, then merge the keys in the current node and its sibling node into a new node**.
 
 <figure><img src="../../../.gitbook/assets/image (1).png" alt=""><figcaption></figcaption></figure>
 
-移动之后，跟兄弟节点合并。
+After moving, merge with the sibling node.
 
 <figure><img src="../../../.gitbook/assets/image (29).png" alt=""><figcaption></figcaption></figure>
 
-删除就只有上面的几种情况，根据不同的情况进行删除即可。
+Deletion has only the cases above. Apply the corresponding action for each case.
 
-上面的这些介绍，相信对于B树已经有一定的了解了，接下来的一部分，我们接着讲解B+树，我相信加上B+树的对比，就更加清晰明了了。
+After the discussion above, you should have a basic understanding of B-trees. The next part introduces B+ trees. With the comparison against B+ trees, the picture should become clearer.
 
-#### 2 B+树 <a href="#item-2" id="item-2"></a>
+#### 2 B+ Tree <a href="#item-2" id="item-2"></a>
 
-**2.1 B+树概述**
+**2.1 B+ Tree Overview**
 
-B+树其实和B树是非常相似的，我们首先看看**相同点**。
+B+ trees are very similar to B-trees. First look at their **similarities**.
 
-* 根节点至少一个元素
-* 非根节点元素范围：m/2 <= k <= m-1
+* The root node has at least one element.
+* The element count range for a non-root node is `m/2 <= k <= m-1`.
 
-**不同点**。
+**Differences**:
 
-* B+树有两种类型的节点：内部结点（也称索引结点）和叶子结点。内部节点就是非叶子节点，内部节点不存储数据，只存储索引，数据都存储在叶子节点。
-* 内部结点中的key都按照从小到大的顺序排列，对于内部结点中的一个key，左树中的所有key都小于它，右子树中的key都大于等于它。叶子结点中的记录也按照key的大小排列。
-* 每个叶子结点都存有相邻叶子结点的指针，叶子结点本身依关键字的大小自小而大顺序链接。
-* 父节点存有右孩子的第一个元素的索引。
+* A B+ tree has two types of nodes: internal nodes, also called index nodes, and leaf nodes. Internal nodes are non-leaf nodes. Internal nodes do not store data; they store only indexes. All data is stored in leaf nodes.
+* Keys in internal nodes are sorted in increasing order. For a key in an internal node, all keys in the left subtree are smaller than it, and keys in the right subtree are greater than or equal to it. Records in leaf nodes are also sorted by key.
+* Each leaf node stores a pointer to its adjacent leaf node, and leaf nodes are linked in increasing key order.
+* The parent node stores the first element index of the right child.
 
-下面我们看一个B+树的例子，感受感受它吧！
+Now look at a B+ tree example to get a feel for it.
 
 <figure><img src="../../../.gitbook/assets/image (16).png" alt=""><figcaption></figcaption></figure>
 
-**2.2 插入操作**
+**2.2 Insertion**
 
-对于插入操作很简单，只需要记住一个技巧即可：**当节点元素数量大于m-1的时候，按中间元素分裂成左右两部分，中间元素分裂到父节点当做索引存储，但是，本身中间元素还是分裂右边这一部分的**。
+Insertion is simple. Remember one technique: **when the number of elements in a node exceeds `m-1`, split the node into left and right parts around the middle element. The middle element is copied into the parent as an index, but the middle element itself remains in the right split part**.
 
-下面以一颗5阶B+树的插入过程为例，5阶B+树的节点最少2个元素，最多4个元素。
+The following uses insertion into a B+ tree of order 5 as an example. A B+ tree of order 5 has at least 2 elements and at most 4 elements per node.
 
-* 插入5，10，15，20
+* Insert 5, 10, 15, 20
 
 ![](<../../../.gitbook/assets/image (30).png>)
 
-* 插入25，此时元素数量大于4个了，分裂
+* Insert 25. Now the number of elements exceeds 4, so split.
 
 <figure><img src="../../../.gitbook/assets/image (39).png" alt=""><figcaption></figcaption></figure>
 
-接着插入26，30，继续分裂
+Then insert 26 and 30, continuing to split.
 
 <figure><img src="../../../.gitbook/assets/image (31).png" alt=""><figcaption></figcaption></figure>
 
-有了这几个例子，相信插入操作没什么问题了，下面接着看看删除操作。
+With these examples, insertion should be clear. Next, look at deletion.
 
-**2.3 删除操作**
+**2.3 Deletion**
 
-对于删除操作是比B树简单一些的，因为**叶子节点有指针的存在，向兄弟节点借元素时，不需要通过父节点了，而是可以直接通过兄弟节移动即可（前提是兄弟节点的元素大于m/2），然后更新父节点的索引；如果兄弟节点的元素不大于m/2（兄弟节点也没有多余的元素），则将当前节点和兄弟节点合并，并且删除父节点中的key**，下面我们看看具体的实例。
+Deletion is simpler than in a B-tree because **leaf nodes have sibling pointers. When borrowing an element from a sibling, the operation does not need to go through the parent node; it can move directly through the sibling, assuming the sibling has more than `m/2` elements, and then update the parent index. If the sibling does not have more than `m/2` elements, meaning the sibling also has no extra element, merge the current node and the sibling node, and delete the corresponding key from the parent node**. The following example illustrates the details.
 
-* 初始状态
+* Initial state
 
 <figure><img src="../../../.gitbook/assets/image (27).png" alt=""><figcaption></figcaption></figure>
 
-* 删除10，删除后，不满足要求，发现左边兄弟节点有多余的元素，所以去借元素，最后，修改父节点索引
+* Delete 10. After deletion, the node violates the requirement. The left sibling has an extra element, so borrow one and finally update the parent index.
 
 <figure><img src="../../../.gitbook/assets/image (13).png" alt=""><figcaption></figcaption></figure>
 
-* 删除元素5，发现不满足要求，并且发现左右兄弟节点都没有多余的元素，所以，可以选择和兄弟节点合并，最后修改父节点索引
+* Delete element 5. The node violates the requirement, and neither left nor right sibling has an extra element. Therefore, merge with a sibling and finally update the parent index.
 
 <figure><img src="../../../.gitbook/assets/image (37).png" alt=""><figcaption></figcaption></figure>
 
-* 发现父节点索引也不满足条件，所以，需要做跟上面一步一样的操作
+* The parent index also violates the requirement, so perform the same kind of operation as above.
 
 <figure><img src="../../../.gitbook/assets/image (25).png" alt=""><figcaption></figcaption></figure>
 
-这样，B+树的删除操作也就完成了，是不是看完之后，觉得非常简单！
+At this point, B+ tree deletion is complete. After walking through the examples, it should feel straightforward.
 
-#### 3 B树和B+树总结 <a href="#item-3" id="item-3"></a>
+#### 3 B-tree and B+ Tree Summary <a href="#item-3" id="item-3"></a>
 
-B+树相对于B树有一些自己的优势，可以归结为下面几点。
+Compared with B-trees, B+ trees have several advantages:
 
-* 单一节点存储的元素更多，使得查询的IO次数更少，所以也就使得它更适合做为数据库MySQL的底层数据结构了。
-* 所有的查询都要查找到叶子节点，查询性能是稳定的，而B树，每个节点都可以查找到数据，所以不稳定。
-* 所有的叶子节点形成了一个有序链表，更加便于查找。
-
----
+* A single node stores more elements, reducing the number of I/O operations during lookup. This makes B+ trees more suitable as the underlying data structure for database indexes such as MySQL indexes.
+* Every query reaches a leaf node, so query performance is stable. In a B-tree, data may be found at any node, so lookup depth is less uniform.
+* All leaf nodes form an ordered linked list, making range lookup more convenient.
 
 ---
-description: 知识点总结
+
+---
+description: Knowledge summary
 ---
 
-# 🤣 Pre:  B+Tree
+# 🤣 Pre: B+Tree
 
-## B+树 <a href="#b-shu" id="b-shu"></a>
+## B+ Tree <a href="#b-shu" id="b-shu"></a>
 
-### 为什么需要B+树 <a href="#wei-shen-me-xu-yaobshu" id="wei-shen-me-xu-yaobshu"></a>
+### Why B+ Trees Are Needed <a href="#wei-shen-me-xu-yaobshu" id="wei-shen-me-xu-yaobshu"></a>
 
-B+树本质上是一个索引数据结构。比如我们要用某个给定的ID去检索某个student记录，如果没有索引的话，我们可能从第一条记录开始遍历每一个student记录，直到找到某个ID和我们给定的ID一致的记录。可想而知，这是非常耗时的。\
-如果我们已经维护了一个以ID为KEY的索引结构，我们可以向索引查询这个ID对应的记录所在的位置，然后直接从这个位置读取这个记录。从索引查询某个ID对应的位置，这个操作需要高效，B+树能保证以O(log n)的时间复杂度完成。
+A B+ tree is essentially an index data structure. For example, suppose we want to retrieve a `student` record by a given ID. Without an index, we may need to scan every `student` record from the first record until we find one whose ID matches the given ID. This is clearly time-consuming.\
+If we already maintain an index structure whose key is ID, we can query the index for the location of the record corresponding to that ID, and then directly read the record from that location. Querying the index for the location corresponding to an ID must be efficient, and a B+ tree can guarantee this in `O(log n)` time complexity.
 
-### B+树的性质 <a href="#b-shu-de-xing-zhi" id="b-shu-de-xing-zhi"></a>
+### B+ Tree Properties <a href="#b-shu-de-xing-zhi" id="b-shu-de-xing-zhi"></a>
 
-B+树由叶子节点和内部节点组成，和其它树结构差不多，但是对(KEY, VALUE)的个数和排列顺序有要求。
+A B+ tree consists of leaf nodes and internal nodes. Like other tree structures, it has requirements for the number and ordering of `(KEY, VALUE)` pairs.
 
-#### 叶子节点： <a href="#ye-zi-jie-dian" id="ye-zi-jie-dian"></a>
+#### Leaf Nodes <a href="#ye-zi-jie-dian" id="ye-zi-jie-dian"></a>
 
-格式如下：
+The format is as follows:
 
 ```markdown
  *  ---------------------------------------------------------------------------
@@ -194,15 +194,15 @@ B+树由叶子节点和内部节点组成，和其它树结构差不多，但是
  *  ---------------------------------------------------------------------------
 ```
 
-假设叶子结点最多能容纳个n个(KEY, RID)对，那么该叶子节点任何时候都不能少于n/2向上取整个(KEY, RID)对。假设(KEY, RID)对个数为x，那么x必须满足：
+Assume a leaf node can hold at most `n` `(KEY, RID)` pairs. Then this leaf node must never contain fewer than `ceil(n/2)` `(KEY, RID)` pairs. If the number of `(KEY, RID)` pairs is `x`, then `x` must satisfy:
 
 ```markdown
 ceil(n/2) <= x <= n
 ```
 
-ceil 表示向上取整。\
-KEY是search key，RID是该KEY对应的记录的位置。(KEY, RID)对按照KEY的増序进行排列。\
-HEADER的结构如下：
+`ceil` means rounding up.\
+`KEY` is the search key, and `RID` is the location of the record corresponding to that key. `(KEY, RID)` pairs are sorted in increasing `KEY` order.\
+The HEADER structure is:
 
 ```markdown
  * ----------------------------------------------------------------------------------------
@@ -210,9 +210,9 @@ HEADER的结构如下：
  * ---------------------------------------------------------------------------------------
 ```
 
-`ParentPageId` 指向父节点。
+`ParentPageId` points to the parent node.
 
-#### 内部节点 <a href="#nei-bu-jie-dian" id="nei-bu-jie-dian"></a>
+#### Internal Nodes <a href="#nei-bu-jie-dian" id="nei-bu-jie-dian"></a>
 
 ```markdown
  *  ----------------------------------------------------------------------------------------
@@ -220,30 +220,30 @@ HEADER的结构如下：
  *  ----------------------------------------------------------------------------------------
 ```
 
-假设内部节点最多容纳n个(KEY, PAGE\_ID)对，和叶子节点一样，x必须满足：
+Assume an internal node can hold at most `n` `(KEY, PAGE_ID)` pairs. As with leaf nodes, `x` must satisfy:
 
 ```
 ceil(n/2) <= x <= n
 ```
 
-KEY表示search key，PAGE\_ID指的是子节点的ID。\
-(KEY, PAGE\_ID)对按照KEY的増序进行排列。\
-第一个KEY是无效的。\
-假设PAGE\_ID(i)对应的子树中的KEY用SUB\_KEY表示，那么SUBKEY都满足：`KEY(i) <= SUB_KEY < KEY(i+1)`。\
+`KEY` is the search key, and `PAGE_ID` is the ID of the child node.\
+`(KEY, PAGE_ID)` pairs are sorted in increasing `KEY` order.\
+The first `KEY` is invalid.\
+Assume the keys in the subtree corresponding to `PAGE_ID(i)` are represented by `SUB_KEY`; then those keys satisfy `KEY(i) <= SUB_KEY < KEY(i+1)`.\
 
 
 <figure><img src="https://blog-1253119293.cos.ap-beijing.myqcloud.com/cmu-15445/lab2/lab2_1_page_node.PNG" alt=""><figcaption></figcaption></figure>
 
-### 查找操作 <a href="#cha-zhao-cao-zuo" id="cha-zhao-cao-zuo"></a>
+### Lookup <a href="#cha-zhao-cao-zuo" id="cha-zhao-cao-zuo"></a>
 
-课本p489给出了find的伪代码。总结来说就是先找到KEY应该出现的叶子节点，然后在该叶子节点中，查找KEY对应的RID。\
-如下图：
+The textbook gives pseudocode for `find` on p.489. In summary, first find the leaf node where the `KEY` should appear, and then search that leaf node for the `RID` corresponding to the `KEY`.\
+As shown below:
 
 <figure><img src="https://blog-1253119293.cos.ap-beijing.myqcloud.com/cmu-15445/lab2/lab2_2_find.PNG" alt=""><figcaption></figcaption></figure>
 
 \
-假如我们希望查找的KEY为38，第一步在根节点A查找38应该出现在哪个子节点中，根据之前的性质，38应该出现在以B为根的子树中，继续查找节点B，以此类推，最终38应该出现在H的叶子节点中。最后我们在H中查找38。\
-所以对于内部节点，我们需要一个`Lookup(const KeyType &key, const KeyComparator &comparator)`方法，查找key应该出现在哪个子节点对应的子树中。
+Suppose the key we want to find is 38. First, in root node A, determine which child node should contain 38. Based on the properties above, 38 should appear in the subtree rooted at B. Continue searching node B, and so on. Eventually, 38 should appear in leaf node H. Finally, search for 38 inside H.\
+Therefore, for internal nodes, we need a `Lookup(const KeyType &key, const KeyComparator &comparator)` method to find which child node's subtree should contain `key`.
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```cpp
@@ -252,7 +252,8 @@ ValueType
 B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
                                        const KeyComparator &comparator) const {
     assert(GetSize() >= 2);
-    // 先找到第一个array[index].first大于等于key的index（从index 1开始）
+    // Find the first index whose array[index].first is greater than or equal to key.
+    // The search starts from index 1.
     int left = 1;
     int right = GetSize() - 1;
     int mid;
@@ -272,7 +273,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     }
     targetIndex = left;
 
-    // key比array中所有key都要大
+    // key is greater than every key in array.
     if (targetIndex >= GetSize()) {
         return array[GetSize() - 1].second;
     }
@@ -286,72 +287,72 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
 ```
 {% endcode %}
 
-因为KEY是已排序的，所以可以先二分查找第一个大于或等于KEY的下标targetIndex，如果targetIndex对应的KEY就是我们要找的KEY，那么targetIndex对应的value就是下一步要搜索的节点，否则targetIndex-1对应的value是下一步应该搜索的节点。
+Because the keys are sorted, we can first use binary search to find the first index `targetIndex` whose key is greater than or equal to `KEY`. If the key at `targetIndex` is the key we are looking for, the value at `targetIndex` is the next node to search. Otherwise, the value at `targetIndex - 1` is the next node to search.
 
-### 插入操作 <a href="#cha-ru-cao-zuo" id="cha-ru-cao-zuo"></a>
+### Insertion <a href="#cha-ru-cao-zuo" id="cha-ru-cao-zuo"></a>
 
-课本p494给出了完整的insert(key, value)操作的伪代码。\
-思路就是：
+The textbook gives complete pseudocode for `insert(key, value)` on p.494.\
+The idea is:
 
-1. 先找到key应该出现的叶子节点，将(key, value)插入到该叶子节点中。
-2.  如果插入后该叶子节点中键值对超出了最大值，则进行分裂。如果插入后没有超出最大限制，那么就完成任务了。\
+1. First find the leaf node where `key` should appear, then insert `(key, value)` into that leaf node.
+2.  If the number of key-value pairs in the leaf node exceeds the maximum after insertion, split it. If it does not exceed the maximum, the operation is complete.\
     \
-    如上图准备插入(7, 'g')，但是插入前p1叶子结点已经满了，那么先插入，然后将插入后的节点，分裂出新的节点p3，将p1原来一半的元素挪到p3，然后将(6, p3)插入到父节点p2中，其中6是新创建的节点p3第一个key。\
-    同样的，如果我们在父节点p2中插入了(6, p3)导致了p2超过最大限制，p2也需要分裂，以此类推，这个过程可能产生新的根节点。
+    In the figure above, suppose we want to insert `(7, 'g')`, but leaf node `p1` is already full before insertion. First insert the pair, then split the resulting node and create a new node `p3`. Move half of the original elements from `p1` to `p3`, then insert `(6, p3)` into the parent node `p2`, where 6 is the first key of the newly created node `p3`.\
+    Similarly, if inserting `(6, p3)` into parent node `p2` causes `p2` to exceed the maximum, `p2` also needs to split, and this may continue recursively. The process may create a new root node.
 
     <figure><img src="https://blog-1253119293.cos.ap-beijing.myqcloud.com/cmu-15445/lab2/lab2_3_insert.png" alt=""><figcaption><p>img.png</p></figcaption></figure>
 
-### 删除操作 <a href="#shan-chu-cao-zuo" id="shan-chu-cao-zuo"></a>
+### Deletion <a href="#shan-chu-cao-zuo" id="shan-chu-cao-zuo"></a>
 
-#### 思路： <a href="#shan-chu-cao-zuo" id="shan-chu-cao-zuo"></a>
+#### Idea <a href="#shan-chu-cao-zuo" id="shan-chu-cao-zuo"></a>
 
-1. 先找到key应该出现的叶子节点，删除该叶子节点中key对应的键值对。
-2.  删除后如果个数少于规定最少个数，那么有两个措施，如果当前节点个数和兄弟节点个数总和不超过允许的最大个数，那么进行并合。否则，从兄弟节点中借一个元素。
+1. First find the leaf node where `key` should appear, then delete the key-value pair corresponding to `key` in that leaf node.
+2.  If the number of pairs after deletion is less than the required minimum, there are two possible actions. If the total number of elements in the current node and its sibling does not exceed the allowed maximum, merge them. Otherwise, borrow one element from the sibling node.
 
     <figure><img src="https://blog-1253119293.cos.ap-beijing.myqcloud.com/cmu-15445/lab2/lab2_4_delete.png" alt=""><figcaption></figcaption></figure>
 
-上图第一种情况：\
-删除(7, 'g')后，p3只有一个元素，少于最少允许的个数（2），于是将(6, 'f')已到兄弟节点p1, 删除p3节点，并且删除父节点p2中的(6, p3)，如果p2也少于最少允许个数，递归进行。\
-第二种请求：\
-删除p3的(8, 'h')后，p3只有一个元素，于是从兄弟节点p1借一个元素(6, f)，然后将父节点(7, 'g')修改为(6, 'f')，这种情况不需要递归。
+First case in the figure above:\
+After deleting `(7, 'g')`, `p3` has only one element, fewer than the minimum allowed count of 2. Therefore, move `(6, 'f')` into sibling node `p1`, delete node `p3`, and delete `(6, p3)` from parent node `p2`. If `p2` also has fewer than the minimum allowed count, apply the process recursively.\
+Second case:\
+After deleting `(8, 'h')` from `p3`, `p3` has only one element. Borrow one element `(6, f)` from sibling node `p1`, then change the parent entry `(7, 'g')` to `(6, 'f')`. This case does not require recursion.
 
-## 支持并发操作 <a href="#zhi-chi-bing-fa-cao-zuo" id="zhi-chi-bing-fa-cao-zuo"></a>
+## Supporting Concurrent Operations <a href="#zhi-chi-bing-fa-cao-zuo" id="zhi-chi-bing-fa-cao-zuo"></a>
 
-最粗暴的方式就是在find, insert, delete开始就加锁，执行完毕后解锁，这样逻辑上没有问题，但是并发效率很低，相当于串行执行。
+The most brute-force method is to acquire a lock at the beginning of `find`, `insert`, and `delete`, and release it after execution completes. This is logically correct, but concurrency is poor because operations are effectively serialized.
 
-### crabbing协议 <a href="#crabbing-xie-yi" id="crabbing-xie-yi"></a>
+### Crabbing Protocol <a href="#crabbing-xie-yi" id="crabbing-xie-yi"></a>
 
-该协议允许多个线程同时访问修改B+树。
+This protocol allows multiple threads to access and modify a B+ tree concurrently.
 
-### 基本算法 <a href="#ji-ben-suan-fa" id="ji-ben-suan-fa"></a>
+### Basic Algorithm <a href="#ji-ben-suan-fa" id="ji-ben-suan-fa"></a>
 
-1. 对于查询操作，从根节点开始，首先获取根节点的**读锁**，然后在根节点中查找key应该出现的孩子节点，获取孩子节点的**读锁**，然后释放根节点的**读锁**，以此类推，直到找到目标叶子节点，此时该叶子节点获取了读锁。
-2. 对于删除和插入操作，也是从根节点开始，先获取根节点的**写锁**，一旦孩子节点也获取了**写锁**，检查根节点是否安全，如果安全释放孩子节点所有祖先节点的**写锁**，以此类推，直到找到目标叶子节点。节点安全定义如下：如果对于插入操作，如果再插入一个元素，不会产生分裂，或者对于删除操作，如果再删除一个元素，不会产生并合。
+1. For lookup operations, start from the root node. First acquire the **read lock** of the root node, then find the child node where the key should appear, acquire the **read lock** of the child node, and then release the **read lock** of the root node. Continue this way until the target leaf node is reached; at that point, the leaf node holds the read lock.
+2. For delete and insert operations, also start from the root node. First acquire the **write lock** of the root node. Once the child node also acquires its **write lock**, check whether the root node is safe. If it is safe, release the **write locks** of all ancestors of the child node. Continue this way until the target leaf node is reached. A node is safe if, for insertion, inserting one more element will not cause a split, or for deletion, deleting one more element will not cause a merge.
 
-举个查找过程的例子，查找key=38：\
+Example lookup process for `key = 38`:\
 
 
 <figure><img src="https://blog-1253119293.cos.ap-beijing.myqcloud.com/cmu-15445/lab2/lab2_5_crabbing_protol_find.png" alt=""><figcaption></figcaption></figure>
 
-举个插入过程的例子，插入25：\
+Example insertion process for inserting 25:\
 
 
 <figure><img src="https://blog-1253119293.cos.ap-beijing.myqcloud.com/cmu-15445/lab2/lab2_6-crabbing_protol_insert.png" alt=""><figcaption></figcaption></figure>
 
-crab有螃蟹的意思，了解完crabbing协议加锁的过程，应该不难理解为什么叫crabbing协议了吧。
+The word "crab" explains the name of the crabbing protocol. After understanding the locking process, it should be easy to see why the protocol is called crabbing.
 
-### 需要注意的地方 <a href="#xu-yao-zhu-yi-de-di-fang" id="xu-yao-zhu-yi-de-di-fang"></a>
+### Things to Watch Out For <a href="#xu-yao-zhu-yi-de-di-fang" id="xu-yao-zhu-yi-de-di-fang"></a>
 
-我们需要保护根节点id。\
-考虑下面这种情况：\
-两个线程同时执行插入操作，插入前B+树只有一个节点，线程一插入当前key后将分裂，生成一个新的根节点。另一个线程在线程一分裂前读取了旧的根节点，从而将key插入到了错误的叶子节点中。\
-解决办法：\
-在访问，修改root\_page\_id\_的地方加锁，访问或者修改完毕root\_page\_id\_后释放锁。root\_page\_id\_指向的是该B+树的根节点，会保存在内存中，以便快速查找。
+We need to protect the root node ID.\
+Consider the following situation:\
+Two threads execute insertions at the same time. Before insertion, the B+ tree has only one node. After thread 1 inserts its key, the node will split and generate a new root node. Before thread 1 finishes the split, another thread reads the old root node and inserts its key into the wrong leaf node.\
+Solution:\
+Add a lock around every access or modification of `root_page_id_`, and release the lock after accessing or modifying `root_page_id_`. `root_page_id_` points to the root node of the B+ tree and is stored in memory for fast lookup.
 
-## 实验遇到的坑和解决方案 <a href="#shi-yan-yu-dao-de-keng-he-jie-jue-fang-an" id="shi-yan-yu-dao-de-keng-he-jie-jue-fang-an"></a>
+## Pitfalls Encountered in the Lab and Solutions <a href="#shi-yan-yu-dao-de-keng-he-jie-jue-fang-an" id="shi-yan-yu-dao-de-keng-he-jie-jue-fang-an"></a>
 
-1. 前文提到我们需要保护root\_page\_id\_这个变量，可以用一个mutex，访问或修改前加锁，访问或者修改后释放锁。一次加锁只能对应一次解锁，如果多调用了一次unlock()，同样起不到保护的作用。unlock()调用分别在各个函数中，很可能不小心就多调用了次，所以千万要小心。
-2. 必须先释放Page上的锁，然后才能unpin该Page。为什么？我们知道unpin后，如果pin\_count为0，那么这个Page将被送到LRUReplacer，当没有足够的Page时，将从LRUReplacer中取Page，将该Page的内容保存到磁盘后用于保存其它其它页的内容。考虑下面这个场景：在插入25的过程中，查找到目标叶子节点，这时该叶子节点肯定被加上了写锁，如果我们执行完插入后，先unpin了该Page，然后才释放该Page的锁。可能出现这种情况，在unpin完后，释放锁前，这个Page被送到了LRUReplacer，另一个线程请求访问页面1，但是所有的Page都被占用了，LRUReplacer选择这个淘汰带锁的这个Page来保存页面1，因为该Page的锁还没释放，所以另一个线程可以直接访问或者修改，这是回到原来的线程，再释放已经晚了。
-3. lab本身提供的测试case是完全不够的，就算全部通过了，也不能保证代码是正确的。我自己加入了很多测试，涵盖多个线程的，根节点分裂等case。原代码只有对BPlusTree的测试，所以我添加了对BPlusTreeInternalPage和BPlusTreeLeafPage单独的测试，这样在用BPlusTreeInternalPage和BPlusTreeLeafPage构建BPlusTree前能保证自己是正确的。
-4. 在使用完一个Page后应该立刻unpin掉，不能忘记unpin，如果忘记unpin的话，那么这个Page将永远不能用于保存其它页，当所有Page都被占用后，系统将无法继续运行。这个问题一度困扰我很久，一定要非常仔细。
-5. 本lab的一个难点是调试，多使用assert和log。
+1. As mentioned earlier, `root_page_id_` needs to be protected. A mutex can be used: lock before access or modification, and unlock afterward. One lock operation must correspond to one unlock operation. If `unlock()` is called one extra time, the protection is lost. Because `unlock()` calls are distributed across multiple functions, it is easy to accidentally call it one time too many, so be very careful.
+2. A page lock must be released before the page is unpinned. Why? We know that after unpinning, if `pin_count` becomes 0, the page may be sent to the `LRUReplacer`. When there are not enough pages, the system takes a page from the `LRUReplacer`, writes its content back to disk, and uses it to store another page. Consider this scenario: during insertion of 25, the target leaf node has been found and must hold a write lock. If after insertion we first unpin this page and only then release its lock, the following situation may occur. After unpinning but before releasing the lock, this page is sent to the `LRUReplacer`. Another thread requests page 1, but all pages are occupied. The `LRUReplacer` chooses this still-locked page for eviction and uses it to store page 1. Because the lock on the old page has not yet been released, another thread may directly access or modify it. When the original thread returns and releases the lock, it is already too late.
+3. The test cases provided by the lab itself are far from sufficient. Even if all of them pass, the code is not guaranteed to be correct. I added many tests myself, covering multi-threaded cases, root-node splits, and so on. The original code only tested `BPlusTree`, so I added separate tests for `BPlusTreeInternalPage` and `BPlusTreeLeafPage`. This ensures those two components are correct before using them to build `BPlusTree`.
+4. After using a page, it should be unpinned immediately. Do not forget to unpin it. If a page is never unpinned, it can never be reused to store other pages. Once all pages are occupied, the system can no longer continue running. This problem bothered me for a long time, so be very careful.
+5. One difficult part of this lab is debugging. Use `assert` and logs frequently.

@@ -2,18 +2,18 @@
 description: Project 2
 ---
 
-# 😂 Expand
+# B+Tree Expansion
 
-### 1. 实验介绍 <a href="#1-shi-yan-jie-shao" id="1-shi-yan-jie-shao"></a>
+### 1. Lab Overview <a href="#1-lab-overview" id="1-lab-overview"></a>
 
-> 第一个打分点---实现b+树的基本结构、插入、搜索操作
+> The first grading checkpoint implements the basic B+Tree structure, insertion, and search operations.
 >
-> 注意这里没有考虑打分点2的并发问题，所以对于加锁、解锁和事物都没有考虑。
+> This part does not consider the concurrency requirements of the second checkpoint, so locking, unlocking, and transactions are not covered here.
 
 * [**Task #1 - B+Tree Pages**](https://15445.courses.cs.cmu.edu/fall2020/project2/#b+tree-pages)
 * [**Task #2.a - B+Tree Data Structure (Insertion & Point Search)**](https://15445.courses.cs.cmu.edu/fall2020/project2/#b+tree-structure-1)
 
-> 第二个打分点--实现b+树的删除操作、索引迭代器和对并发访问的支持
+> The second grading checkpoint implements B+Tree deletion, the index iterator, and support for concurrent access.
 
 * [**Task #2.b - B+Tree Data Structure (Deletion)**](https://15445.courses.cs.cmu.edu/fall2020/project2/#b+tree-structure-2)
 * [**Task #3 - Index Iterator**](https://15445.courses.cs.cmu.edu/fall2020/project2/#index-iterator)
@@ -21,7 +21,7 @@ description: Project 2
 
 ### Task 1 B+TREE PAGES[#](https://www.cnblogs.com/JayL-zxl/p/14324297.html#task-1-btree-pages) <a href="#task-1-btree-pages" id="task-1-btree-pages"></a>
 
-您需要实现三个页面类来存储B+树的数据。
+You need to implement three page classes to store B+Tree data.
 
 * B+ Tree Parent Page
 * B+ Tree Internal Page
@@ -29,7 +29,7 @@ description: Project 2
 
 #### <mark style="color:purple;">1.</mark>  B+ Tree Parent Page <a href="#1-b-tree-parent-page" id="1-b-tree-parent-page"></a>
 
-这是内部页和叶页都继承的父类，它只包含两个子类共享的信息。父页面被划分为如下表所示的几个字段。\
+This is the parent class inherited by both internal pages and leaf pages. It contains only the information shared by those two subclasses. The parent page is divided into the fields shown below.\
 `*`_`B+Tree Parent Page Content`_
 
 | Variable Name      | Size | Description                             |
@@ -41,22 +41,22 @@ description: Project 2
 | parent\_page\_id\_ | 4    | Parent Page Id                          |
 | page\_id\_         | 4    | Self Page Id                            |
 
-必须在指定的文件中实现父页。只能修改头文件(`src/include/storage/page/b_plus_tree_page.h`) 和其对应的源文件 (`src/storage/page/b_plus_tree_page.cpp`).
+The parent page must be implemented in the specified files. Only the header file (`src/include/storage/page/b_plus_tree_page.h`) and its corresponding source file (`src/storage/page/b_plus_tree_page.cpp`) should be modified.
 
-这里都是一些简单的set、get就不写出来了
+Most methods here are simple setters and getters, so they are not listed in detail.
 
-* `IsRootPage` 函数根据 `parent_id_` 是否是 `INVALID_PAGE_ID` 返回 `true` 或者 `false`
-* `GetMinSize()`：需要区分 **1**）根结点且为叶子结点  **2**）根结点  **3**）其他
+* `IsRootPage` returns `true` or `false` depending on whether `parent_id_` is `INVALID_PAGE_ID`.
+* `GetMinSize()` needs to distinguish three cases: **1**) the root is also a leaf, **2**) the page is the root, and **3**) all other pages.
 
 #### <mark style="color:purple;">2.</mark> B+TREE INTERNAL PAGE <a href="#2-btree-internal-page" id="2-btree-internal-page"></a>
 
-内部页不存储任何实际数据，而是存储有序的m个键条目和m + 1个指针（也称为page\_id）。&#x20;
+Internal pages do not store actual tuple data. Instead, they store `m` ordered key entries and `m + 1` pointers, also called `page_id`s.&#x20;
 
-由于指针的数量不等于键的数量，因此将第一个键设置为无效，并且查找方法应始终从第二个键开始。&#x20;
+Because the number of pointers is not equal to the number of keys, the first key is set as invalid, and lookup should always start from the second key.&#x20;
 
-任何时候，每个内部页面至少有一半已满。 在删除期间，可以将两个半满页面合并为合法页面，或者可以将其重新分配以避免合并，而在插入期间，可以将一个完整页面分为两部分。
+At all times, each internal page should be at least half full, subject to the usual root exceptions. During deletion, two half-full pages may be merged into a valid page, or entries may be redistributed to avoid merging. During insertion, a full page may be split into two pages.
 
-你只能修改头文件(`src/include/storage/page/b_plus_tree_internal_page.h`) 和对应的源文件(`src/page/b_plus_tree_internal_page.cpp`).
+You may only modify the header file (`src/include/storage/page/b_plus_tree_internal_page.h`) and the corresponding source file (`src/page/b_plus_tree_internal_page.cpp`).
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```cpp
@@ -70,24 +70,24 @@ description: Project 2
 
 #### <mark style="color:purple;">3.</mark>  B+TREE LEAF PAGE <a href="#3-btree-leaf-page" id="3-btree-leaf-page"></a>
 
-叶子页存储有序的m个键条目(key)和m个值条目(value)。&#x20;
+Leaf pages store `m` ordered key entries and `m` value entries.&#x20;
 
-实现中，值只能是用于定位实际元组存储位置的64位`record_id`，请参阅`src / include / common / rid.h`中定义的`RID`类。&#x20;
+In this implementation, the value is only a 64-bit `record_id` used to locate the actual tuple storage position. See the `RID` class defined in `src/include/common/rid.h`.&#x20;
 
-叶子页与内部页在键/值对的数量上具有相同的限制，并且应该遵循相同的合并，重新分配和拆分操作。
+Leaf pages follow similar occupancy constraints on key/value pairs and should follow the same merge, redistribution, and split logic.
 
-必须在指定的文件中实现内部页。 仅允许修改头文件`（src / include / storage / page / b_plus_tree_leaf_page.h`）及其相应的源文件`（src / storage / page / b_plus_tree_leaf_page.cpp`）。
+The leaf page must be implemented in the specified files. Only the header file (`src/include/storage/page/b_plus_tree_leaf_page.h`) and its corresponding source file (`src/storage/page/b_plus_tree_leaf_page.cpp`) should be modified.
 
-<mark style="color:red;">**‼️**</mark>** 重要的KeyIndex函数**
+<mark style="color:red;">**Important**</mark>: **the `KeyIndex` function**
 
-这个函数可以返回第一个>=当前key值的编号。这个在插入的时候经常会用到，这样就可以让代码重复利用，在`LevelDB`中也有类似的操作。
+This function returns the index of the first key that is greater than or equal to the input key. It is frequently used during insertion and makes the code reusable. `LevelDB` has a similar operation.
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```cpp
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyComparator &comparator) const {
-  // 二分查找
-  // TODO : 换成std::lower_bound()好看一点
+  // binary search
+  // TODO: std::lower_bound() would be cleaner
   int l = 0;
   int r = GetSize();
   if (l >= r) {
@@ -106,21 +106,21 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyComparator
 ```
 {% endcode %}
 
-重要提示：尽管叶子页和内部页包含相同类型的键，但它们可能具有不同类型的值，因此叶子页和内部页的最大大小可能不同。
+Important note: although leaf pages and internal pages contain the same key type, they may use different value types, so their maximum sizes may differ.
 
-每个`B + Tree`叶子/内部页面对应从缓冲池获取的存储页面的内容（即data\_部分）。 因此，每次尝试读取或写入叶子/内部页面时，都需要首先使用其唯一的`page_id`从缓冲池中提取页面，然后将其重新解释为叶子或内部页面，并在写入或删除后执行`unpin`操作。
+Each `B+Tree` leaf/internal page corresponds to the contents of a storage page fetched from the buffer pool, namely the `data_` region. Therefore, whenever reading or writing a leaf/internal page, first fetch the page from the buffer pool using its unique `page_id`, reinterpret it as a leaf or internal page, and then `unpin` it after writing or deleting.
 
 ### Task 2.A - B+TREE DATA STRUCTURE (INSERTION & POINT SEARCH) <a href="#task-2a---btree-data-structure-insertion--point-search" id="task-2a---btree-data-structure-insertion--point-search"></a>
 
-> 其实就是实现`b_plus_tree.cpp/InsertIntoLeaf`函数所涉及到的相关函数。
+> This is essentially implementing the functions related to `b_plus_tree.cpp/InsertIntoLeaf`.
 
-这里 B +树索引只能支持唯一键。 也就是说，当您尝试将具有重复键的键值对插入索引时，它应该返回`false`。
+The B+Tree index here supports only unique keys. In other words, if you try to insert a key/value pair with a duplicate key, the operation should return `false`.
 
-对于`checkpoint1`，仅需要B + Tree索引支持插入（`Insert`）和点搜索（`GetValue`）。 我们不需要实现删除操作。&#x20;
+For `checkpoint1`, the B+Tree index only needs to support insertion (`Insert`) and point search (`GetValue`). Deletion is not required.&#x20;
 
-插入后如果当前键/值对的数量等于`max_size`，则应该正确执行分割。 由于任何写操作都可能导致B + Tree索引中的`root_page_id`发生更改，因此要更新（`src / include / storage / page / header_page.h`）中的`root_page_id`，以确保索引在磁盘上具有持久性 。 在`BPlusTree`类中，我们已经为您实现了一个名为`UpdateRootPageId`的函数。 您需要做的就是在B + Tree索引的`root_page_id`更改时调用此函数。
+After insertion, if the number of key/value pairs reaches `max_size`, the page should be split correctly. Because any write operation may change the `root_page_id` of the B+Tree index, the `root_page_id` in `src/include/storage/page/header_page.h` must be updated to ensure that the index root is durable on disk. The `BPlusTree` class already provides a function named `UpdateRootPageId`; call it whenever the B+Tree index's `root_page_id` changes.
 
-您的B + Tree实现必须隐藏key/value等的详细信息，建议使用如下结构：
+Your B+Tree implementation must hide details such as the concrete key and value types. The suggested structure is:
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```cpp
@@ -133,28 +133,28 @@ class BPlusTree{
 ```
 {% endcode %}
 
-这些类别已经为你实现了
+These types have already been implemented for you:
 
 * `KeyType`: The type of each key in the index. This will only be `GenericKey`, the actual size of `GenericKey` is specified and instantiated with a template argument and depends on the data type of indexed attribute.
 * `ValueType`: The type of each value in the index. This will only be 64-bit RID.
 * `KeyComparator`: The class used to compare whether two `KeyType` instances are less/greater-than each other. These will be included in the `KeyType` implementation files.
 
-1. 你必须使用传入的transaction，把已经加锁的页面保存起来。
-2. 我们提供了读写锁存器的实现（`src / include / common / rwlatch.h`）。 并且已经在页面头文件下添加了辅助函数来获取和释放Latch锁（`src / include / storage / page / page.h`）。
+1. You must use the incoming `transaction` to track pages that have already been latched.
+2. The project provides a reader-writer latch implementation in `src/include/common/rwlatch.h`. Helper functions for acquiring and releasing latches have also been added to the page header in `src/include/storage/page/page.h`.
 
-首先附上书上的b+树插入算法
+First, here is the B+Tree insertion algorithm from the textbook.
 
 <figure><img src="../../../.gitbook/assets/image (17).png" alt=""><figcaption></figcaption></figure>
 
-**对上面几种情况的分析**
+**Analysis of the cases above**
 
-#### **1. 如果当前为空树则创建一个叶子结点并且也是根节点** <a href="#1-ru-guo-dang-qian-wei-kong-shu-ze-chuang-jian-yi-ge-ye-zi-jie-dian-bing-qie-ye-shi-gen-jie-dian" id="1-ru-guo-dang-qian-wei-kong-shu-ze-chuang-jian-yi-ge-ye-zi-jie-dian-bing-qie-ye-shi-gen-jie-dian"></a>
+#### **1. If the tree is empty, create a leaf page that is also the root** <a href="#1-create-root-leaf-for-empty-tree" id="1-create-root-leaf-for-empty-tree"></a>
 
-* 这里是`leaf`结点所以这里需要用到`leaf page`内的函数
-* 注意这里需要用lab1实现的buffer池管理器来获得page。 这里记得创建完新的结点之后要unpin
-* 进行插入的时候用二分插入来进行优化
+* This is a `leaf` node, so the functions inside the `leaf page` implementation are needed.
+* Use the buffer pool manager implemented in Lab 1 to obtain the page. Remember to `unpin` the newly created page after creating the node.
+* Use binary-search-based insertion to optimize insertion.
 
-**1. 创建新结点**
+**1. Create a new node**
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```cpp
@@ -178,15 +178,15 @@ void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType &value) {
 ```
 {% endcode %}
 
-**2. `insert`函数**[**#**](https://www.cnblogs.com/JayL-zxl/p/14324297.html#2-insert%E5%87%BD%E6%95%B0)
+**2. The `Insert` function** [**#**](https://www.cnblogs.com/JayL-zxl/p/14324297.html#2-insert%E5%87%BD%E6%95%B0)
 
-这里的`insert`函数可以直接用之前的`KeyIndex`函数
+The `Insert` function can directly reuse the `KeyIndex` function from above.
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```cpp
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) {
-  // 1. 边界判断
+  // 1. boundary check
   if (GetSize() == GetMaxSize()) {
     std::cout << "leaf_page Insert: size=" << GetSize() << ", max_size=" << GetMaxSize() << std::endl;
   }
@@ -206,24 +206,24 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &valu
 ```
 {% endcode %}
 
-#### 2. **否则寻找到插入元素应该在的叶子结点**，并插入(不分裂) <a href="#2-fou-ze-xun-zhao-dao-cha-ru-yuan-su-ying-gai-zai-de-ye-zi-jie-dian-bing-cha-ru-bu-fen-lie" id="2-fou-ze-xun-zhao-dao-cha-ru-yuan-su-ying-gai-zai-de-ye-zi-jie-dian-bing-cha-ru-bu-fen-lie"></a>
+#### 2. **Otherwise, find the target leaf page and insert without splitting** <a href="#2-find-target-leaf-and-insert-without-split" id="2-find-target-leaf-and-insert-without-split"></a>
 
-1. 首先找到叶子结点
-2. 如果叶子结点内的元素个数小于最大值则直接插入
-3. 否则需要进行分裂。产生两个新的结点。把元素上提
-4. 如果提到父亲结点，父结点仍需要分裂。则递归进行分裂否则结束
+1. First find the leaf page.
+2. If the number of elements in the leaf page is below the maximum, insert directly.
+3. Otherwise, split the page, create a new node, and promote the separator key.
+4. If inserting into the parent also requires splitting, recursively split the parent; otherwise stop.
 
-如果叶子结点内的关键字小于m-1,则直接插入到叶子结点
+If the number of keys in the leaf page is less than `m - 1`, insert directly into the leaf page.
 
-**1. LookUp函数实现**
+**1. `Lookup` function implementation**
 
-> Lookup函数用来寻找包含输入"key"的children pointer(其实就是page\_id)
+> The `Lookup` function finds the child pointer, which is essentially a `page_id`, that should contain the input `key`.
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```c
 INDEX_TEMPLATE_ARGUMENTS
 ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key, const KeyComparator &comparator) const {
-  // 从第二个节点开始
+  // start from the second entry
   for (int i = 1; i < GetSize(); i++) {
     KeyType cur_key = array_[i].first;
     if (comparator(key, cur_key) < 0) {
@@ -237,11 +237,11 @@ ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key, const KeyCo
 
 **2. findLeafPage**[**#**](https://www.cnblogs.com/JayL-zxl/p/14324297.html#2-findleafpage)
 
-由于要找到应该插入的`LeafPage`所以这个函数狠狠重要。但是这里是非并发下插入，在这里用`findLeafPage`进行对插入算法的测试。后面对于并发情况会有所修改。
+This function is important because it finds the `LeafPage` where insertion should happen. This version is for non-concurrent insertion and is used to test the insertion algorithm. It will be modified later for the concurrent case.
 
-1. 从整个b+树的根节点开始。一直向下找到叶子结点
-2. 因为b+树是多路搜索树，所以整个向下搜索就是通过key值进行比较
-3. 其中内部结点向下搜索的过程利用了上面提到的`lookup`函数
+1. Start from the root of the B+Tree and keep descending until a leaf page is reached.
+2. Because a B+Tree is a multi-way search tree, the downward search is driven by key comparisons.
+3. The search through internal pages uses the `Lookup` function mentioned above.
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```cpp
@@ -269,43 +269,43 @@ Page *BPLUSTREE_TYPE::FindLeafPage(const KeyType &key, bool leftMost) {
 ```
 {% endcode %}
 
-**3. 无分裂直接插入**
+**3. Direct insertion without splitting**
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```cpp
 INDEX_TEMPLATE_ARGUMENTS
 bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transaction) {
-  // 不考虑锁的实现
+  // locking is not considered in this version
   {
     if (IsEmpty()) {
       StartNewTree(key, value);
       return true;
     }
-    //[Attention] 这里获取到page是pined
+    // [Attention] the fetched page is pinned here
     Page *right_leaf = FindLeafPage(key, false);
     LeafPage *leaf_page = reinterpret_cast<LeafPage *>(right_leaf);
 
     // 1. if insert key is exist
     if (leaf_page->Lookup(key, nullptr, comparator_)) {
-      buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false); // unpined page
+      buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false); // unpin page
       return false;
     }
     // 2. insert entry
     leaf_page->Insert(key, value, comparator_);
-    // 下面分析需要分裂的情况
+    // the split case is analyzed below
 ```
 {% endcode %}
 
-#### **3. 分裂的情况** <a href="#3-fen-lie-de-qing-kuang" id="3-fen-lie-de-qing-kuang"></a>
+#### **3. Split case** <a href="#3-split-case" id="3-split-case"></a>
 
-`InsertLeaf主函数`接上文。
+The main `InsertIntoLeaf` flow continues from the previous code.
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```cpp
 // 2.1 need to split
     // split need to do two things
     // 1. create new page copy [mid, r] to new page
-    // 2. if necessary 递归处理
+    // 2. handle recursively if necessary
     if (leaf_page->GetSize() == maxSize(leaf_page) + 1) {
       LeafPage *new_leaf = Split(leaf_page);
       InsertIntoParent(leaf_page, new_leaf->KeyAt(0), new_leaf, transaction);
@@ -317,10 +317,10 @@ bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value, 
 ```
 {% endcode %}
 
-**1. 调用`split`函数对叶子结点进行分割**
+**1. Call `Split` to split the leaf page**
 
-1. split的时候会产生一个含有m-m/2个关键字的新结点。注意把两个叶子结点连接起来。
-2. 这里注意split函数要区分叶子结点和内部结点。因为叶子结点需要更新双向链表
+1. Splitting creates a new node containing `m - m / 2` keys. Remember to link the two leaf pages.
+2. The `Split` function must distinguish leaf pages from internal pages because leaf pages need to update the linked-list pointers.
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```cpp
@@ -339,12 +339,12 @@ N *BPLUSTREE_TYPE::Split(N *node) {
     LeafPage *new_leaf_node = reinterpret_cast<LeafPage *>(new_page);
     new_leaf_node->Init(new_page_id, leaf_node->GetParentPageId(),leaf_max_size_);
     leaf_node->MoveHalfTo(new_leaf_node);
-    // 叶子节点更新双向链表
+    // update the leaf-level linked list
     new_leaf_node->SetNextPageId(leaf_node->GetNextPageId());
     leaf_node->SetNextPageId(new_leaf_node->GetPageId());
     new_node = reinterpret_cast<N *>(new_leaf_node);
   } else {
-    // 内部节点不需要设置双向链表
+    // internal pages do not need linked-list pointers
     InternalPage *internal_node = reinterpret_cast<InternalPage *>(node);
     InternalPage *new_internal_node = reinterpret_cast<InternalPage *>(new_page);
     new_internal_node->Init(new_page_id, internal_node->GetParentPageId(),internal_max_size_);
@@ -356,13 +356,13 @@ N *BPLUSTREE_TYPE::Split(N *node) {
 ```
 {% endcode %}
 
-这里涉及到了`MoveHalfTo`函数简单的附上一下，这个非常简单
+This involves the `MoveHalfTo` function. A simple version is shown below.
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recipient) {
-  // 这里好像是说 你左边多还是右边多都行，书上是左边多，我个人习惯右边多
+  // Either side can hold the extra entry; the textbook keeps more on the left, while this version keeps more on the right.
   int moved_num = GetSize() - GetSize() / 2;
   int start = GetSize() - moved_num;
   CopyNFrom(array_ + start, moved_num);
@@ -372,13 +372,13 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recipient) {
 ```
 {% endcode %}
 
-**2. `InsertIntoParent`函数实现**
+**2. `InsertIntoParent` function implementation**
 
-这个函数的实现先看一下书上给出的算法
+Before implementing this function, first look at the algorithm from the textbook.
 
 <figure><img src="../../../.gitbook/assets/image (18).png" alt=""><figcaption></figcaption></figure>
 
-1. 如果`old_node`就是根节点，那么就要创建一个新的节点R当作根节点。然后取`key`的值当作根节点的值。修改`old_node`和`new_node`的父指针。以及根节点的孩子指针
+1. If `old_node` is the root, create a new node `R` as the new root. Use `key` as the separator key in the new root. Then update the parent pointers of `old_node` and `new_node`, as well as the root's child pointers.
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```cpp
@@ -401,11 +401,11 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recipient) {
 ```
 {% endcode %}
 
-1. 找到分裂的叶子结点的父亲节点随后进行判断
+1. Find the parent of the split leaf page and then check its state.
 
-a. 如果可以直接插入则直接插入
+a. If the separator can be inserted directly, insert it directly.
 
-b. 否则需要对父结点在进行分裂，即递归调用。
+b. Otherwise, split the parent as well, which means making a recursive call.
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```cpp
@@ -428,51 +428,51 @@ else {
 ```
 {% endcode %}
 
-好了第一部分的测试就通过了
+At this point, the first part of the test passes.
 
 <figure><img src="../../../.gitbook/assets/image (7).png" alt=""><figcaption></figcaption></figure>
 
-附上一个pass的截图完成第一部分✅\
-如果我们插入1、2、3、4、5那么我们用程序得到的结果如下：
+The following screenshot shows the first part passing.\
+If we insert `1`, `2`, `3`, `4`, and `5`, the program produces the result below:
 
 <figure><img src="../../../.gitbook/assets/image (20).png" alt=""><figcaption></figcaption></figure>
 
-可以发现是完全正确的 🌟
+The result is correct.
 
-### 3. ⚠️一些细节 <a href="#3-yi-xie-xi-jie" id="3-yi-xie-xi-jie"></a>
+### 3. Some Details <a href="#3-some-details" id="3-some-details"></a>
 
-#### 1. 关于内部结点和叶子结点的区别 <a href="#1-guan-yu-nei-bu-jie-dian-he-ye-zi-jie-dian-de-qu-bie" id="1-guan-yu-nei-bu-jie-dian-he-ye-zi-jie-dian-de-qu-bie"></a>
+#### 1. Difference Between Internal Pages and Leaf Pages <a href="#1-difference-between-internal-pages-and-leaf-pages" id="1-difference-between-internal-pages-and-leaf-pages"></a>
 
-**1.1 大小不一样**
+**1.1 Different sizes**
 
-* 内部结点的最大结点个数是比叶子结点多一
-* 例如m = 3, 那么内部结点的个数就可以是3。而叶子结点则最多是2，但是内部结点的array\[0]实际上就是个存地址的。它的key在我们的Draw结果图中都不显示。
+* The maximum number of entries in an internal page is one greater than that of a leaf page.
+* For example, if `m = 3`, an internal page can contain three entries, while a leaf page can contain at most two. However, `array[0]` in the internal page is effectively used to store a child pointer; its key is not shown in the draw result.
 
-**1.2 在`Split`的时候有区别**
+**1.2 Different behavior during `Split`**
 
-* 在叶子结点split的时候需要进行双向链表的维护
-* 而在内部结点则不需要
-* 共有操作都是获得一个新页--> 类型转换 ---> MoveHalfTo
+* When splitting a leaf page, the leaf-level linked list must be maintained.
+* Internal pages do not need that linked-list maintenance.
+* The shared steps are: obtain a new page -> reinterpret the page type -> call `MoveHalfTo`.
 
-#### 2. upin的pin的注意事项 <a href="#2upin-de-pin-de-zhu-yi-shi-xiang" id="2upin-de-pin-de-zhu-yi-shi-xiang"></a>
+#### 2. Notes on Pin and Unpin <a href="#2-notes-on-pin-and-unpin" id="2-notes-on-pin-and-unpin"></a>
 
-* 当你利用`FetchPage`拿到一个page的时候他就是pined
-* 当你使用完之后记得要`unpin`这很重要
+* When you obtain a page through `FetchPage`, the page is pinned.
+* Remember to `unpin` the page after using it. This is important.
 
-#### 3. debug的一些小技巧 <a href="#3debug-de-yi-xie-xiao-ji-qiao" id="3debug-de-yi-xie-xiao-ji-qiao"></a>
+#### 3. Debugging Tips <a href="#3-debugging-tips" id="3-debugging-tips"></a>
 
-* 利用[可视化网站](https://www.cs.usfca.edu/\~galles/visualization/BPlusTree.html)和代码中给的`b_plus_print_test`这个测试，把输入图打印成`xxx.dot`然后复制里面的内容在 [GraphvizOnline](http://dreampuf.github.io/GraphvizOnline/) 显示进行对比。
-* 对于`Mac`系统利用Clion可以直接对测试文件debug。还是非常爽的。其中`lldb`的利用非常重要。
+* Use the [visualization website](https://www.cs.usfca.edu/\~galles/visualization/BPlusTree.html) together with the provided `b_plus_print_test`. Print the input graph as `xxx.dot`, copy its contents into [GraphvizOnline](http://dreampuf.github.io/GraphvizOnline/), and compare the result.
+* On `Mac`, CLion can be used to debug the test files directly. `lldb` is especially useful here.
 
-#### 4. maxSize的含义 <a href="#4maxsize-de-han-yi" id="4maxsize-de-han-yi"></a>
+#### 4. Meaning of `maxSize` <a href="#4-meaning-of-maxsize" id="4-meaning-of-maxsize"></a>
 
-这里要注意在进行B+树初始化时候给的
+Pay attention to the values supplied during B+Tree initialization.
 
-`internal_max_size`可以认为指的是**指针数**。也就是说假设我们有m = 3的b+树
+`internal_max_size` can be understood as the **number of pointers**. Suppose we have a B+Tree with `m = 3`.
 
-inter\_max\_size = 3 是可以有三个key。但是 leaf\_max\_size = 2 就只能包含一个key。这个在测试用例被卡才发现的。
+`internal_max_size = 3` allows three internal entries in this implementation context, while `leaf_max_size = 2` means the leaf can effectively contain fewer keys before splitting under the helper logic below. This was discovered from failing tests.
 
-所以`maxSize()`函数可以这样实现
+Therefore, `maxSize()` can be implemented like this:
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```cpp

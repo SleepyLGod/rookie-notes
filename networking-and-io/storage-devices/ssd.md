@@ -1,183 +1,183 @@
 ---
-description: SSD固态硬盘的结构和基本工作原理概述
+description: Overview of SSD structure and basic operating principles
 ---
 
 # 😁 SSD
 
-### 1. 什么是SSD
+### 1. What Is an SSD?
 
-固态硬盘（Solid State Drives），用固态电子存储芯片阵列而制成的硬盘，由**控制单元**和**存储单元**（FLASH芯片、DRAM芯片）组成。固态硬盘在接口的规范和定义、功能及使用方法上与普通硬盘的完全相同，在产品外形和尺寸上也完全与普通硬盘一致。被广泛应用于军事、车载、工控、视频监控、网络监控、网络终端、电力、医疗、航空、导航设备等领域。
+A solid-state drive (SSD) is a storage device built from arrays of solid-state electronic memory chips. It consists of a **controller** and **storage units** such as flash chips and, in some designs, DRAM chips. From the operating system's perspective, SSDs use the same interface specifications, functional model, and usage patterns as ordinary disks. Their product form factors and dimensions can also match those of conventional hard drives. SSDs are widely used in military systems, vehicles, industrial control, video surveillance, network monitoring, network terminals, power systems, medical equipment, aviation, navigation devices, and many other domains.
 
-### 2. SSD的分类
+### 2. SSD Categories
 
-固态硬盘(SSD)的存储介质分为两种，一种是采用**闪存（FLASH芯片）**作为存储介质，另外一种是采用**DRAM**作为存储介质。
+SSD storage media are usually divided into two categories. One uses **flash memory** as the storage medium, and the other uses **DRAM** as the storage medium.
 
-**基于闪存类**：基于闪存的固态硬盘（IDEFLASH DISK、Serial ATA Flash Disk），采用FLASH芯片作为存储介质，这也是通常所说的SSD。它的外观可以被制作成多种模样，例如：笔记本硬盘、微硬盘、存储卡、U盘等样式。这种SSD固态硬盘最大的优点就是可以移动，而且数据保护不受电源控制，能适应于各种环境，适合于个人用户使用。
+**Flash-based SSDs**: Flash-based SSDs, such as IDE Flash Disk and Serial ATA Flash Disk products, use flash chips as the storage medium. This is what people usually mean by SSD. They can be manufactured in many physical forms, such as laptop drives, micro drives, memory cards, and USB flash drives. Their main advantage is mobility. Data protection is not dependent on external power, so they can adapt to many environments and are suitable for personal users.
 
-**基于DRAM类**：基于DRAM的固态硬盘，采用DRAM作为存储介质，应用范围较窄。它仿效传统硬盘的设计，可被绝大部分操作系统的文件系统工具进行卷设置和管理，并提供工业标准的PCI和FC接口用于连接主机或者服务器。应用方式可分为SSD硬盘和SSD硬盘阵列两种。它是一种高性能的存储器，而且使用寿命很长，美中不足的是需要**独立电源**来保护数据安全。DRAM固态硬盘属于比较非主流的设备。
+**DRAM-based SSDs**: DRAM-based SSDs use DRAM as the storage medium, so their application scope is narrower. They imitate traditional hard-disk design, can be configured and managed by most operating-system file-system tools, and provide industry-standard PCI and FC interfaces for host or server connections. Their deployment modes include single SSD drives and SSD arrays. DRAM SSDs provide high performance and long lifetime, but the drawback is that they require an **independent power supply** to protect data safety. DRAM SSDs are relatively niche devices.
 
-### 3. SSD的构成
+### 3. SSD Components
 
-SSD主要由主控制器，存储单元，缓存（可选），以及跟HOST接口（诸如SATA, SAS, PCIe等）组成。
+An SSD is mainly composed of a main controller, storage units, optional cache, and a host interface such as SATA, SAS, or PCIe.
 
-#### 3.1 主控制器
+#### 3.1 Main Controller
 
-每个 SSD 都有一个控制器(controller)将存储单元连接到电脑，主控器可以通过若干个通道（**channel**）并行操作多块FLASH颗粒，类似RAID0，大大提高底层的带宽。
+Every SSD has a controller that connects the storage units to the computer. The controller can operate multiple flash packages in parallel through several **channels**, similar to RAID 0, which greatly improves low-level bandwidth.
 
-控制器是一个执行固件(firmware)代码的嵌入式处理器。主要功能如下：
+The controller is an embedded processor that runs firmware code. Its main responsibilities include:
 
-1. 错误检查和纠正(ECC)
-2. 磨损平衡(Wear leveling)
-3. 坏块映射(Bad block mapping)
-4. Read disturb(读取某个块的数据的时候会影响到相邻块的数据)管理
-5. 缓存控制
-6. 垃圾回收
-7. 加密
+1. Error checking and correction (ECC)
+2. Wear leveling
+3. Bad-block mapping
+4. Read-disturb management, where reading one block may affect data in adjacent blocks
+5. Cache control
+6. Garbage collection
+7. Encryption
 
-#### 3.2 **存储单元**
+#### 3.2 **Storage Units**
 
-尽管有某些厂商推出了基于更高速的 DRAM 内存的产品，但 **NAND** 闪存依然最常见，占据绝对主导地位。
+Although some vendors have shipped products based on faster DRAM memory, **NAND** flash is still the most common medium and dominates the SSD market.
 
-低端产品一般采用 MLC(multi-level cell) 甚至 TLC(Triple Level Cell) 闪存，其特点是容量大、速度慢、可靠性低、存取次数低、价格也低。
+Low-end products usually use MLC (multi-level cell) or even TLC (triple-level cell) flash. Their typical characteristics are larger capacity, lower speed, lower reliability, lower program/erase endurance, and lower price.
 
-高端产品一般采用 SLC(single-level cell) 闪存，其特点是技术成熟、容量小、速度快、可靠性高、存取次数高、价格也高。但是事实上，取决于不同产品的内部架构设计，速度和可靠性的差别也可以通过各种技术加以弥补甚至反转。
+High-end products usually use SLC (single-level cell) flash. Its typical characteristics are mature technology, smaller capacity, higher speed, higher reliability, higher program/erase endurance, and higher price. In practice, however, speed and reliability differences can be mitigated or even reversed by different internal product architectures.
 
-**3.2.1  存储单元内部结构**
+**3.2.1 Internal Structure of Storage Units**
 
-一个Flash Page由两个或者多个Die(又称chips组成)，这些Dies可以共享I/0数据总线和一些控制信号线。
+A flash package consists of two or more dies, also called chips. These dies can share an I/O data bus and some control signal lines.
 
-一个Die又可以分为多个Plane，而每个Plane又包含多个多个Block，每个Block又分为多个Page。
+A die can be divided into multiple planes. Each plane contains multiple blocks, and each block contains multiple pages.
 
-以Samsung 4GB Flash为例，一个4GB的Flash Page由两个2GB的Die组成，共享8位I/0数据总线和一些控制信号线。每个Die由4个Plane组成，每个Plane包含2048个Block，每个Block又包含64个4KB大小的Page。
+Take a Samsung 4 GB flash package as an example. A 4 GB flash package consists of two 2 GB dies, sharing an 8-bit I/O data bus and several control signal lines. Each die contains four planes. Each plane contains 2,048 blocks, and each block contains 64 pages of 4 KB each.
 
-**3.2.2  存储单元的分类**
+**3.2.2 Storage Cell Types**
 
-* **SLC(Single Level Cell 单层单元)：**,就是在每个存储单元里存储 1bit 的数据，存储的数据是0还是1是基于电压阀值的判定，对于 NAND Flash 的写入(编程)，就是控制 Control Gate 去充电(对 Control Gate 加压)，使得浮置栅极存储的电荷够多，超过4V，存储单元就表示 0(已编程)，如果没有充电或者电压阀值低于4V，就表示 1(已擦除)。
-* **MLC(Multi-Level Cell 多层单元)**： 就是每个存储单元里存储 2bit 的数据，存储的数据是"00","01","10","11"也是基于电压阀值的判定，当充入的电荷不足3.5V时，就代表"11"，当充入的电荷在3.5V和4.0V之间，则代表"10"，当充入的电荷在4V和5.5V之间，则表示"01"，当充入的电荷在5.5V以上，则表示"00"。同时由前面的图可以看到，MLC 相比 SLC 虽然使用相同的电压值，但是电压之间的阀值被分成了4份，可以想象这样就直接影响了性能和稳定性。
-* **TLC(Triple Level Cell 三层单元)**： 就更加复杂，因为每个存储单元里存储 3bit 的数据，所以它的电压阈值的分界点就更细致，导致的结果也就每个存储单元的可靠性也更低。
+* **SLC (Single-Level Cell)**: Each storage cell stores 1 bit of data. Whether the stored data is `0` or `1` is determined by a voltage threshold. For NAND flash programming, the control gate is charged by applying voltage. If enough charge is stored in the floating gate and the voltage exceeds 4 V, the cell represents `0` (programmed). If it is not charged or the voltage threshold is below 4 V, it represents `1` (erased).
+* **MLC (Multi-Level Cell)**: Each storage cell stores 2 bits of data. The possible values are `00`, `01`, `10`, and `11`, also determined by voltage thresholds. When the stored charge is below 3.5 V, the value is `11`; between 3.5 V and 4.0 V, it is `10`; between 4.0 V and 5.5 V, it is `01`; above 5.5 V, it is `00`. Compared with SLC, MLC uses the same voltage range but divides it into four threshold regions, which directly affects performance and stability.
+* **TLC (Triple-Level Cell)**: TLC is more complex because each storage cell stores 3 bits of data. Its voltage-threshold boundaries are finer, so each storage cell is less reliable.
 
-### 4. Host访问SSD的原理
+### 4. How the Host Accesses an SSD
 
-Host是通过**LBA**（Logical BlockAddress，逻辑地址块）访问SSD的，每个LBA代表着一个Sector（一般为512B大小），操作系统一般以4K为单位访问SSD，我们把Host访问SSD的**基本单元**叫**用户页（Host Page）**。
+The host accesses an SSD through **LBA** (Logical Block Addressing). Each LBA represents a sector, usually 512 B. Operating systems usually access SSDs in 4 KB units. We call the basic unit used by the host to access the SSD a **host page**.
 
-而在SSD内部，SSD主控与Flash之间是**Flash Page为基本单元**访问Flash的，我们称Flash Page为**物理页（Physical Page）**。
+Inside the SSD, the SSD controller accesses flash using the **flash page** as the basic unit. We call this a **physical page**.
 
-Host每写入一个Host Page，SSD主控会找一个Physical Page把Host数据写入，SSD内部同时记录了这样一条映射（**Map**）。有了这样一个映射关系后，下次Host需要**读**某个Host Page 时，SSD就知道从Flash的哪个位置把数据读取上来。
+Whenever the host writes one host page, the SSD controller selects one physical page and writes the host data into it. The SSD also records a corresponding **mapping** internally. With this mapping, when the host later needs to **read** a host page, the SSD knows which flash location contains the data.
 
-SSD内部维护了一张映射表（**Map Table**），Host每写入一个Host Page，就会产生一个新的映射关系，这个映射关系会**加入**（第一次写）或者**更改**（覆盖写）Map Table；当读取某个Host Page时， SSD首先查找Map Table中该Host Page对应的Physical Page，然后再访问Flash读取相应的Host数据。
+The SSD maintains a **map table** internally. Each time the host writes a host page, a new mapping is generated. This mapping is **added** to the map table for the first write, or **updated** for an overwrite. When reading a host page, the SSD first looks up the physical page corresponding to that host page in the map table, and then accesses flash to read the corresponding host data.
 
-大多数SSD，我们可以看到上面都有**板载DRAM**，其主要作用就是用来存储这张映射表。
+Most SSDs include **on-board DRAM**. Its main purpose is to store this map table.
 
-也有例外，比如基于Sandforce主控的SSD，它并不支持板载DRAM，那么它的映射表存在哪里呢？SSD工作时，它的绝大部分映射是存储在FLASH里面，还有一部分存储在片上RAM上。
+There are exceptions. For example, some SandForce-controller SSDs do not support on-board DRAM. Where is their map table stored? During SSD operation, most mappings are stored in flash, and a smaller portion is stored in on-chip RAM.
 
-当Host需要读取一笔数据时，对有板载DRAM的SSD来说，只要查找DRAM当中的映射表，获取到物理地址后访问Flash从而得到Host数据。这期间只需要访问一次Flash；而对Sandforce的SSD来说，它首先看看该Host Page对应的映射关系是否在RAM内，如果在，那好办，直接根据映射关系读取FLASH；如果该映射关系不在RAM内，那么它首先需要把映射关系从FLASH里面读取出来，然后再根据这个映射关系读取Host数据，这就意味着相比有DRAM的SSD，它需要读取两次FLASH才能把HOST数据读取出来，底层有效带宽减半。对HOST随机读来说，由于片上RAM有限，映射关系Cache命中(映射关系在片上RAM)的概率很小，所以对它来说，基本每次读都需要访问两次FLASH，所以我们可以看到基于Sandforce主控的SSD随机读取性能是不太理想的。
+When the host reads data from an SSD with on-board DRAM, the SSD only needs to look up the map table in DRAM, obtain the physical address, and then access flash to retrieve the host data. This path needs only one flash access. For a SandForce SSD, the controller first checks whether the mapping for the host page is in RAM. If it is, the controller reads flash directly according to the mapping. If the mapping is not in RAM, the controller first reads the mapping from flash, and then reads the host data using that mapping. Compared with an SSD with DRAM, this requires two flash reads before returning the data, effectively halving the low-level bandwidth. For random host reads, because on-chip RAM is limited, the probability of a mapping-cache hit is low. Therefore, these SSDs usually need two flash accesses for each read, which explains why SandForce-controller SSDs often have weaker random-read performance.
 
-### 5. SSD相关概念和技术
+### 5. SSD Concepts and Techniques
 
-#### 5.1 多 Plane NAND
+#### 5.1 Multi-Plane NAND
 
-多 Plane NAND 是一种能够有效提升性能的设计。例如，一个晶片内部分成了2个 Plane，而且2个 Plane 内的 Block 编号是单双交叉的，想象我们在操作时，也可以进行**交叉操作**(一单一双)来提升性能。
+Multi-plane NAND is a design that can improve performance effectively. For example, one die may be divided into two planes, and the block numbers in the two planes may be interleaved as odd and even numbers. During operation, the controller can also execute **interleaved operations** across the planes, such as one odd block and one even block, to improve performance.
 
 #### 5.2 FTL
 
-操作系统通常将硬盘理解为**一连串 512B 大小的扇区**\[注意：操作系统对磁盘进行一次读或写的最小单位并不是扇区，而是文件系统的**块**，一般为 512B/1KB/4KB 之一(也可能更大)，其具体大小在格式化时设定]，但是**闪存的读写单位是 4KB 或 8KB 大小的页**，而且**闪存的擦除(又叫编程)操作是按照 128 或 256 页大小的块**来操作的。更要命的是写入数据前必须要先擦除整个块，而不能直接覆盖。这完全不符合现有的、针对传统硬盘设计的文件系统的操作方式，很明显，我们需要更高级、专门针对 SSD 设计的文件系统来适应这种操作方式。
+Operating systems usually treat a disk as **a sequence of 512 B sectors**. Note that the minimum unit for one disk read or write by an operating system is not necessarily the sector; it is usually the file-system **block**, commonly 512 B, 1 KB, or 4 KB, and sometimes larger, depending on the format-time configuration. However, **the flash read/write unit is a 4 KB or 8 KB page**, while **flash erase, also called programming in this note, operates on blocks made of 128 or 256 pages**. More importantly, data cannot be overwritten in place. The whole block must be erased before new data can be written. This is completely incompatible with file systems designed for traditional hard drives. Clearly, a more advanced file system designed specifically for SSDs would be needed to fit this operating model.
 
-但遗憾的是，目前还没有这样的文件系统。为了兼容现有的文件系统，就出现了 **FTL(闪存转换层)**，它位于文件系统和物理介质之间，把闪存的操作习惯虚拟成以传统硬盘的 512B 扇区进行操作。这样，操作系统就可以按照传统的扇区方式操作，而不用担心之前说的擦除/读/写问题。一切**逻辑到物理**的转换，全部由 FTL 层包了。
+Unfortunately, such file systems are not yet the default mainstream solution. To remain compatible with existing file systems, SSDs introduce the **FTL (Flash Translation Layer)**. It sits between the file system and the physical medium, virtualizing flash behavior into the traditional 512 B sector model used by hard drives. With FTL, the operating system can operate as if it were using ordinary sectors, without worrying about the erase/read/write constraints mentioned above. All **logical-to-physical** translation is handled by the FTL.
 
-FTL 算法，本质上就是一种逻辑到物理的映射，因此，当文件系统发送指令说要写入或者更新一个特定的逻辑扇区时，FTL 实际上写入了另一个空闲物理页，并更新映射表，再把这个页上包含的旧数据标记为无效(更新后的数据已经写入新地址了，旧地址的数据自然就无效了)。
+An FTL algorithm is essentially a logical-to-physical mapping. When the file system sends a command to write or update a specific logical sector, the FTL actually writes the data to another free physical page, updates the map table, and marks the old page containing the previous data as invalid. The new data has already been written to a new address, so the old address naturally becomes invalid.
 
-#### 5.3 磨损平衡(Wear leveling)
+#### 5.3 Wear Leveling
 
-简单说来，磨损平衡是确保**闪存的每个块被写入的次数相等**的一种机制。
+Simply put, wear leveling is a mechanism that ensures **each flash block is written approximately the same number of times**.
 
-通常情况下，在 NAND 块里的数据更新频度是不同的：有些会经常更新，有些则不常更新。很明显，那些经常更新的数据所占用的块会被快速的磨损掉，而不常更新的数据占用的块磨损就小得多。
+In normal usage, data in NAND blocks is updated at different frequencies. Some data is updated often, while some data is rarely updated. Obviously, blocks containing frequently updated data wear out quickly, while blocks containing rarely updated data wear much more slowly.
 
-为了解决这个问题，需要让每个块的编程(擦写)次数尽可能保持一致：这就是需要对每个页的读取/编程操作进行监测，在最乐观的情况下，这个技术会让全盘的颗粒物理磨损程度相同并同时报废。 磨损平衡算法分**静态和动态**。
+To solve this problem, the SSD needs to keep the program/erase count of every block as even as possible. This requires monitoring read/program operations for each page. In the most optimistic case, this technique makes the physical wear of all flash cells across the drive roughly equal, so the drive ages uniformly. Wear-leveling algorithms are divided into **dynamic** and **static** approaches.
 
-动态磨损算法是基本的磨损算法：只有用户在使用中更新的文件占用的物理页地址被磨损平衡了。
+Dynamic wear leveling is the basic wear-leveling approach. It only balances physical page addresses occupied by files that are updated during user workloads.
 
-而静态磨损算法是更高级的磨损算法：在动态磨损算法的基础上，增加了对于那些不常更新的文件占用的物理地址进行磨损平衡，这才算是真正的**全盘磨损平衡**。简单点说来，动态算法就是每次都挑最年轻的 NAND 块来用，老的 NAND 块尽量不用。静态算法就是把长期没有修改的老数据从一个年轻 NAND 块里面搬出来，重新找个最老的 NAND 块放着，这样年轻的 NAND 块就能再度进入经常使用区。 尽管磨损均衡的目的是避免数据重复在某个空间写入，以保证各个存储区域内磨损程度基本一致，从而达到延长固态硬盘的目的。但是，它对固态硬盘的性能有不利影响。
+Static wear leveling is a more advanced approach. On top of dynamic wear leveling, it also balances physical addresses occupied by files that are rarely updated. This is true **whole-drive wear leveling**. In simple terms, dynamic wear leveling always tries to choose the youngest NAND blocks for new writes and avoids older NAND blocks when possible. Static wear leveling moves long-lived cold data out of young NAND blocks and places it into older NAND blocks, allowing the younger blocks to return to the frequently used pool. Although wear leveling prevents data from being repeatedly written to the same physical area and helps keep wear roughly uniform across storage regions, thereby extending SSD lifetime, it can also hurt SSD performance.
 
-#### 5.4 垃圾回收(Garbagecollection)
+#### 5.4 Garbage Collection
 
-当整个SSD写满后，从用户角度来看，如果想写入新的数据，则必须删除一些数据，然后腾出空间再写。用户在删除和写入数据的过程中，会导致一些Block里面的数据变无效或者变老。Block中的数据变老或者无效，是**指没有任何映射关系指向它们**，用户不会访问到这些FLASH空间，它们被新的映射关系所取代。
+When an SSD is completely full, from the user's perspective, writing new data requires deleting some data first and freeing space. During deletion and writing, data in some blocks becomes invalid or stale. Data in a block becomes stale or invalid when **no mapping points to it anymore**. Users will no longer access those flash locations because they have been replaced by new mappings.
 
-比如有一个Host Page A，开始它存储在FLASH空间的X，映射关系为A->X。后来，HOST重写了该Host Page，由于**FLASH不能覆盖写**，SSD内部必须寻找一个没有写过的位置写入新的数据，假设为Y，这个时候新的映射关系建立：A->Y，之前的映射关系解除，位置X上的数据变老失效，我们把这些数据叫垃圾数据。随着HOST的持续写入，FLASH存储空间慢慢变小，直到耗尽。如果不及时清除这些垃圾数据，HOST就无法写入。
+For example, suppose host page A is initially stored at flash location X, and the mapping is `A -> X`. Later, the host rewrites this host page. Because **flash cannot overwrite in place**, the SSD must find an unwritten location for the new data. Suppose it chooses location Y. A new mapping is established: `A -> Y`. The previous mapping is removed, and the data at location X becomes stale and invalid. We call this garbage data. As the host continues writing, available flash space gradually decreases until it is exhausted. If this garbage data is not reclaimed in time, the host will no longer be able to write.
 
-SSD内部都有垃圾回收机制，它的**基本原理**是把几个Block中的有效数据（非垃圾数据）集中搬到一个新的Block上面去，然后再把这几个Block擦除掉，这样就产生新的可用Block了.
+SSDs include an internal garbage-collection mechanism. Its **basic principle** is to collect valid data, meaning non-garbage data, from several blocks into a new block, and then erase those old blocks. This creates new available blocks.
 
-另一方面，由前面的磨损平衡机制知道，磨损平衡的执行需要有“空白块”来写入更新后的数据。**当可以直接写入数据的“备用空白块”数量低于一个阀值后**，SSD主控制器就会把那些包含无效数据的块里的所有有效数据合并起来写到新的“空白块”中，然后擦除这个块以增加“备用空白块”的数量。
+From the wear-leveling discussion above, wear leveling requires "blank blocks" for updated data. **When the number of spare blank blocks that can be written directly falls below a threshold**, the SSD controller gathers all valid data from blocks containing invalid data, writes that valid data into new blank blocks, and then erases the old blocks to increase the number of spare blank blocks.
 
-有三种垃圾回收策略：
+There are three garbage-collection strategies:
 
-*   **闲置垃圾回收**：很明显在进行垃圾回收时候会消耗大量的主控处理能力和带宽造成处理用户请求的性能下降，SSD 主控制器可以设置在**系统闲置时**候做“预先”垃圾回收(提前做垃圾回收操作)，保证一定数量的"备用空白块"，让 SSD 在运行时候能够保持较高的性能。
+* **Idle garbage collection**: Garbage collection obviously consumes a large amount of controller processing power and bandwidth, reducing performance for user requests. The SSD controller can perform proactive garbage collection while the **system is idle**, preserving a certain number of spare blank blocks so the SSD can maintain higher performance during active operation.
 
-    闲置垃圾回收的缺点是会增加额外的"写入放大"，因为你刚刚垃圾回收的"有效数据"，也许马上就会被更新后的数据替代而变成"无效数据"，这样就造成之前的垃圾回收做无用功了。
-* **被动垃圾回收**：每个 SSD 都支持的技术，但是对**主控制器的性能**提出了很高的要求，适合在服务器里用到，SandForce 的主控就属这类。在垃圾回收操作消耗带宽和处理能力的同时处理用户操作数据，如果没有足够强劲的主控制器性能则会造成明显的速度下降。这就是为啥很多 SSD 在全盘写满一次后会出现性能下降的道理，因为要想继续写入数据就必须要边垃圾回收边做写入。
-* **手动垃圾回收**：用户自己手动选择合适的时机运行垃圾回收软件，执行垃圾回收操作。
+  The drawback of idle garbage collection is that it increases extra write amplification. The "valid data" just moved by garbage collection may soon be replaced by updated data and become invalid, making the previous garbage-collection work wasted.
+* **Passive garbage collection**: This is supported by every SSD, but it places high demands on **controller performance** and is suitable for server use. SandForce controllers are an example of this category. User operations are processed while garbage collection consumes bandwidth and compute capacity. If the controller is not strong enough, performance drops significantly. This explains why many SSDs slow down after the whole drive has been filled once: continued writing requires garbage collection and writes to proceed at the same time.
+* **Manual garbage collection**: The user manually chooses an appropriate time to run garbage-collection software and execute garbage collection.
 
-可以想象，如果系统经常进行垃圾回收处理，频繁的将一些区块进行擦除操作，那么 SSD 的寿命反而也会进一步下降。由此把握这个垃圾回收的频繁程度，同时确保 SSD 中的闪存芯片拥有更高的使用寿命，这确实需要找到一个完美的平衡点。所以，SSD 必须要支持 **Trim** 技术，不然 GC 就显不出他的优势了。
+It is easy to imagine that if the system performs garbage collection too often and repeatedly erases blocks, SSD lifetime can decrease further. Therefore, controlling garbage-collection frequency while ensuring longer flash-chip lifetime requires a careful balance. This is why SSDs need to support **TRIM**. Without TRIM, garbage collection cannot fully show its advantages.
 
-#### 5.5 Trim
+#### 5.5 TRIM
 
-Trim 是一个 ATA 指令，当操作系统删除文件或格式化的时候，由操作系统同时把这个文件地址发送给 SSD 的主控制器，让主控制器知道这个地址的数据无效了。
+TRIM is an ATA command. When the operating system deletes a file or formats a region, it sends the corresponding file address to the SSD controller, letting the controller know that the data at that address is invalid.
 
-当你删除一个文件的时候，文件系统其实并不会真正去删除它，而只是把这个**文件地址标记为“已删除”**，可以被再次使用，这意味着这个文件占的地址已经是“无效”的了。这就会带来一个问题，硬盘并不知道操作系统把这个地址标记为“已删除”了，机械盘的话无所谓，因为可以直接在这个地址上重新覆盖写入，但是到了 SSD 上问题就来了。NAND 需要先擦除才能再次写入数据，要得到空闲的 NAND 空间，SSD 必须复制所有的有效页到新的空闲块里，并擦除旧块(垃圾回收)。如果没有 Trim 指令，意味着 SSD 主控制器不知道这个页是“无效”的，除非再次被操作系统要求覆盖上去。 Trim 只是条指令，让操作系统告诉 SSD 主控制器这个页已经“无效”了。Trim 会减少写入放大，因为主控制器不需要复制“无效”的页(没 Trim 就是“有效”的)到空白块里，这同时代表复制的“有效”页变少了，垃圾回收的效率和 SSD 性能也提升了。Trim 能大量减少伪有效页的数量，它能大大提升垃圾回收的效率。目前，支持 Trim 需要三个要素，
+When a file is deleted, the file system does not actually erase it immediately. It only marks the **file address as deleted**, meaning it can be reused. This means the address occupied by the file is now invalid. This creates a problem: the disk itself does not know that the operating system has marked the address as deleted. For mechanical disks this is not a problem, because the same address can simply be overwritten. For SSDs, however, NAND must be erased before data can be written again. To obtain free NAND space, the SSD must copy all valid pages into a new free block and erase the old block through garbage collection. Without TRIM, the SSD controller does not know that a page is invalid unless the operating system later asks to overwrite it. TRIM is simply a command that lets the operating system tell the SSD controller that the page is invalid. TRIM reduces write amplification because the controller no longer needs to copy invalid pages, which would otherwise still look valid, into blank blocks. This also reduces the number of valid pages that must be copied, improving garbage-collection efficiency and SSD performance. TRIM can greatly reduce the number of pseudo-valid pages and significantly improve garbage collection. Supporting TRIM requires three components:
 
-* **系统**：操作系统必须会发送 Trim 指令，Win7, Win2008R2 , Linux-2.6.33 以上。
-* **固件**： SSD 的厂商在固件里要放有 Trim 算法，也就是 SSD 的主控制器必须认识 Trim 指令。
-* **驱动**： 控制器驱动必须要支持 Trim 指令的传输，也就是能够将 Trim 指令传输到 SSD 控制器。MS 的驱动，Intel 的 AHCI 驱动目前支持。别的要看之后的更新了。
+* **System**: The operating system must send TRIM commands. Examples include Windows 7, Windows Server 2008 R2, and Linux 2.6.33 or later.
+* **Firmware**: The SSD vendor must implement a TRIM algorithm in firmware, meaning the SSD controller must recognize the TRIM command.
+* **Driver**: The controller driver must support TRIM command transport, meaning it can pass TRIM commands to the SSD controller. Microsoft's driver and Intel's AHCI driver support it; support in other drivers depends on later updates.
 
-目前，RAID 阵列里的盘明确不支持 TRIM，不过 RAID 阵列支持 GC。
+At present, disks in RAID arrays clearly do not support TRIM, although RAID arrays can still support garbage collection.
 
-#### 5.6 预留空间(Over-provisioning)
+#### 5.6 Over-Provisioning
 
-预留空间是指用户不可操作的容量，为**实际物理闪存容量减去用户可用容量**。这块区域一般被用来做优化，包括磨损均衡，GC和坏块映射。
+Over-provisioning refers to capacity that users cannot operate directly. It is **the actual physical flash capacity minus the user-visible capacity**. This region is generally used for optimization, including wear leveling, garbage collection, and bad-block mapping.
 
-第一层为固定的7.37%，这个数字是如何得出的哪？我们知道机械硬盘和 SSD 的厂商容量是这样算的，1GB 是1,000,000,000字节(10的9 次方)，**但是闪存的实际容量是每 GB=1,073,741,824，(2的30次方)** ，两者相差7.37%。所以说假设1块 128GB 的 SSD，用户得到的容量是 128,000,000,000 字节，多出来的那个 7.37% 就被主控固件用做OP了。
+The first layer is a fixed 7.37%. Where does this number come from? Mechanical disk and SSD manufacturers calculate capacity using 1 GB = 1,000,000,000 bytes, or 10^9 bytes. **However, the actual binary capacity of flash is 1 GiB = 1,073,741,824 bytes, or 2^30 bytes**. The difference is 7.37%. Therefore, for a 128 GB SSD, the user receives 128,000,000,000 bytes, and the extra 7.37% is used by controller firmware as over-provisioning.
 
-第二层来自制造商的设置，通常为 0%，7%，28% 等，打个比方，对于 128G 颗粒的 SandForce 主控 SSD，市场上会有 120G 和 100G 两种型号卖，这个取决于厂商的固件设置，这个容量不包括之前的第一层 7.37% 。
+The second layer comes from manufacturer configuration, usually 0%, 7%, or 28%. For example, for an SSD using 128 GB of flash with a SandForce controller, the market may offer 120 GB and 100 GB models. This depends on the vendor's firmware settings and does not include the first 7.37% layer.
 
-第三层是用户在日常使用中可以分配的预留空间，用户可以在分区的时候，不分到完全的 SSD 容量来达到这个目的。不过需要注意的是，需要先做安全擦除(Secure Erase)，以保证此空间确实没有被使用过。
+The third layer is over-provisioning that users can allocate during daily use. Users can intentionally avoid partitioning the full SSD capacity. However, a secure erase should be performed first to ensure that this space has truly not been used.
 
-预留空间的具体作用：
+Specific uses of over-provisioning:
 
-* **垃圾回收**：就是要把数据搬来搬去，那就需要始终有空的地方来放搬的数据。空的越多，搬的越快，多多益善，有些SSD为了更快，还会再拿走一些用户的容量。
-* **映射表等内部数据保存**：SSD里面有一个巨大的映射表，把用户地址转成物理Flash颗粒地址，需要保存，以防掉电丢失。这个大概是千分之三的容量。
-* **坏块替换**：写得多了，坏块会逐渐增加，需要用好的顶替。随着Flash的制程从32nm不断变小，变到现在的14nm，Flash质量越来越差，坏块越来越多，这部分可能会到3%甚至更多。
+* **Garbage collection**: Garbage collection moves data around, so it needs free space to place moved data. The more free space available, the faster the movement. Some SSDs take additional user capacity to become faster.
+* **Map table and other internal metadata**: The SSD contains a large map table that translates user addresses into physical flash addresses. This table must be saved to prevent loss after power failure. It consumes roughly 0.3% of the capacity.
+* **Bad-block replacement**: As writes accumulate, bad blocks gradually increase and need to be replaced by good blocks. As flash process nodes shrink from 32 nm to 14 nm, flash quality declines and bad blocks increase. This portion may reach 3% or more.
 
-#### 5.7 写入放大(Write amplification)
+#### 5.7 Write Amplification
 
-因为闪存必须先擦除(也叫编程)才能写入，在执行这些操作的时候，移动或覆盖用户数据和元数据(metadata)不止一次。这些额外的操作，不但增加了写入数据量，减少了SSD的使用寿命，而且还吃光了闪存的带宽，间接地影响了随机写入性能。这种**效应**就叫写入放大(Write amplification)。一个**主控的好坏**主要体现在写入放大上。
+Because flash must be erased, also called programmed in this note, before it can be written, user data and metadata may be moved or overwritten more than once during these operations. These extra operations increase the amount of data written, reduce SSD lifetime, consume flash bandwidth, and indirectly affect random-write performance. This **effect** is called write amplification. The quality of a **controller** is largely reflected in its write-amplification behavior.
 
-比如我要写入一个 4KB 的数据，最坏的情况是，一个块里已经没有干净空间了，但是有无效数据可以擦除，所以主控就把所有的数据**读到缓存**，擦除块，从缓存里更新整个块的数据，再把新数据写回去。这个操作带来的写入放大就是：我实际写4K的数据，造成了整个块(1024KB)的写入操作，那就是256倍放大。同时带来了原本只需要简单的写4KB的操作变成：<mark style="color:red;">**<**</mark> 闪存读取(1024KB) <mark style="color:red;">**->**</mark> 缓存改(4KB) <mark style="color:red;">**->**</mark> 闪存擦(1024KB) <mark style="color:red;">**->**</mark> 闪存写(1024KB) <mark style="color:red;">**>**</mark>，造成了延迟大大增加，速度急剧下降也就是自然的事了。所以，写入放大是影响 SSD 随机写入性能和寿命的关键因素。
+For example, suppose I want to write 4 KB of data. In the worst case, a block has no clean space left, but it contains invalid data that can be erased. The controller then reads all data into cache, erases the block, updates the whole block's data in cache, and writes the new data back. The write amplification caused by this operation is: I logically write 4 KB of data, but the system performs an entire block write of 1,024 KB, which is 256x amplification. The simple 4 KB write becomes: <mark style="color:red;">**<**</mark> flash read (1,024 KB) <mark style="color:red;">**->**</mark> cache update (4 KB) <mark style="color:red;">**->**</mark> flash erase (1,024 KB) <mark style="color:red;">**->**</mark> flash write (1,024 KB) <mark style="color:red;">**>**</mark>. The resulting latency increase and performance drop are natural consequences. Therefore, write amplification is a key factor affecting SSD random-write performance and lifetime.
 
-用100%随机4KB来写入 SSD，对于目前的大多数 SSD 主控而言，在最糟糕的情况下，写入放大的实际值可能会达到或超过20倍。当然，用户也可以设置一定的预留空间来减少写入放大，假设你有个 128G 的 SSD，你只分了 64G 的区使用，那么最坏情况下的写入放大就能减少约3倍。
+When writing 100% random 4 KB data to an SSD, for most current SSD controllers, the actual write amplification in the worst case may reach or exceed 20x. Users can reduce write amplification by configuring over-provisioning. For example, if a 128 GB SSD is partitioned with only 64 GB for use, worst-case write amplification can be reduced by about three times.
 
-许多因素影响 SSD 的写入放大。下面列出了主要因素，以及它们如何影响写入放大。
+Many factors affect SSD write amplification. The main factors and their effects are listed below:
 
-* 垃圾回收虽然增加了写入放大(被动垃圾回收不影响，**闲置垃圾回收影响**)，但是速度有提升。
-* 预留空间可以减少写入放大，预留空间越大，写入放大越低。
-* 开启 TRIM 指令后可以减少写入放大
-* 用户使用中没有用到的空间越大，写入放大越低(需要有 Trim 支持)。
-* **持续写入**可以减少写入放大。理论上来说，持续写入的写入放大为1，但是某些因素还是会影响这个数值。
-* **随机写入**将会大大提升写入放大，因为会写入很多非连续的 LBA。
-* **磨损平衡**机制直接提高了写入放大
+* Garbage collection increases write amplification, although passive garbage collection does not have the same effect as **idle garbage collection**, and it can improve speed.
+* Over-provisioning reduces write amplification. More over-provisioning means lower write amplification.
+* Enabling TRIM reduces write amplification.
+* More unused space during user workloads reduces write amplification, assuming TRIM support exists.
+* **Sequential writes** reduce write amplification. In theory, write amplification for sequential writes is 1, although some factors can still affect the actual value.
+* **Random writes** greatly increase write amplification because they write many non-contiguous LBAs.
+* The **wear-leveling** mechanism directly increases write amplification.
 
-#### 5.8 交错操作
+#### 5.8 Interleaved Operations
 
-交错操作可以**成倍提升NAND的传输率**，因为NAND颗粒封装时候可能有多Die、多Plane(每个plane都有4KB寄存器)，Plane操作时候可以交叉操作**(**第一个plane接到指令后，在操作的同时第二个指令已经发送给了第二个plane，以此类推**)**，达到接近双倍甚至4倍的传输能力(看闪存颗粒支持度)。
+Interleaved operations can **multiply NAND transfer rate**, because NAND packages may contain multiple dies and multiple planes, with each plane having a 4 KB register. Plane operations can be interleaved: after the first plane receives an instruction and starts operating, the second instruction can already be sent to the second plane, and so on. This can achieve nearly 2x or even 4x transfer capability, depending on flash support.
 
 #### 5.9 ECC
 
-ECC的全称是Error Checking and Correction，是一种用于Nand的差错检测和修正算法 。
+ECC stands for Error Checking and Correction. It is an error-detection and correction algorithm used for NAND.
 
-由于NAND Flash的工艺不能保证NAND在其生命周期中保持性能的可靠，因此，在NAND的生产中及使用过程中会**产生坏块**。为了检测数据的可靠性，在应用NAND Flash的系统中一般都会采用一定的坏区管理机制，而管理坏区的前提是能比较可靠的进行坏区检测。
+The NAND flash manufacturing process cannot guarantee that NAND remains reliable throughout its lifecycle, so **bad blocks** appear during NAND production and use. To verify data reliability, systems using NAND flash usually adopt a bad-block management mechanism. Reliable bad-block detection is the prerequisite for bad-block management.
 
-如果操作时序和电路稳定性不存在问题的话，NAND Flash出错的时候一般不会造成整个Block或是Page不能读取或是全部出错，而是整个Page中只有一个或几个bit出错，这时候ECC就能发挥作用了。不同颗粒有不同的基本ECC要求，不同主控制器支持的ECC能力也不同，理论上说主控越强ECC能力越强。
+If there are no timing or circuit-stability problems, NAND flash errors usually do not make an entire block or page unreadable or completely incorrect. Instead, only one or several bits in a page are wrong. This is where ECC becomes useful. Different flash particles have different basic ECC requirements, and different controllers support different ECC capabilities. In theory, stronger controllers provide stronger ECC capability.
 
 
 
-参考：[http://www.jinbuguo.com/storage/ssd\_intro.html](http://www.jinbuguo.com/storage/ssd\_intro.html)
+References: [http://www.jinbuguo.com/storage/ssd\_intro.html](http://www.jinbuguo.com/storage/ssd\_intro.html)
 
 &#x20;         [http://www.ssdfans.com/?p=131](http://www.ssdfans.com/?p=131)

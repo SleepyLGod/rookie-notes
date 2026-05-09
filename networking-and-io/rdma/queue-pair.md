@@ -1,169 +1,169 @@
 # 😅 Queue Pair
 
-本文将更深入的讲解一些关于QP的细节。
+This note explains more details about QP.
 
-### 基本概念回顾
+### Basic Concept Review
 
-首先我们来简单回顾下关于QP的基础知识：
+First, briefly review the basic knowledge of QP.
 
-根据IB协议中的描述，QP是硬件和软件之间的一个虚拟接口。QP是队列结构，按顺序存储着软件给硬件下发的任务（WQE），WQE中包含从哪里取出多长的数据，并且发送给哪个目的地等等信息。
+According to the IB protocol, a QP is a virtual interface between hardware and software. A QP is a queue structure that sequentially stores tasks, or WQEs, posted by software to hardware. A WQE contains information such as where to fetch data from, how much data to fetch, and which destination to send it to.
 
 <figure><img src="https://pic1.zhimg.com/v2-1e8db2b2499ca6c838f3b5d91b440aac_b.jpg" alt=""><figcaption></figcaption></figure>
 
-每个QP间都是独立的，彼此通过PD隔离，因此一个QP可以被视为某个用户独占的一种资源，一个用户也可以同时使用多个QP。
+Each QP is independent from other QPs and is isolated through PDs. Therefore, a QP can be viewed as a resource exclusively owned by a user, and one user can also use multiple QPs at the same time.
 
-QP有很多种服务类型，包括RC、UD、RD和UC等，所有的源QP和目的QP必须为同一种类型才能进行数据交互。
+QPs have many service types, including RC, UD, RD, UC, and others. The source QP and destination QP must be of the same type before they can exchange data.
 
-虽然IB协议将QP称为“虚拟接口”，但是它是有实体的：
+Although the IB protocol calls QP a "virtual interface", it has concrete representations:
 
-* 硬件上，QP是一段包含着若干个WQE的存储空间，IB网卡会从这段空间中读取WQE的内容，并按照用户的期望去内存中存取数据。至于这个存储空间是内存空间还是IB网卡的片内存储空间，IB协议并未做出限制，每个厂商有各自的实现\
+* In hardware, a QP is a storage region containing several WQEs. The IB NIC reads WQE content from this region and accesses memory according to the user's expectations. The IB protocol does not restrict whether this storage region is host memory or on-chip storage inside the IB NIC; each vendor can implement it differently.\
 
-* 软件上，QP是一个由IB网卡的驱动程序所维护的数据结构，其中包含QP的地址指针以及一些相关的软件属性。
+* In software, a QP is a data structure maintained by the IB NIC driver. It contains the QP address pointer and related software attributes.
 
 ### QPC
 
-[5. RDMA基本服务类型](https://zhuanlan.zhihu.com/p/144099636)一文中，我们曾经提到过QPC全称是Queue Pair Context，用于存储QP相关属性。驱动程序里面是有储存QP的软件属性的，既然我们可以在软件里储存QP的属性，为什么还要用使用QPC呢？
+In [5. RDMA Basic Service Types](https://zhuanlan.zhihu.com/p/144099636), we mentioned that QPC stands for Queue Pair Context and is used to store QP-related attributes. The driver already stores QP software attributes, so why do we still need QPC?
 
-这是因为**QPC主要是给硬件看的，也会用来在软硬件之间同步QP的信息**。
+The reason is that **QPC is mainly for hardware to read, and it is also used to synchronize QP information between software and hardware**.
 
-我们说过QP在硬件上的实体只是一段存储空间而已，硬件除了知道这段空间的起始地址和大小之外一无所知，甚至连这个QP服务类型都不知道。还有很多其他的重要信息，比如某个QP中包含了若干个WQE，硬件怎么知道有多少个，当前应该处理第几个呢？
+As discussed above, the hardware representation of a QP is only a storage region. Aside from the starting address and size of this region, hardware knows nothing about it. It may not even know the service type of this QP. There is also other important information. For example, if a QP contains several WQEs, how does hardware know how many there are and which one should be processed now?
 
-所有上述的这些信息，软件是可以设计一定的数据结构并为其申请内存空间的，但是软件看到的都是虚拟地址，这些内存空间在物理上是离散的，硬件并不知道这些数据存放到了哪里。所以就需要软件通过操作系统提前申请好一大片连续的空间，即QPC来承载这些信息给硬件看。网卡及其配套的驱动程序提前约定好了QPC中都有哪些内容，这些内容分别占据多少空间，按照什么顺序存放。这样驱动和硬件就可以通过通过QPC这段空间来读写QP的状态等等信息。
+Software can design data structures and allocate memory for all of this information, but software sees virtual addresses, and these memory regions are physically scattered. Hardware does not know where the data is stored. Therefore, software needs the operating system to allocate a large contiguous region in advance, namely the QPC, to carry this information for hardware. The NIC and its driver agree in advance on what fields are contained in the QPC, how much space each field occupies, and in what order the fields are stored. In this way, the driver and hardware can read and write information such as QP state through the QPC region.
 
 <figure><img src="https://pic2.zhimg.com/v2-d010221f5c05a699969184a197b251a5_b.jpg" alt=""><figcaption></figcaption></figure>
 
-如上图所示，硬件其实只需要知道QPC的地址0x12350000就可以了，因为它可以解析QPC的内容，从而得知QP的位置，QP序号，QP大小等等信息。进而就能找到QP，知道应该取第几个WQE去处理。不同的厂商可能实现有些差异，但是大致的原理就是这样。
+As shown in the figure, hardware only needs to know the QPC address `0x12350000`, because it can parse the QPC content and learn the QP location, QP number, QP size, and other information. It can then find the QP and know which WQE should be fetched for processing. Vendor implementations may differ, but the general principle is like this.
 
-IB软件栈中还有很多Context的概念，除了QPC之外，还有Device Context，SRQC，CQC，EQC（Event Queue Context，事件队列上下文）等，它们的作用与QPC类似，都是用来在记录和同步某种资源的相关属性。
+The IB software stack has many other Context concepts besides QPC, such as Device Context, SRQC, CQC, and EQC (Event Queue Context). Their roles are similar to QPC: they record and synchronize attributes of a particular resource.
 
 ### QP Number
 
-简称为QPN，就是每个QP的编号。IB协议中规定用24个bit来表示QPN，即每个节点最大可以同时使用 224 个QP，这已经是一个很大的数量了，几乎不可能用完。每个节点都各自维护着QPN的集合，相互之间是独立的，即不同的节点上可以存在编号相同的QP。
+QPN is short for QP Number, meaning the identifier of each QP. The IB protocol specifies that QPN is represented by 24 bits. That means each node can use up to `2^24` QPs at the same time, which is already a very large number and is almost impossible to exhaust. Each node maintains its own QPN set independently, so different nodes may have QPs with the same number.
 
-QPN的概念本身非常简单，但是有两个特殊的保留编号需要额外注意一下：
+The QPN concept itself is simple, but two special reserved numbers require extra attention.
 
 #### QP0
 
-编号为0的QP用于子网管理接口SMI（Subnet Management Interface），用于管理子网中的全部节点，说实话我也还没搞清楚这个接口的作用，暂且按下不表。
+QP number 0 is used for the Subnet Management Interface (SMI), which manages all nodes in a subnet. To be honest, I have not fully understood the role of this interface yet, so leave it aside for now.
 
 #### QP1
 
-编号为1的QP用于通用服务接口GSI（General Service Interface），GSI是一组管理服务，其中最出名的就是CM（Communication Management），是一种在通信双方节点正式建立连接之前用来交换必须信息的一种方式。其细节将在后面的文章中专门展开介绍。
+QP number 1 is used for the General Service Interface (GSI). GSI is a set of management services, the best-known of which is CM (Communication Management). CM is a way for two communicating nodes to exchange required information before formally establishing a connection. Its details will be introduced in a later note.
 
-这也就是我们之前的文章画的关于QP的图中，没有出现过QP0和QP1的原因了。这两个QP之外的其他QP就都是普通QP了。用户在创建QP的时候，驱动或者硬件会给这个新QP分配一个QPN，一般的QPN都是2、3、4这样按顺序分配的。当QP被销毁之后，它的QPN也会被重新回收，并在合适的时候分配给其他新创建的QP。
+This is why QP0 and QP1 never appeared in the QP diagrams in previous notes. All QPs other than these two are ordinary QPs. When the user creates a QP, the driver or hardware allocates a QPN to the new QP. Ordinary QPNs are usually assigned sequentially, such as 2, 3, 4, and so on. After a QP is destroyed, its QPN is recycled and assigned to another newly created QP when appropriate.
 
-### 用户接口
+### User Interfaces
 
-我们从控制层面和数据层面来分类介绍用户接口，控制面即用户对某种资源进行某种设置，一般都是在正式收发数据之前进行；而数据面自然就是真正的数据收发过程中进行的操作。
+We introduce user interfaces from the control plane and data plane. The control plane refers to user configuration of a resource, usually before formal data transmission. The data plane refers to operations performed during real data send and receive.
 
-#### 控制面
+#### Control Plane
 
-接触过算法的读者应该都了解，链表的节点涉及到“增、删、改、查”四个操作，链表的节点是一片内存区域，是一种软件资源。
+Readers familiar with algorithms know that linked-list nodes involve four operations: create, delete, modify, and query. A linked-list node is a memory region and is a software resource.
 
-“增”即向操作系统申请一片内存用来存放数据，系统将在内存中划分一块空间，并将其标记为“已被进程XX使用”，其他没有权限的进程将无法覆盖甚至读取这片内存空间。
+"Create" means requesting a memory region from the operating system to store data. The system allocates a region in memory and marks it as "used by process XX", so other unauthorized processes cannot overwrite or even read this memory region.
 
-“删”即通知操作系统，这片空间我不使用了，可以标记成“未使用”并给其它进程使用了。
+"Delete" means notifying the operating system that this region is no longer used, so it can be marked as unused and made available to other processes.
 
-“改”就是写，即修改这片内存区域的内容。
+"Modify" means writing, or changing the content of this memory region.
 
-"查"就是读，即获取这片内存区域的内容。
+"Query" means reading, or obtaining the content of this memory region.
 
-QP作为RDMA技术中最重要的一种资源，在生命周期上与链表并无二致：
+As one of the most important resources in RDMA, QP has a lifecycle similar to a linked-list node:
 
 <figure><img src="https://pic3.zhimg.com/v2-62f578aee30bb5dd47249b9faaa3d7be_b.jpg" alt=""><figcaption></figcaption></figure>
 
-这四种操作，其实就是Verbs（RDMA对上层应用的API）在控制面上对上层用户提供给用户的几个接口：
+These four operations are the control-plane interfaces provided by Verbs, the RDMA API exposed to upper-layer applications.
 
 #### Create QP
 
-创建一个QP的软硬件资源，包含QP本身以及QPC。用户创建时会写传入一系列的初始化属性，包含该QP的服务类型，可以储存的WQE数量等信息
+Create the software and hardware resources of a QP, including the QP itself and the QPC. When creating a QP, the user passes a series of initialization attributes, including the QP service type and the number of WQEs it can store.
 
 #### Destroy QP
 
-释放一个QP的全部软硬件资源，包含QP本身及QPC。销毁QP后，用户将无法通过QPN索引到这个QP。
+Release all software and hardware resources of a QP, including the QP itself and the QPC. After destroying a QP, the user can no longer locate this QP through its QPN.
 
 #### Modify QP
 
-修改一个QP的某些属性，比如QP的状态，路径的MTU等等。这个修改过程既包括软件数据结构的修改，也包括对QPC的修改。
+Modify certain attributes of a QP, such as QP state and path MTU. This modification process includes both software data-structure updates and QPC updates.
 
 #### Query QP
 
-查询一个QP当前的状态和一些属性，查询到的数据来源于驱动以及QPC的内容。
+Query the current state and attributes of a QP. The queried data comes from the driver and the QPC content.
 
-这四种操作都有配套的Verbs接口，类似于ibv\_create\_qp()这种形式，我们编写APP时直接调用就可以了。更多关于对上层的API的细节，我们将在后面专门进行介绍。
+These four operations all have corresponding Verbs interfaces, in forms such as `ibv_create_qp()`. When writing applications, we can call them directly. More details about upper-layer APIs will be introduced separately later.
 
-#### 数据面
+#### Data Plane
 
-数据面上，一个QP对上层的接口其实只有两种，分别用于向QP中填写发送和接收请求。**这里的“发送”和“接收”并不是指的发送和接收数据，而是指的是一次通信过程的“发起方”（Requestor）和“接收方”（Responser）**。
+On the data plane, a QP exposes only two kinds of interfaces to upper layers. They are used to fill send and receive requests into the QP. **Here, "send" and "receive" do not mean sending and receiving data directly. They refer to the initiator, or Requestor, and receiver, or Responder, of one communication process.**
 
-在行为上都是软件向QP中填写一个WQE（对应用层来说叫WR），请求硬件执行一个动作。所以这两种行为都叫做“Post XXX Request”的形式，即下发XXX请求。
+In behavior, software fills a WQE into the QP. At the application layer this is called a WR. The request asks hardware to execute an action. Therefore, both behaviors are called "Post XXX Request", meaning posting an XXX request.
 
 #### Post Send Request
 
-再强调一下，Post Send本身不是指这个WQE的操作类型是Send，而是表示这个WQE属于通信发起方。这个流程中填写到QP中的WQE/WR可以是Send操作，RDMA Write操作以及RDMA Read操作等。
+To emphasize again, Post Send itself does not mean the WQE operation type is Send. It means the WQE belongs to the communication initiator. The WQE/WR filled into the QP through this flow may be a Send operation, RDMA Write operation, RDMA Read operation, and so on.
 
-用户需要提前准备好数据缓冲区、目的地址等信息，然后调用接口将WR传给驱动，驱动再把WQE填写到QP中。
+The user needs to prepare data buffers, destination addresses, and other information in advance, then call the interface to pass the WR to the driver. The driver then fills the WQE into the QP.
 
 #### Post Receive Request
 
-Post Recv的使用场景就相对比较少了，一般只在Send-Recv操作的接收端执行，接收端需要提前准备好接收数据的缓冲区，并将缓冲区地址等信息以WQE的形式告知硬件。
+Post Recv is used less frequently. It is generally executed only by the receiver side of Send-Recv operations. The receiver needs to prepare the receive-data buffer in advance and provide information such as buffer address to hardware in the form of a WQE.
 
-### QP状态机
+### QP State Machine
 
-说到QP的状态，就不得不祭出下面这张图（取自IB协议10.3.1节）：
+When discussing QP state, the following figure must be shown. It is taken from IB protocol Section 10.3.1:
 
 <figure><img src="https://pic1.zhimg.com/v2-9368ea8d0bbb0b9a74bf8f3dcf4402d8_b.jpg" alt=""><figcaption></figcaption></figure>
 
-所谓状态机，就是描述一个对象的不同状态，以及触发状态间跳转的条件。为一个对象设计状态机可以使这个对象的生命周期变得非常明确，实现上也会使得逻辑更加清晰。
+A state machine describes the different states of an object and the conditions that trigger transitions between those states. Designing a state machine for an object makes its lifecycle very clear and also makes implementation logic clearer.
 
-对于QP来说，IB规范也为其设计了几种状态，处于不同状态的QP的功能是有差异的，比如只有进入到Ready to Send状态之后，QP才能够进行Post Send数据操作。正常状态（绿色的）之间的状态转换都是由用户通过上文介绍的Modify QP的用户接口来主动触发的；而错误状态（红色的）往往是出错之后自动跳转的，当一个QP处于错误状态之后就无法执行正常的业务了，就需要上层通过Modify QP将其重新配置到正常状态上。
+For QP, the IB specification also defines several states. QPs in different states have different capabilities. For example, only after entering Ready to Send can a QP perform Post Send data operations. Transitions between normal states, shown in green, are actively triggered by the user through the Modify QP interface introduced above. Error states, shown in red, are usually entered automatically after errors occur. Once a QP is in an error state, it can no longer execute normal business operations. Upper layers must reconfigure it back into a normal state through Modify QP.
 
-上图中我们只关注QP的部分，EE（End-to-End Context）是专门给RD服务类型使用的一个概念，我们暂不涉及。我们通过Create QP接口来进入这个状态图，通过Destroy QP接口来离开这个状态图。
+In the figure above, we only focus on the QP portion. EE (End-to-End Context) is a concept used specifically for the RD service type, and it is not covered here. We enter this state diagram through the Create QP interface and leave it through the Destroy QP interface.
 
-QP有以下几种状态，我们仅介绍一下比较重要的点：
+QP has the following states. Only the important points are introduced here:
 
-#### RST（Reset）
+#### RST (Reset)
 
-复位状态。当一个QP通过Create QP创建好之后就处于这个状态，相关的资源都已经申请好了，但是这个QP目前什么都做不了，其无法接收用户下发的WQE，也无法接受对端某个QP的消息。
+Reset state. After a QP is created through Create QP, it is in this state. The related resources have already been allocated, but the QP cannot do anything yet. It cannot accept WQEs posted by the user, and it cannot accept messages from a peer QP.
 
-#### INIT（Initialized）
+#### INIT (Initialized)
 
-已初始化状态。这个状态下，用户可以通过Post Receive给这个QP下发Receive WR，但是接收到的消息并不会被处理，会被静默丢弃；如果用户下发了一个Post Send的WR，则会报错。
+Initialized state. In this state, the user can post Receive WRs to this QP through Post Receive, but received messages are not processed and are silently discarded. If the user posts a Post Send WR, an error is reported.
 
-#### RTR（Ready to Receive）
+#### RTR (Ready to Receive)
 
-准备接收状态。在INIT状态的基础上，RQ可以正常工作，即对于接收到的消息，可以按照其中WQE的指示搬移数据到指定内存位置。此状态下SQ仍然不能工作。
+Ready to Receive state. On top of INIT, the RQ can work normally. For received messages, data can be moved to the specified memory location according to the WQE. In this state, the SQ still cannot work.
 
-#### RTS（Ready to Send）
+#### RTS (Ready to Send)
 
-准备发送状态。在RTR基础上，SQ可以正常工作，即用户可以进行Post Send，并且硬件也会根据SQ的内容将数据发送出去。进入该状态前，QP必须已于对端建立好链接。
+Ready to Send state. On top of RTR, the SQ can work normally. The user can execute Post Send, and hardware sends data according to the SQ content. Before entering this state, the QP must have established a connection with the peer.
 
-#### SQD（Send Queue Drain）
+#### SQD (Send Queue Drain)
 
-SQ排空状态。顾名思义，该状态会将SQ队列中现存的未处理的WQE全部处理掉，这个时候用户还可以下发新的WQE下来，但是这些WQE要等到旧的WQE全处理之后才会被处理。
+Send Queue Drain state. As the name suggests, this state drains all existing unprocessed WQEs in the SQ. At this time, the user can still post new WQEs, but these WQEs will not be processed until all old WQEs have been processed.
 
-#### SQEr（Send Queue Error）
+#### SQEr (Send Queue Error)
 
-SQ错误状态。当某个Send WR发生完成错误（即硬件通过CQE告知驱动发生的错误）时，会导致QP进入此状态。
+Send Queue Error state. When a completion error occurs for some Send WR, meaning hardware reports the error to the driver through a CQE, the QP enters this state.
 
-#### ERR（Error）
+#### ERR (Error)
 
-即错误状态。其他状态如果发生了错误，都可能进入该状态。Error状态时，QP会停止处理WQE，已经处理到一半的WQE也会停止。上层需要在修复错误后再将QP重新切换到RST的初始状态。
+Error state. If an error occurs in other states, the QP may enter this state. In Error state, the QP stops processing WQEs, and WQEs that are already halfway through processing also stop. Upper layers need to fix the error and then switch the QP back to the initial RST state.
 
-### 总结
+### Summary
 
-本文先回顾了QP的一些重要基本概念，然后讲解了QPC、QPN等QP强相关的概念，最后介绍了用户操作QP常用的接口以及QP状态机，相信本文过后读者一定对QP有了更深的了解。
+This note first reviewed several important basic concepts about QP, then explained closely related concepts such as QPC and QPN, and finally introduced common user interfaces for operating QPs and the QP state machine. After this note, readers should have a deeper understanding of QP.
 
-其实作为RDMA的核心概念，QP的内容很多，本文难以全部囊括。我将在后面的文章中逐渐把相关的内容补全，比如QKey的概念将在后续专门介绍各种Key的文章中讲解。
+As the core concept of RDMA, QP contains a lot of material, and this note cannot cover everything. Later notes will gradually fill in related topics. For example, the QKey concept will be explained in a future note dedicated to different keys.
 
-好了，本文就到这了，感谢阅读。预告下一篇文章将详细讲解CQ。
+That is all for this note. Thanks for reading. The next note will explain CQ in detail.
 
-### 协议相关章节
+### Protocol Sections
 
-3.5.1 10.2.4 QP的基本概念
+3.5.1 and 10.2.4 Basic QP concepts
 
-10.3 QP 状态机
+10.3 QP state machine
 
-10.2.5 QP相关的软件接口
+10.2.5 QP-related software interfaces
 
-11.4 Post Send Post Recv
+11.4 Post Send and Post Recv

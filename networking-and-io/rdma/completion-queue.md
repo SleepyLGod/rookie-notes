@@ -1,248 +1,248 @@
-# 😂 Completion Queue ​
+# 😂 Completion Queue
 
-### 基本概念 <a href="#h_259650980_0" id="h_259650980_0"></a>
+### Basic Concepts <a href="#h_259650980_0" id="h_259650980_0"></a>
 
-我们先回顾下CQ的作用。CQ意为完成队列，它的作用和WQ（SQ和RQ）相反，硬件通过CQ中的CQE/WC来告诉软件某个WQE/WR的完成情况。再次提醒读者，对于上层用户来说一般用WC，对于驱动程序来说，一般称为CQE，本文不对两者进行区分。
+First, recall the role of a CQ. CQ means Completion Queue. Its role is the opposite of a WQ, meaning SQ and RQ: hardware uses CQEs/WCs in the CQ to tell software the completion status of a WQE/WR. As a reminder, upper-layer users usually call this object a WC, while drivers usually call it a CQE. This note does not distinguish between the two.
 
 <figure><img src="https://pic2.zhimg.com/v2-017a227c8b78fab94a938a6870f00f1d_b.png" alt=""><figcaption></figcaption></figure>
 
-CQE可以看作一份“报告”，其中写明了某个任务的执行情况，其中包括：
+A CQE can be understood as a "report" that describes the execution status of a task. It includes:
 
-* 本次完成了哪个QP的哪一个WQE指定的任务（QP Number和WR ID）
-* 本次任务执行了什么操作（Opcode操作类型）
-* 本次任务执行成功/失败，失败原因是XXX（Status状态和错误码）
+* Which WQE in which QP has completed, identified by QP Number and WR ID.
+* What operation this task executed, namely the Opcode operation type.
+* Whether the task succeeded or failed, and if it failed, the status and error code.
 * ...
 
-每当硬件处理完一个WQE之后，都会产生一个CQE放在CQ队列中。如果一个WQE对应的CQE没有产生，那么这个WQE就会一直被认为还未处理完，这意味着什么呢？
+Every time hardware finishes processing one WQE, it generates a CQE and places it into the CQ. If the CQE corresponding to a WQE has not been generated, that WQE must still be considered unfinished. What does this mean?
 
-* 涉及从内存中取数据的操作（SEND和WRITE）
+* Operations that fetch data from memory, such as SEND and WRITE
 
-在产生CQE之前，硬件可能还未发送消息，可能正在发送消息，可能对端有接收到正确的消息。由于内存区域是在发送前申请好的，所以上层软件收到对应的CQE之前，其必须认为这片内存区域仍在使用中，不能将所有相关的内存资源进行释放。
+Before the CQE is generated, hardware may not have sent the message yet, may be sending the message, or the peer may have received the correct message. Because the memory region is allocated before sending, upper-layer software must consider that memory region still in use until it receives the corresponding CQE. It must not release any related memory resources.
 
-* 涉及向内存中存放数据的操作（RECV和READ）
+* Operations that place data into memory, such as RECV and READ
 
-在产生CQE之前，有可能硬件还没有开始写入数据，有可能数据才写了一半，也有可能数据校验出错。所以上层软件在获得CQE之前，这段用于存放接收数据的内存区域中的内容是不可信的。
+Before the CQE is generated, hardware may not have started writing data, may have written only half of the data, or may have detected a data-check error. Therefore, before upper-layer software obtains the CQE, the content of the memory region used to store received data is not trustworthy.
 
-总之，用户必须获取到CQE并确认其内容之后才能认为消息收发任务已经完成。
+In short, the user can only consider a message send/receive task complete after obtaining the CQE and checking its contents.
 
-#### 何时产生 <a href="#h_259650980_1" id="h_259650980_1"></a>
+#### When CQEs Are Generated <a href="#h_259650980_1" id="h_259650980_1"></a>
 
-我们将按照服务类型（本篇只讲RC和UD）和操作类型来分别说明，因为不同的情况产生CQE的时机和含义都不同，建议读者回顾第4篇和第5篇。
+The timing and meaning of CQE generation differ by service type and operation type. This section only covers RC and UD. It is useful to review notes 4 and 5 before reading this part.
 
-* 可靠服务类型（RC）
+* Reliable service type (RC)
 
-前面的文章说过，**可靠意味着本端关心发出的消息能够被对端准确的接收**，这是通过ACK、校验和重传等机制保证的。
+As discussed earlier, **reliable means the local side cares that the sent message is received correctly by the remote side**. This is guaranteed through mechanisms such as ACKs, checksums, and retransmission.
 
 * SEND\
-  SEND操作需要硬件从内存中获取数据，然后组装成数据包通过物理链路发送到对端。对SEND来说，Client端产生CQE表示**对端已准确无误的收到数据**，对端硬件收到数据并校验之后，会回复ACK包给发送方。发送方收到这ACK之后才会产生CQE，从而告诉用户这个任务成功执行了。如图所示，左侧Client端在红点的位置产生了本次任务的CQE。
+  A SEND operation requires hardware to fetch data from memory, assemble packets, and send them to the peer through the physical link. For SEND, CQE generation on the client side means **the peer has received the data correctly**. After peer hardware receives and verifies the data, it replies with an ACK packet to the sender. The sender generates a CQE only after receiving this ACK, thereby telling the user that the task completed successfully. As shown in the figure, the left client side generates the CQE for this task at the red dot.
 
 <figure><img src="https://pic1.zhimg.com/v2-af0a569fdf5b78066a455b1da6037b6c_b.jpg" alt=""><figcaption></figcaption></figure>
 
 * RECV\
-  RECV操作需要硬件将收到的数据放到用户WQE中指定的内存区域，完成校验和数据存放动作后，硬件就会产生CQE。如上图右侧Server端所示。\
+  A RECV operation requires hardware to place received data into the memory region specified by the user's WQE. After completing validation and data placement, hardware generates a CQE, as shown on the server side in the figure above.\
 
 * WRITE\
-  对于Client端来说，WRITE操作和SEND操作是一样的，硬件会从内存中取出数据，并等待对端回复ACK后，才会产生CQE。差别在于，因为WRITE是RDMA操作，对端CPU不感知，自然用户也不感知，所以上面的图变成了这样：
+  For the client side, WRITE is similar to SEND: hardware fetches data from memory and waits for an ACK from the peer before generating a CQE. The difference is that WRITE is an RDMA operation. The peer CPU is unaware of it, and naturally the peer user is also unaware. Therefore, the previous figure becomes:
 
 <figure><img src="https://pic1.zhimg.com/v2-8354562f3bd3eeba9deb0a7acb6b38d4_b.jpg" alt=""><figcaption></figcaption></figure>
 
 * READ\
-  READ和RECV有点像，Client端发起READ操作后，对端会回复我们想读取的数据，然后本端校验没问题后，会把数据放到WQE中指定的位置。完成上述动作后，本端会产生CQE。READ同样是RDMA操作，对端用户不感知，自然也没有CQE产生。这种情况上图变成了这样：
+  READ is somewhat similar to RECV. After the client initiates a READ operation, the peer replies with the data we want to read. The local side validates the data and places it into the location specified by the WQE. After those actions complete, the local side generates a CQE. READ is also an RDMA operation, so the peer user is unaware of it and no CQE is generated on the peer side. In this case, the figure becomes:
 
 <figure><img src="https://pic3.zhimg.com/v2-41245a836ef08d02be3df5c535a0f6aa_b.jpg" alt=""><figcaption></figcaption></figure>
 
-* 不可靠服务类型（UD）
+* Unreliable service type (UD)
 
-因为不可靠的服务类型没有重传和确认机制，所以产生CQE表示硬件**已经将对应WQE指定的数据发送出去了**。以前说过UD只支持SEND-RECV操作，不支持RDMA操作。所以对于UD服务的两端，CQE产生时机如下图所示：
+Because an unreliable service type has no retransmission or acknowledgment mechanism, CQE generation means hardware **has already sent out the data specified by the corresponding WQE**. As noted earlier, UD only supports SEND-RECV operations and does not support RDMA operations. Therefore, CQE generation timing on both sides of a UD service is shown below:
 
 <figure><img src="https://pic3.zhimg.com/v2-4de94036dff67d4755705886a770182e_b.jpg" alt=""><figcaption></figcaption></figure>
 
-#### WQ和CQ的对应关系 <a href="#h_259650980_2" id="h_259650980_2"></a>
+#### Relationship Between WQ and CQ <a href="#h_259650980_2" id="h_259650980_2"></a>
 
-**每个WQ都必须关联一个CQ，而每个CQ可以关联多个SQ和RQ**。
+**Every WQ must be associated with one CQ, while each CQ can be associated with multiple SQs and RQs**.
 
-这里的所谓“关联”，指的是一个WQ的所有WQE对应的CQE，都会被硬件放到绑定的CQ中，需要注意同属于一个QP的SQ和RQ可以各自关联不同的CQ。如下图所示，QP1的SQ和RQ都关联了CQ1，QP2的RQ关联到了CQ1、SQ关联到了CQ2。
+Here, "associated" means that all CQEs corresponding to WQEs in a WQ are placed by hardware into the bound CQ. Note that the SQ and RQ belonging to the same QP can each be associated with different CQs. As shown below, both the SQ and RQ of QP1 are associated with CQ1, while QP2's RQ is associated with CQ1 and its SQ is associated with CQ2.
 
 <figure><img src="https://pic2.zhimg.com/v2-53f2a12d262db6813b6f85e462acc045_b.jpg" alt=""><figcaption></figcaption></figure>
 
-因为每个WQ必须关联一个CQ，所以用户创建QP前需要提前创建好CQ，然后分别指定SQ和RQ将会使用的CQ。
+Because every WQ must be associated with a CQ, the user needs to create CQs before creating QPs, and then specify which CQ the SQ and RQ will use.
 
-**同一个WQ中的WQE，其对应的CQE间是保序的**
+**For WQEs in the same WQ, the corresponding CQEs are ordered**
 
-> 本小节有修改，原文为“WQE和对应的CQE间是不保序的”，会对读者造成误导，感谢评论区 [@老生物楼里的家兔](https://www.zhihu.com/people/c7fd0f8e0a53fa9f5a27639d9fa3459a) 和 [@江上泛舟](https://www.zhihu.com/people/3f1ae153e0f53a4609df5749e72a2d30) 同学的指正。关于WR的发送端处理顺序、传输顺序、接收端处理顺序等问题，以后会专门写文章澄清。
+> This subsection has been modified. The original text said "WQEs and their corresponding CQEs are not ordered", which could mislead readers. Thanks to the commenters [@old-biology-building-rabbit](https://www.zhihu.com/people/c7fd0f8e0a53fa9f5a27639d9fa3459a) and [@river-boating](https://www.zhihu.com/people/3f1ae153e0f53a4609df5749e72a2d30) for the correction. Topics such as sender-side WR processing order, transmission order, and receiver-side processing order will be clarified in a separate article later.
 
-硬件是按照“先进先出”的FIFO顺序从某一个WQ（SQ或者RQ）中取出WQE并进行处理的，而向WR关联的CQ中存放CQE时，也是遵从这些WQE被放到WQ中的顺序的。简单来说，就是谁先被放到队列里，谁就先被完成。该过程如下图所示：
+Hardware fetches WQEs from a WQ, either SQ or RQ, in FIFO order. When it places CQEs corresponding to WRs into the associated CQ, it also follows the order in which those WQEs were placed into the WQ. In simple terms, whoever enters the queue first completes first. The process is shown below:
 
 <figure><img src="https://pic3.zhimg.com/v2-833c50d2a96e9e9158fe58176c8372da_b.jpg" alt=""><figcaption></figcaption></figure>
 
-需要注意的是，使用SRQ的情况以及RD服务类型的RQ这两种情况是不保序的，本文中不展开讨论。
+Note that SRQ usage and the RQ of the RD service type are unordered cases. This note does not expand on them.
 
-**不同WQ中的WQE，其对应的CQE间是不保序的**
+**For WQEs in different WQs, the corresponding CQEs are not ordered**
 
-前文中我们说过，一个CQ可能会被多个WQ共享。这种情况下，是不能保证这些WQE对应的CQE的产生顺序的。如下图所示（WQE编号表示下发的次序，即1最先被下发，6最后被下发）：
+As mentioned above, one CQ may be shared by multiple WQs. In this case, the CQE generation order corresponding to those WQEs cannot be guaranteed. The following figure illustrates this situation. The WQE numbers indicate posting order: 1 is posted first, and 6 is posted last.
 
 <figure><img src="https://pic1.zhimg.com/v2-7135324c6de191ff9f510299144f7a28_b.jpg" alt=""><figcaption></figcaption></figure>
 
-上面的描述其实还包含了“同一个QP的SQ和RQ中的WQE，其对应的CQE间是不保序的”的情况，这一点其实比较容易理解，SQ和RQ，一个负责主动发起的任务，一个负责被动接收的任务，它们本来就可以是认为是两条不同方向的通道，自然不应该相互影响。假设用户对同一个QP先下发了一个Receive WQE，又下发一个Send WQE，总不能对端不给本端发送消息，本端就不能发送消息给对端了吧？
+The description above also covers the case where "WQEs in the SQ and RQ of the same QP do not have ordered corresponding CQEs." This is easy to understand. SQ and RQ are two different directions: one handles actively initiated tasks, and the other handles passive receive tasks. They should not affect each other. Suppose a user first posts a Receive WQE and then posts a Send WQE to the same QP. It would make no sense for the local side to be unable to send a message to the peer just because the peer has not sent a message to the local side.
 
-既然这种情况下CQE产生的顺序和获取WQE的顺序是不相关的，那么上层应用和驱动是如何知道收到的CQE关联的是哪个WQE呢？其实很简单，**CQE中指明它所对应的WQE的编号**就可以了。
+Since CQE generation order in this case is unrelated to WQE posting order, how do upper-layer applications and drivers know which WQE a received CQE corresponds to? The answer is simple: **the CQE indicates the identifier of its corresponding WQE**.
 
-另外需要注意的是，即使在多个WQ共用一个CQ的情况下，“同一个WR中的WQE，其对应的CQE间是保序的”这一点也是一定能够保证的，即上图中的属于WQ1的WQE 1、3、4对应的CQE一定是按照顺序产生的，对于属于WQ2的WQE 2、5、6也是如此。
+Also note that even when multiple WQs share one CQ, "for WQEs within the same WQ, their corresponding CQEs are ordered" is still guaranteed. In the figure above, CQEs corresponding to WQ1's WQEs 1, 3, and 4 must be generated in order, and the same is true for WQ2's WQEs 2, 5, and 6.
 
 #### CQC <a href="#h_259650980_3" id="h_259650980_3"></a>
 
-同QP一样，CQ只是一段存放CQE的队列内存空间。硬件除了知道首地址以外，对于这片区域可以说是一无所知。所以需要提前跟软件约定好格式，然后驱动将申请内存，并按照格式把CQ的基本信息填写到这片内存中供硬件读取，这片内存就是CQC。CQC中包含了CQ的容量大小，当前处理的CQE的序号等等信息。所以把QPC的图稍微修改一下，就能表示出CQC和CQ的关系：
+Like a QP, a CQ is only a memory queue used to store CQEs. Aside from the base address, hardware knows almost nothing about this memory region. Therefore, software and hardware must agree on the format in advance. The driver allocates memory and fills basic CQ information into this memory according to the agreed format, allowing hardware to read it. This memory is the CQC. The CQC contains information such as CQ capacity and the current CQE sequence number being processed. By slightly modifying the QPC figure, we can show the relationship between CQC and CQ:
 
 <figure><img src="https://pic4.zhimg.com/v2-b1241e57f7ca7f556c1b5a040859fe3b_b.jpg" alt=""><figcaption></figcaption></figure>
 
 #### CQN <a href="#h_259650980_4" id="h_259650980_4"></a>
 
-CQ Number，就是CQ的编号，用来区别不同的CQ。CQ没有像QP0和QP1一样的特殊保留编号，本文中不再赘述了。
+CQ Number, or CQN, is the identifier of a CQ and is used to distinguish different CQs. CQ does not have special reserved numbers like QP0 and QP1, so this note does not discuss it further.
 
-### 完成错误 <a href="#h_259650980_5" id="h_259650980_5"></a>
+### Completion Errors <a href="#h_259650980_5" id="h_259650980_5"></a>
 
-IB协议中有三种错误类型，立即错误（immediate error）、完成错误（Completion Error）以及异步错误（Asynchronous Errors)。
+The IB protocol has three error types: immediate errors, completion errors, and asynchronous errors.
 
-立即错误的是“立即停止当前操作，并返回错误给上层用户”；完成错误指的是“通过CQE将错误信息返回给上层用户”；而异步错误指的是“通过中断事件的方式上报给上层用户”。可能还是有点抽象，我们来举个例子说明这两种错误都会在什么情况下产生：
+An immediate error means "stop the current operation immediately and return an error to the upper-layer user." A completion error means "return error information to the upper-layer user through a CQE." An asynchronous error means "report the error to the upper-layer user through an interrupt event." This may still sound abstract, so the following examples show when these error types are generated:
 
-* 用户在Post Send时传入了非法的操作码，比如想在UD的时候使用RDMA WRITE操作。
+* The user passes an illegal opcode when posting Send, such as trying to use RDMA WRITE in UD mode.
 
-结果：产生立即错误（有的厂商在这种情况会产生完成错误）
+Result: an immediate error is generated. Some vendors may generate a completion error in this situation.
 
-一般这种情况下，驱动程序会直接退出post send流程，并返回错误码给上层用户。注意此时WQE还没有下发到硬件就返回了。
+In this case, the driver usually exits the post-send flow directly and returns an error code to the upper-layer user. Note that the WQE has not yet been issued to hardware at this point.
 
-* 用户下发了一个WQE，操作类型为SEND，但是长时间没有受到对方的ACK。
+* The user posts a WQE whose operation type is SEND, but no ACK is received from the peer for a long time.
 
-结果：产生完成错误
+Result: a completion error is generated.
 
-因为WQE已经到达了硬件，所以硬件会产生对应的CQE，CQE中包含超时未响应的错误详情。
+Because the WQE has already reached hardware, hardware generates the corresponding CQE. The CQE contains timeout and no-response error details.
 
-* 用户态下发了多个WQE，所以硬件会产生多个CQE，但是软件一直没有从CQ中取走CQE，导致CQ溢出。
+* The user posts multiple WQEs, so hardware generates multiple CQEs, but software never removes CQEs from the CQ, causing CQ overflow.
 
-结果：产生异步错误
+Result: an asynchronous error is generated.
 
-因为软件一直没取CQE，所以自然不会从CQE中得到信息。此时IB框架会调用软件注册的事件处理函数，来通知用户处理当前的错误。
+Because software never takes CQEs from the CQ, it naturally cannot obtain information from CQEs. At this point, the IB framework calls the event handler registered by software to notify the user to handle the current error.
 
-由此可见，它们都是底层向上层用户报告错误的方式，只是产生的时机不一样而已。IB协议中对不同情况的错误应该以哪种方式上报做了规定，比如下图中，对于Modify QP过程中修改非法的参数，应该返回立即错误。
+These are all ways for the lower layer to report errors to upper-layer users; they differ only in when they are generated. The IB protocol specifies which reporting method should be used in different situations. For example, in the figure below, modifying an illegal parameter during Modify QP should return an immediate error.
 
 <figure><img src="https://pic1.zhimg.com/v2-f5f415adf5938600b34fbc051124cbe4_b.png" alt=""><figcaption></figcaption></figure>
 
-本文的重点在于CQ，所以介绍完错误类型之后，我们着重来看一下完成错误。完成错误是硬件通过在CQE中填写错误码来实现上报的，一次通信过程需要发起端（Requester）和响应端（Responder）参与，具体的错误原因也分为本端和对端。我们先来看一下错误检测是在什么阶段进行的（下图对IB协议中Figure 118进行了重画）：
+This note focuses on CQs. After introducing error types, we now focus on completion errors. Completion errors are reported by hardware by filling an error code into the CQE. One communication process involves both the requester and the responder, and the specific error cause can be local or remote. First, look at the stages where error detection occurs. The following figure redraws Figure 118 from the IB protocol:
 
 <figure><img src="https://pic2.zhimg.com/v2-af9c2d762baaba1e97858d333e948209_b.jpg" alt=""><figcaption></figcaption></figure>
 
-Requester的错误检测点有两个：
+The requester has two error-detection points:
 
-1. 本地错误检测
+1. Local error detection
 
-即对SQ中的WQE进行检查，如果检测到错误，就从本地错误检查模块直接产生CQE到CQ，不会发送数据到响应端了；如果没有错误，则发送数据到对端。
+This checks the WQE in the SQ. If an error is detected, a CQE is generated directly from the local error-checking module into the CQ, and no data is sent to the responder. If there is no error, data is sent to the peer.
 
-2\. 远端错误检测
+2. Remote error detection
 
-即检测响应端的ACK是否异常，ACK/NAK是由对端的本地错误检测模块检测后产生的，里面包含了响应端是否有错误，以及具体的错误类型。无论远端错误检测的结果是否有问题，都会产生CQE到CQ中。
+This checks whether the responder's ACK is abnormal. ACK/NAK is generated by the peer after its local error-checking module performs detection. It contains whether the responder has an error and the specific error type. Regardless of whether the remote error-detection result has a problem, a CQE is generated into the CQ.
 
-Responder的错误检测点只有一个：
+The responder has only one error-detection point:
 
-1. 本地错误检测
+1. Local error detection
 
-实际上检测的是对端报文是否有问题，IB协议也将其称为“本地”错误检测。如果检测到错误，则会体现在ACK/NAK报文中回复给对端，以及在本地产生一个CQE。
+In practice, this checks whether the peer packet has a problem. The IB protocol also calls it "local" error detection. If an error is detected, it is reflected in the ACK/NAK packet returned to the peer, and a local CQE is generated.
 
-需要注意的是，上述的产生ACK和远端错误检测只对面向连接的服务类型有效，无连接的服务类型。比如UD类型并不关心对端是否收到，接收端也不会产生ACK，所以在Requester的本地错误检测之后就一定会产生CQE，无论是否有本地错误。
+Note that ACK generation and remote error detection are only valid for connected service types. For unconnected service types, such as UD, the requester does not care whether the peer has received the packet, and the receiver does not generate ACKs. Therefore, after requester's local error detection, a CQE is always generated, regardless of whether there is a local error.
 
-然后我们简单介绍下几种常见的完成错误：
+Several common completion errors are briefly introduced below:
 
-* RC服务类型的SQ完成错误
+* RC SQ completion errors
 * Local Protection Error\
-  本地保护域错误。本地WQE中指定的数据内存地址的MR不合法，即用户试图使用一片未注册的内存中的数据。\
+  Local protection-domain error. The MR for the data memory address specified in the local WQE is invalid, meaning the user is trying to use data from unregistered memory.\
 
 * Remote Access Error\
-  远端权限错误。本端没有权限读/写指定的对端内存地址。\
+  Remote permission error. The local side does not have permission to read or write the specified remote memory address.\
 
 * Transport Retry Counter Exceeded Error\
-  重传超次错误。对端一直未回复正确的ACK，导致本端多次重传，超过了预设的次数。\
+  Retry-count-exceeded error. The peer never replies with a correct ACK, causing the local side to retransmit multiple times until the preset retry count is exceeded.\
 
-* RC服务类型的RQ完成错误\
+* RC RQ completion errors\
 
 * Local Access Error\
-  本地访问错误。说明对端试图写入其没有权限写入的内存区域。\
+  Local access error. This means the peer tried to write into a memory region that it does not have permission to write.\
 
 * Local Length Error\
-  本地长度错误。本地RQ没有足够的空间来接收对端发送的数据。
+  Local length error. The local RQ does not have enough space to receive the data sent by the peer.
 
-完整的完成错误类型列表请参考IB协议的10.10.3节。
+For a full list of completion error types, see Section 10.10.3 of the IB specification.
 
-### 用户接口 <a href="#h_259650980_6" id="h_259650980_6"></a>
+### User Interfaces <a href="#h_259650980_6" id="h_259650980_6"></a>
 
-同QP一样，我们依然从通信准备阶段（控制面）和通信进行阶段（数据面）来介绍IB协议对上层提供的关于CQ的接口。
+As with QP, this section introduces the IB protocol's CQ-related interfaces exposed to upper layers from two perspectives: communication preparation, or control plane, and communication execution, or data plane.
 
-#### 控制面 <a href="#h_259650980_7" id="h_259650980_7"></a>
+#### Control Plane <a href="#h_259650980_7" id="h_259650980_7"></a>
 
-同QP一样，还是“增删改查”四种，但是可能因为对于CQ来说，上层用户是资源使用者而不是管理者，只能从CQ中读数据而不能写数据，所以对用户开放的可配的参数就只有“CQ规格”一种。
+As with QP, the control plane still follows the four operations: create, delete, modify, and query. However, for CQs, upper-layer users are resource users rather than resource managers. Users can only read data from a CQ, not write data to it. Therefore, the only configurable parameter exposed to users is the "CQ specification".
 
-* 创建——Create CQ
+* Create: Create CQ
 
-创建的时候用户必须指定CQ的规格，即能够储存多少个CQE，另外用户还可以填写一个CQE产生后的回调函数指针（下文会涉及）。内核态驱动会将其他相关的参数配置好，填写到跟硬件约定好的CQC中告知硬件。
+When creating a CQ, the user must specify the CQ specification, meaning how many CQEs it can store. The user can also provide a callback function pointer that is invoked after CQE generation, which is discussed below. The kernel-mode driver configures other related parameters and fills them into the CQC agreed with hardware.
 
-* 销毁——Destroy CQ
+* Destroy: Destroy CQ
 
-释放一个CQ软硬件资源，包含CQ本身及CQC，另外CQN自然也将失效。
+This releases CQ software and hardware resources, including the CQ itself and the CQC. The CQN naturally becomes invalid as well.
 
-* 修改——Resize CQ
+* Modify: Resize CQ
 
-这里名字稍微有点区别，因为CQ只允许用户修改规格大小，所以就用的Resize而不是Modify。
+The name is slightly different here. Because users can only modify the CQ size, the operation is called Resize rather than Modify.
 
-* 查询——Query CQ
+* Query: Query CQ
 
-查询CQ的当前规格，以及用于通知的回调函数指针。
+This queries the current CQ specification and the callback function pointer used for notification.
 
-> 通过对比RDMA规范和软件协议栈，可以发现很多verbs接口并不是按照规范实现的。所以读者如果发现软件API和协议有差异时也无须感到疑惑，RDMA技术本身一直还在演进，软件框架也处于活跃更新的状态。如果更关心编程实现，那么请以软件协议栈的API文档为准；如果更关心学术上的研究，那么请以RDMA规范为准。
+> By comparing RDMA specifications with software protocol stacks, one can see that many verbs interfaces are not implemented exactly according to the specification. Therefore, readers should not be surprised if software APIs differ from the protocol. RDMA technology is still evolving, and software frameworks are also actively changing. If you care more about programming implementation, use the software protocol-stack API documentation as the source of truth. If you care more about academic research, use the RDMA specification as the source of truth.
 
-#### 数据面 <a href="#h_259650980_8" id="h_259650980_8"></a>
+#### Data Plane <a href="#h_259650980_8" id="h_259650980_8"></a>
 
-CQE是硬件将信息传递给软件的媒介，虽然软件知道在什么情况下会产生CQE，但是软件并不知道具体什么时候硬件会把CQE放到CQ中。在通信和计算机领域，我们把这种接收方不知道发送方什么时候发送的模式称为“异步”。我们先来举一个网卡的例子，再来说明用户如何通过数据面接口获取CQE（WC）。
+CQE is the medium through which hardware passes information to software. Although software knows under what conditions CQEs are generated, it does not know exactly when hardware will place a CQE into the CQ. In communication and computer systems, this pattern, where the receiver does not know when the sender will send, is called "asynchronous". First consider a NIC example, and then look at how users obtain CQEs, or WCs, through data-plane interfaces.
 
-网卡收到数据包后如何让CPU知道这件事，并进行数据包处理，有两种常见的模式：
+When a NIC receives packets, how does it tell the CPU and trigger packet processing? There are two common modes:
 
-* 中断模式
+* Interrupt mode
 
-当数据量较少，或者说偶发的数据交换较多时，适合采用中断模式——即CPU平常在做其他事情，当网卡收到数据包时，会上报中断打断CPU当前的任务，CPU转而来处理数据包（比如TCP/IP协议栈的各层解析）。处理完数据之后，CPU跳回到中断前的任务继续执行。
+When the amount of data is small, or when occasional data exchange is common, interrupt mode is suitable. The CPU usually does other work. When the NIC receives a packet, it raises an interrupt and interrupts the CPU's current task. The CPU then processes the packet, for example by parsing each layer of the TCP/IP stack. After processing the data, the CPU returns to the task it was executing before the interrupt.
 
-每次中断都需要保护现场，也就是把当前各个寄存器的值、局部变量的值等等保存到栈中，回来之后再恢复现场（出栈），这本身是有开销的。如果业务负载较重，网卡一直都在接收数据包，那么CPU就会一直收到中断，CPU将一直忙于中断切换，导致其他任务得不到调度。
+Each interrupt must save context, meaning values of registers, local variables, and other state are saved to the stack and restored later. This itself has overhead. If the workload is heavy and the NIC continuously receives packets, the CPU keeps receiving interrupts and remains busy with interrupt switching, causing other tasks not to be scheduled.
 
-* 轮询模式
+* Polling mode
 
-所以除了中断模式之外，网卡还有一种轮询模式，即收到数据包后都先放到缓冲区里，CPU每隔一段时间会去检查网卡是否受到数据。如果有数据，就把缓冲区里的数据一波带走进行处理，没有的话就接着处理别的任务。
+In addition to interrupt mode, NICs also support polling mode. After packets are received, they are placed into a buffer first. The CPU checks periodically whether the NIC has received data. If there is data, it takes a batch of data from the buffer for processing. If not, it continues processing other tasks.
 
-通过对比中断模式我们可以发现，轮询模式虽然每隔一段时间需要CPU检查一次，带来了一定的开销，但是当业务繁忙的时候采用轮询模式能够极大的减少中断上下文的切换次数，反而减轻了CPU的负担。
+By comparing with interrupt mode, we can see that polling mode requires the CPU to check periodically, which introduces some overhead. However, when the workload is busy, polling mode can greatly reduce interrupt-context switches and therefore reduce CPU burden.
 
-现在的网卡，一般都是中断+轮询的方式，也就是根据业务负载动态切换。
+Modern NICs generally use interrupt plus polling, dynamically switching according to workload.
 
-在RDMA协议中，CQE就相当于是网卡收到的数据包，RDMA硬件把它传递给CPU去处理。RDMA框架定义了两种对上层的接口，分别是poll和notify，对应着轮询和中断模式。
+In RDMA, a CQE is analogous to a packet received by a NIC: RDMA hardware passes it to the CPU for processing. The RDMA framework defines two upper-layer interfaces, poll and notify, corresponding to polling and interrupt modes.
 
-#### Poll completion queue <a href="#h_259650980_9" id="h_259650980_9"></a>
+#### Poll Completion Queue <a href="#h_259650980_9" id="h_259650980_9"></a>
 
-很直白，poll就是轮询的意思。用户调用这个接口之后，CPU就会定期去检查CQ里面是否有新鲜的CQE，如果有的话，就取出这个CQE（注意取出之后CQE就被“消耗”掉了），解析其中的信息并返回给上层用户。
+The meaning of poll is straightforward: polling. After the user calls this interface, the CPU periodically checks whether the CQ contains fresh CQEs. If so, it takes out the CQE. Note that once the CQE is taken out, it is consumed. The software then parses its information and returns it to the upper-layer user.
 
-#### Request completion notification <a href="#h_259650980_10" id="h_259650980_10"></a>
+#### Request Completion Notification <a href="#h_259650980_10" id="h_259650980_10"></a>
 
-直译过来是请求完成通知，用户调用这个接口之后，相当于向系统注册了一个中断。这样当硬件将CQE放到CQ中后，会立即触发一个中断给CPU，CPU进而就会停止手上的工作取出CQE，处理后返回给用户。
+Request completion notification means that after the user calls this interface, it effectively registers an interrupt with the system. When hardware places a CQE into the CQ, it immediately triggers an interrupt to the CPU. The CPU stops its current work, takes out the CQE, processes it, and returns the result to the user.
 
-同样的，这两种接口使用哪种，取决于用户对于实时性的要求，以及实际业务的繁忙程度。
+Which of these two interfaces should be used depends on the user's real-time requirements and the actual workload intensity.
 
-感谢阅读，CQ就介绍到这里，下篇打算详细讲讲SRQ。
+Thanks for reading. This is the end of the CQ introduction. The next note will discuss SRQ in detail.
 
-### 协议相关章节 <a href="#h_259650980_11" id="h_259650980_11"></a>
+### Protocol Sections <a href="#h_259650980_11" id="h_259650980_11"></a>
 
-9.9 CQ错误检测和恢复
+9.9 CQ error detection and recovery
 
-10.2.6 CQ和WQ的关系
+10.2.6 Relationship between CQ and WQ
 
-10.10 错误类型及其处理
+10.10 Error types and handling
 
-11.2.8 CQ相关控制面接口
+11.2.8 CQ-related control-plane interfaces
 
-11.4.2 CQ相关数据面接口
+11.4.2 CQ-related data-plane interfaces
 
-### 其他参考资料 <a href="#h_259650980_12" id="h_259650980_12"></a>
+### Other References <a href="#h_259650980_12" id="h_259650980_12"></a>
 
 \[1] Linux Kernel Networking - Implement and Theory. Chapter 13. Completion Queue

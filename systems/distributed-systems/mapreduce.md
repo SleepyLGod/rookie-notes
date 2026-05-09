@@ -1,22 +1,22 @@
 ---
-description: 😀 google三驾马车第三弹！
+description: The third note in Google's classic systems trilogy
 ---
 
-# 😍 Google MapReduce
+# Google MapReduce
 
 ## **MapReduce Model**
 
-总的来讲，Google MapReduce 所执行的分布式计算会以**一组键值**对作为**输入**，**输出另一组键值对**
+At a high level, a distributed computation executed by Google MapReduce takes **a set of key/value pairs** as **input** and **produces another set of key/value pairs** as output.
 
-用户则通过编写 `Map` 函数和 `Reduce` 函数来指定所要进行的计算
+Users specify the computation by writing a `Map` function and a `Reduce` function.
 
-由用户编写的 Map 函数将被应用在每一个**输入**键值对上，并输出若干键值对作为**中间结果**
+The user-defined `Map` function is applied to every **input** key/value pair and emits zero or more key/value pairs as **intermediate results**.
 
-之后，MapReduce 框架则会**将与同一个键 II 相关联的值都传递到同一次 `Reduce` 函数调用中**。
+Then the MapReduce framework **passes all values associated with the same intermediate key `k2` to the same `Reduce` invocation**.
 
-同样由用户编写的 `Reduce` 函数以**键 II 以及与该键相关联的值的集合**作为参数，**对传入的值进行合并并输出合并后的值的集合**。
+The user-defined `Reduce` function takes **an intermediate key `k2` and the collection of values associated with that key** as arguments, **merges the input values, and emits the merged output values**.
 
-形式化地说，由用户提供的 Map 函数和 Reduce 函数应有如下类型：
+Formally, the user-provided `Map` and `Reduce` functions have the following types:
 
 **`[Math Processing Error]`**
 
@@ -24,9 +24,9 @@ description: 😀 google三驾马车第三弹！
 
 **`reduce(k2, list(v2)) → list(v2)`**
 
-值得注意的是，在实际的实现中 `MapReduce` 框架使用 `Iterator` 来代表作为输入的集合，主要是为了避免集合过大，无法被完整地放入到内存中。
+In the actual implementation, the `MapReduce` framework uses an `Iterator` to represent the input collection. This avoids requiring a potentially large collection to fit entirely in memory.
 
-作为案例，我们考虑这样一个问题：给定大量的文档，计算其中每个单词出现的次数（Word Count）。用户通常需要提供形如如下伪代码的代码来完成计算：
+As an example, consider this problem: given a large collection of documents, compute how many times each word appears. This is the classic Word Count example. The user usually provides pseudocode like this:
 
 ```cpp
 map(String key, String value):
@@ -44,74 +44,74 @@ reduce(String key, Iterator values):
   Emit(AsString(result));
 ```
 
-### **函数式编程模型**
+### **Functional Programming Model**
 
-了解函数式编程范式的读者不难发现，MapReduce 所采用的编程模型源自于函数式编程里的 Map 函数和 Reduce 函数。后起之秀 Spark 同样采用了类似的编程模型。
+Readers familiar with functional programming will notice that the MapReduce programming model comes from the `map` and `reduce` functions in functional programming. Later systems such as Spark adopted a similar programming model.
 
-使用函数式编程模型的好处在于这种编程模型本身就对并行执行有良好的支持，这使得底层系统能够轻易地将大数据量的计算并行化，同时由用户函数所提供的确定性也使得底层系统能够将函数重新执行作为提供容错性的主要手段。
+The advantage of this model is that it naturally supports parallel execution. The underlying system can parallelize large-scale computation relatively easily. At the same time, the determinism of user-provided functions allows the system to use re-execution as a primary fault-tolerance mechanism.
 
-## MapReduce 计算执行过程
+## MapReduce Execution Flow
 
-每一轮 MapReduce 的大致过程如下图所示：
+The rough execution flow of a MapReduce job is shown below:
 
 ![](https://s2.loli.net/2022/07/24/D8dExufbkRa52eT.png)
 
-首先，用户通过 MapReduce **客户端指定** Map 函数和 Reduce 函数，以及此次 MapReduce 计算的配置，包括中间结果键值对的 Partition 数量 `R` 以及用于**切分中间结果**的哈希函数 `hash`。 用户开始 MapReduce 计算后，整个 MapReduce 计算的流程可总结如下：
+First, the user uses the MapReduce **client** to specify the `Map` function, the `Reduce` function, and the configuration for this MapReduce job. The configuration includes the number of intermediate-result partitions `R` and the hash function `hash` used to **partition intermediate results**. After the user starts the MapReduce job, the execution flow can be summarized as follows:
 
-1. 作为输入的文件会被分为 M 个 Split，每个 Split 的大小通常在 16\~64 MB 之间
-2. 如此，整个 MapReduce 计算包含 `M` 个Map 任务和 `R` 个 Reduce 任务。Master 结点会从**空闲的 Worker 结点**中进行选取并为其分配 Map 任务和 Reduce 任务
-3. 收到 Map 任务的 Worker 们（又称 **Mapper**）开始读入自己对应的 Split，将读入的内容**解析为输入键值对**并调用由用户定义的 **Map 函数**。由 Map 函数产生的中间结果键值对会被暂时存放在**缓冲内存区**中
-4.  在 Map 阶段进行的同时，Mapper 们**周期性地将放置在缓冲区中的中间结果存入到自己的本地磁盘**中，同时根据用户指定的 `Partition` 函数（默认为 `hash(key) mod R`）将产生的中间结果分为 `R` 个部分。
+1. The input files are divided into `M` splits. Each split is usually between 16 and 64 MB.
+2. The entire MapReduce job therefore contains `M` Map tasks and `R` Reduce tasks. The Master node selects from **idle Worker nodes** and assigns them Map and Reduce tasks.
+3. Workers that receive Map tasks, also called **Mappers**, read their corresponding splits, **parse the contents into input key/value pairs**, and call the user-defined **Map function**. The intermediate key/value pairs produced by the Map function are temporarily stored in an **in-memory buffer**.
+4.  While the Map phase is running, Mappers **periodically spill the intermediate results from the buffer to their local disks**. They also divide the intermediate results into `R` partitions according to the user-specified `Partition` function, whose default is `hash(key) mod R`.
 
-    任务完成时，Mapper 便会将中间结果在其本地磁盘上的存放**位置**报告给 Master
-5. Mapper 上报的中间结果**存放位置会被 Master 转发给 Reducer**。当 Reducer 接收到这些信息后便会通过 **RPC 读取**存储在 Mapper 本地磁盘上属于对应 Partition 的中间结果。在读取完毕后，Reducer 会对读取到的数据进行**排序以令拥有相同键的键值对能够连续分布**
-6. 之后，Reducer 会为每个键收集与其关联的值的集合，并以之调用用户定义的 Reduce 函数。Reduce 函数的结果会被放入到对应的 **Reduce Partition 结果文件**
+    When the task completes, the Mapper reports the **locations** of its local intermediate-result files to the Master.
+5. The Master forwards the Mapper-reported intermediate-result **locations** to the Reducers. After a Reducer receives this information, it uses **RPC** to read the intermediate results for its partition from the Mapper's local disk. After reading the data, the Reducer **sorts it so key/value pairs with the same key are contiguous**.
+6. The Reducer then gathers the values associated with each key and calls the user-defined `Reduce` function. The output of the `Reduce` function is written into the corresponding **Reduce partition output file**.
 
-实际上，在一个 MapReduce 集群中:
+In a MapReduce cluster:
 
-* Master 会记录每一个 Map 和 Reduce 任务的当前完成状态，以及所分配的 Worker。
-* Master 还负责将 Mapper 产生的中间结果文件的位置和大小转发给 Reducer。
+* The Master records the current completion status of every Map and Reduce task, as well as the Worker assigned to each task.
+* The Master is also responsible for forwarding the locations and sizes of intermediate-result files produced by Mappers to Reducers.
 
-值得注意的是，每次 MapReduce 任务执行时，MM 和 RR 的值都应比集群中的 Worker 数量要高得多，以达成集群内负载均衡的效果。
+It is worth noting that, for each MapReduce job, the values of `M` and `R` should usually be much larger than the number of Workers in the cluster. This helps achieve load balancing across the cluster.
 
-## **MapReduce 容错机制**
+## **MapReduce Fault Tolerance**
 
-由于 Google MapReduce 很大程度上利用了由 Google File System 提供的分布式原子文件读写操作，所以 MapReduce 集群的容错机制实现相比之下便简洁很多，也主要集中在任务意外中断的恢复上。
+Because Google MapReduce relies heavily on distributed atomic file read/write operations provided by the Google File System, the fault-tolerance mechanism of a MapReduce cluster is comparatively simple. It mainly focuses on recovering from unexpected task interruption.
 
-### **Worker 失效**
+### **Worker Failure**
 
-在 MapReduce 集群中，Master 会周期地向每一个 Worker 发送 \*\*Ping \*\*信号。如果某个 Worker 在一段时间内没有响应，Master 就会认为这个 Worker 已经不可用。
+In a MapReduce cluster, the Master periodically sends **Ping** messages to every Worker. If a Worker does not respond for a period of time, the Master treats it as unavailable.
 
-**任何**分配给该 Worker 的 Map 任务，无论是正在运行还是已经完成，都需要由 Master 重新分配给其他 Worker，因为该 Worker 不可用也意味着**存储在该 Worker 本地磁盘上的中间结果也不可用了**。
+**Every** Map task assigned to that Worker, whether currently running or already completed, must be reassigned by the Master to another Worker. The reason is that if the Worker is unavailable, then **the intermediate results stored on that Worker's local disk are also unavailable**.
 
-Master 也会将这次重试通知给所有 Reducer，没能从原本的 Mapper 上完整获取中间结果的 Reducer 便会开始从新的 Mapper 上获取数据。
+The Master also notifies all Reducers about the retry. Reducers that failed to fully fetch intermediate results from the original Mapper start fetching data from the new Mapper.
 
-如果有 Reduce 任务分配给该 Worker，Master 则会选取其中尚未完成的 Reduce 任务分配给其他 Worker。鉴于 Google MapReduce 的结果是存储在 Google File System 上的，已完成的 Reduce 任务的结果的可用性由 Google File System 提供，因此 MapReduce Master 只需要处理未完成的 Reduce 任务即可。
+If Reduce tasks were assigned to the failed Worker, the Master reassigns only the unfinished Reduce tasks to other Workers. Since Google MapReduce stores final results in the Google File System, completed Reduce-task outputs remain available through GFS. Therefore, the MapReduce Master only needs to handle unfinished Reduce tasks.
 
-### **Master 失效**
+### **Master Failure**
 
-整个 MapReduce 集群中只会有一个 Master 结点，因此 Master 失效的情况并不多见。
+There is only one Master node in a MapReduce cluster, so Master failure is uncommon but important.
 
-Master 结点在运行时会**周期性地将集群的当前状态作为保存点（Checkpoint）写入到磁盘中**。Master 进程终止后，重新启动的 Master 进程即可利用存储在磁盘中的数据恢复到上一次保存点的状态。
+While running, the Master **periodically writes the current cluster state to disk as a checkpoint**. If the Master process terminates, a restarted Master process can use the data stored on disk to recover to the most recent checkpoint.
 
-### **落后的 Worker**
+### **Straggler Worker**
 
-如果集群中有某个 Worker **花了特别长的时间来完成最后的几个 Map 或 Reduce 任务**，整个 MapReduce 计算任务的耗时就会因此被拖长，这样的 Worker 也就成了落后者（**Straggler**）。
+If a Worker in the cluster **takes an unusually long time to finish the last few Map or Reduce tasks**, the entire MapReduce job is delayed. Such a Worker is called a **Straggler**.
 
-MapReduce 在整个计算完成到一定程度时就会将剩余的任务进行备份，即同时将其分配给其他空闲 Worker 来执行，并在其中一个 Worker 完成后将该任务视作已完成。
+When the overall computation is close to completion, MapReduce creates backup executions for the remaining tasks by assigning them to other idle Workers as well. Once one execution of a task finishes, the task is considered complete.
 
-## **其他优化**
+## **Other Optimizations**
 
-在高可用的基础上，Google MapReduce 系统现有的实现同样采取了一些优化方式来提高系统运行的整体效率。
+In addition to availability, the Google MapReduce implementation also applies several optimizations to improve overall system efficiency.
 
-### **数据本地性**
+### **Data Locality**
 
-在 Google 内部所使用的计算环境中，机器间的网络带宽是比较稀缺的资源，需要尽量减少在机器间过多地进行不必要的数据传输。
+In Google's internal computing environment, cross-machine network bandwidth is a relatively scarce resource, so unnecessary data transfer between machines should be minimized.
 
-Google MapReduce 采用 Google File System 来保存输入和结果数据，因此 Master 在分配 Map 任务时会从 Google File System 中读取各个 Block 的位置信息，并尽量将对应的 Map 任务分配到持有该 Block 的 Replica 的机器上；如果无法将任务分配至该机器，Master 也会利用 Google File System 提供的机架拓扑信息将任务分配到较近的机器上。
+Google MapReduce uses the Google File System to store input and output data. Therefore, when assigning Map tasks, the Master reads block-location information from GFS and tries to assign each Map task to a machine that holds a replica of the corresponding block. If that is not possible, the Master uses rack-topology information provided by GFS to assign the task to a nearby machine.
 
 ### **Combiner**
 
-在某些情形下，用户所定义的 Map 任务可能会产生大量**重复的中间结果键**，同时用户所定义的 Reduce 函数本身也是满足交换律和结合律的。
+In some cases, the user-defined Map function may produce many **repeated intermediate keys**, and the user-defined Reduce function may be commutative and associative.
 
-在这种情况下，Google MapReduce 系统允许用户声明在 **Mapper 上执行的 Combiner 函数**：Mapper 会使用由自己输出的 R 个中间结果 Partition 调用 Combiner 函数以对中间结果进行局部合并，减少 Mapper 和 Reducer 间需要传输的数据量。
+In this case, Google MapReduce allows the user to declare a **Combiner function executed on the Mapper**. The Mapper calls the Combiner over its own `R` intermediate-result partitions to locally merge intermediate results, reducing the amount of data transferred between Mappers and Reducers.

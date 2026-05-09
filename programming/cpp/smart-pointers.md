@@ -1,38 +1,38 @@
 ---
-description: 参考 https://changkun.de/modern-cpp/en-us/05-pointers/
+description: Reference https://changkun.de/modern-cpp/en-us/05-pointers/
 ---
 
-# 🥲 Smart Pointers
+# Smart Pointers
 
 ### Introduction
 
-忘了加delete？不在合适的地方加入delete？那将是一场灾难！
+Forgetting to call `delete`, or calling `delete` in the wrong place, can be disastrous.
 
-自动释放内存，只有类可以做到😭
+Automatic memory release is best handled by classes and RAII.
 
-于是智能指针<mark style="color:purple;background-color:blue;">`auto_ptr`</mark>、<mark style="color:purple;background-color:blue;">`unique_ptr`</mark>和<mark style="color:purple;background-color:purple;">`shared_ptr`</mark>来了！
+That is why smart pointers such as <mark style="color:purple;background-color:blue;">`auto_ptr`</mark>, <mark style="color:purple;background-color:blue;">`unique_ptr`</mark>, and <mark style="color:purple;background-color:purple;">`shared_ptr`</mark> were introduced.
 
-<mark style="color:purple;">**将基本类型指针封装为类对象指针（这个类肯定是个模板，以适应不同基本类型的需求），并在析构函数里编写delete语句删除指针指向的内存空间。**</mark>
+<mark style="color:purple;">**The basic idea is to wrap a raw pointer in a class object. The wrapper class is a template so it can support different pointed-to types, and its destructor calls `delete` to release the memory owned by the pointer.**</mark>
 
-再说说**引用计数**：
+Now consider **reference counting**:
 
-> 基本想法是对于动态分配的对象，进行引用计数，每当增加一次对同一个对象的引用，那么引用对象的引用计数就会增加一次， 每删除一次引用，引用计数就会减一，当一个对象的引用计数减为零时，就自动删除指向的堆内存。
+> The basic idea is to maintain a reference count for dynamically allocated objects. Whenever another reference to the same object is added, the reference count increases by one. Whenever a reference is removed, the count decreases by one. When the reference count reaches zero, the heap memory pointed to by the object is automatically deleted.
 
-STL一共给我们提供了四种智能指针包括 `std::shared_ptr`/`std::unique_ptr`/`std::weak_ptr`，使用它们需要包含头文件 `<memory>`.
+The C++ standard library provides smart pointers such as `std::shared_ptr`, `std::unique_ptr`, and `std::weak_ptr`. To use them, include the `<memory>` header.
 
-模板`auto_ptr`是C++98提供的解决方案，C+11已将将其摒弃，并提供了另外3种解决方案。
+The `auto_ptr` template was the C++98 solution. C++11 deprecated it and introduced the modern alternatives. `auto_ptr` was removed in C++17 and should not be used in new code.
 
-所有的智能指针类都有一个**explicit构造函数**，**以指针作为参数**。比如`auto_ptr`的类模板原型为：
+Smart pointer classes generally provide an **explicit constructor** that takes a raw pointer. For example, the old `auto_ptr` class template looked like this:
 
 ```cpp
-templet<class T>
+template<class T>
 class auto_ptr {
   explicit auto_ptr(X* p = 0) ; 
   ...
 }
 ```
 
-因此不能自动将指针转换为智能指针对象，必须**显式调用**：
+Therefore, a raw pointer cannot be implicitly converted to a smart pointer object. The conversion must be **explicit**:
 
 ```cpp
 shared_ptr<double> pd; 
@@ -40,25 +40,25 @@ double *p_reg = new double;
 pd = p_reg;                               // not allowed (implicit conversion)
 pd = shared_ptr<double>(p_reg);           // allowed (explicit conversion)
 shared_ptr<double> pshared = p_reg;       // not allowed (implicit conversion)
-shared_ptr<double> pshared(p_reg);        // allowed (explicit conversion
+shared_ptr<double> pshared(p_reg);        // allowed (explicit conversion)
 ```
 
-对全部三种智能指针都**应避免**的一点：
+One thing should be **avoided** for all owning smart pointers:
 
 ```cpp
 string vacation("I wandered lonely as a cloud.");
 shared_ptr<string> pvac(&vacation);   // No
 ```
 
-全局变量在堆中，智能指针pvac过期时，程序将把delete运算符用于非堆内存，这是错误的。
+`vacation` is a stack object, not heap memory allocated by `new`. When `pvac` expires, the program will apply `delete` to non-heap memory, which is incorrect.
 
 ### `std::shared_ptr`
 
-它能够记录多少个 `shared_ptr` **共同指向一个对象**，从而消除显式的调用 `delete`，当引用计数变为零的时候就会将对象自动删除。
+`std::shared_ptr` records how many `shared_ptr` instances **jointly point to the same object**. This removes the need for explicit `delete`; when the reference count becomes zero, the object is automatically deleted.
 
-但还不够，因为使用 `std::shared_ptr` 仍然需要使用 `new` 来调用，这使得代码出现了某种程度上的不对称。
+However, directly constructing a `std::shared_ptr` from `new` still leaves an awkward asymmetry in the code.
 
-**`std::make_shared`** 就能够用来消除显式的使用 `new`，所以`std::make_shared` 会分配创建传入参数中的对象， 并返回这个对象类型的`std::shared_ptr`指针。例如：
+**`std::make_shared`** removes the explicit use of `new`. It allocates and constructs the object from the provided arguments and returns a `std::shared_ptr` to that object type. For example:
 
 ```cpp
 #include<iostream>
@@ -77,13 +77,13 @@ int main() {
 }
 ```
 
-`std::shared_ptr` 可以通过 **`get()`** 方法来获取原始指针，通过 **`reset()`** 来减少一个引用计数， 并通过**`use_count()`**来查看一个对象的引用计数。例如：
+`std::shared_ptr` can obtain the raw pointer through **`get()`**, decrease the reference count through **`reset()`**, and inspect the reference count through **`use_count()`**. For example:
 
 ```cpp
 auto pointer = std::make_shared<int>(10);
-auto pointer2 = pointer; // 引用计数+1
-auto pointer3 = pointer; // 引用计数+1
-int *p = pointer.get();  // 这样不会增加引用计数
+auto pointer2 = pointer; // reference count + 1
+auto pointer3 = pointer; // reference count + 1
+int *p = pointer.get();  // this does not increase the reference count
 std::cout << "pointer.use_count() = " << pointer.use_count() << std::endl;   // 3
 std::cout << "pointer2.use_count() = " << pointer2.use_count() << std::endl; // 3
 std::cout << "pointer3.use_count() = " << pointer3.use_count() << std::endl; // 3
@@ -92,27 +92,27 @@ pointer2.reset();
 std::cout << "reset pointer2:" << std::endl;
 std::cout << "pointer.use_count() = " << pointer.use_count() << std::endl;   // 2
 std::cout << "pointer2.use_count() = "
-          << pointer2.use_count() << std::endl;           // pointer2 已 reset; 0
+          << pointer2.use_count() << std::endl;           // pointer2 has been reset; 0
 std::cout << "pointer3.use_count() = " << pointer3.use_count() << std::endl; // 2
 pointer3.reset();
 std::cout << "reset pointer3:" << std::endl;
 std::cout << "pointer.use_count() = " << pointer.use_count() << std::endl;   // 1
 std::cout << "pointer2.use_count() = " << pointer2.use_count() << std::endl; // 0
 std::cout << "pointer3.use_count() = "
-          << pointer3.use_count() << std::endl;           // pointer3 已 reset; 0
+          << pointer3.use_count() << std::endl;           // pointer3 has been reset; 0
 
 ```
 
 ### **`std::unique_ptr`**
 
-`std::unique_ptr` 是一种独占的智能指针，它禁止其他智能指针与其共享同一个对象，从而保证代码的安全：
+`std::unique_ptr` is an exclusive-ownership smart pointer. It prevents other smart pointers from sharing ownership of the same object, improving ownership safety:
 
 ```cpp
-std::unique_ptr<int> pointer = std::make_unique<int>(10); // make_unique 从 C++14 引入
-std::unique_ptr<int> pointer2 = pointer; // 非法
+std::unique_ptr<int> pointer = std::make_unique<int>(10); // make_unique was introduced in C++14
+std::unique_ptr<int> pointer2 = pointer; // invalid
 ```
 
-`make_unique` 并不复杂，C++11 没有提供 `std::make_unique`，可以自行实现：
+`make_unique` is not complicated. C++11 did not provide `std::make_unique`, so it can be implemented manually:
 
 ```cpp
 template<typename T, typename ...Args>
@@ -121,9 +121,9 @@ std::unique_ptr<T> make_unique( Args&& ...args ) {
 }
 ```
 
-至于为什么没有提供，C++ 标准委员会主席 Herb Sutter 在他的[博客](https://herbsutter.com/gotw/\_102/)中提到原因是因为『被他们忘记了』，[**这里**](https://stackoverflow.com/questions/12580432/why-does-c11-have-make-shared-but-not-make-unique)笑一笑😂。
+As for why it was not provided in C++11, Herb Sutter mentioned in his [blog](https://herbsutter.com/gotw/\_102/) that it was essentially forgotten. See [**this discussion**](https://stackoverflow.com/questions/12580432/why-does-c11-have-make-shared-but-not-make-unique).
 
-既然是独占，换句话说就是不可复制。但是，我们可以利用 `std::move` 将其转移给其他的 `unique_ptr`，例如：
+Because ownership is exclusive, `unique_ptr` is not copyable. However, ownership can be transferred to another `unique_ptr` with `std::move`:
 
 ```cpp
 #include <iostream>
@@ -141,32 +141,32 @@ void f(const Foo &) {
 
 int main() {
     std::unique_ptr<Foo> p1(std::make_unique<Foo>());
-    // p1 不空, 输出
+    // p1 is not empty; this prints output
     if (p1) {
         p1->foo();
     }
     {
         std::unique_ptr<Foo> p2(std::move(p1));
-        // p2 不空, 输出
+        // p2 is not empty; this prints output
         f(*p2);
-        // p2 不空, 输出
+        // p2 is not empty; this prints output
         if(p2) {p2->foo();}
-        // p1 为空, 无输出
+        // p1 is empty; this prints nothing
         if(p1) {p1->foo();}
         p1 = std::move(p2);
-        // p2 为空, 无输出
+        // p2 is empty; this prints nothing
         if(p2) {p2->foo();}
-        std::cout << "p2 被销毁" << std::endl;
+        std::cout << "p2 is destroyed" << std::endl;
     }
-    // p1 不空, 输出
+    // p1 is not empty; this prints output
     if (p1) {p1->foo();}
-    // Foo 的实例会在离开作用域时被销毁
+    // The Foo instance is destroyed when leaving the scope
 }
 ```
 
 ### **`std::weak_ptr`**
 
-如果你仔细思考 `std::shared_ptr` 就会发现依然存在着资源无法释放的问题。看下面这个例子：
+If we look more carefully at `std::shared_ptr`, there is still a case where resources cannot be released: cyclic ownership. Consider the following example:
 
 ```cpp
 struct A;
@@ -175,13 +175,13 @@ struct B;
 struct A {
     std::shared_ptr<B> pointer;
     ~A() {
-        std::cout << "A 被销毁" << std::endl;
+        std::cout << "A is destroyed" << std::endl;
     }
 };
 struct B {
     std::shared_ptr<A> pointer;
     ~B() {
-        std::cout << "B 被销毁" << std::endl;
+        std::cout << "B is destroyed" << std::endl;
     }
 };
 int main() {
@@ -192,36 +192,36 @@ int main() {
 }
 ```
 
-运行结果是 A, B 都不会被销毁，这是因为 a,b 内部的 pointer 同时又引用了 `a,b`，这使得 `a,b` 的引用计数均变为了 2，而离开作用域时，`a,b` 智能指针被析构，却只能造成这块区域的引用计数减一，这样就导致了 `a,b` 对象指向的内存区域引用计数不为零，而外部已经没有办法找到这块区域了，也就造成了内存泄露，如图&#x20;
+The result is that neither `A` nor `B` is destroyed. The reason is that the internal `pointer` members of `a` and `b` also reference `a` and `b`, so the reference count of both objects becomes 2. When the local smart pointers `a` and `b` leave scope, their destruction only decreases those reference counts by one. The memory areas pointed to by the `A` and `B` objects therefore still have non-zero reference counts, but the outside program can no longer reach them. This creates a memory leak, as shown below:
 
 ![](<../../.gitbook/assets/image (6).png>)
 
-解决这个问题的办法就是使用弱引用指针 `std::weak_ptr`，`std::weak_ptr`是一种弱引用（相比较而言 `std::shared_ptr` 就是一种强引用）。弱引用不会引起引用计数增加，当换用弱引用时候，最终的释放流程如图&#x20;
+The solution is to use the weak-reference pointer `std::weak_ptr`. A `std::weak_ptr` is a weak reference, whereas `std::shared_ptr` is a strong owning reference. A weak reference does not increase the reference count. After replacing one side of the ownership cycle with a weak reference, the final release process becomes:
 
 ![](<../../.gitbook/assets/image (2) (3).png>)
 
-在上图中，最后一步只剩下 B，而 B 并没有任何智能指针引用它，因此这块内存资源也会被释放。
+In the diagram above, only `B` remains at the last step, and no owning smart pointer references it anymore. Therefore, that memory resource is also released.
 
-`std::weak_ptr` 没有 `*` 运算符和 `->` 运算符，所以不能够对资源进行操作，它可以用于检查 `std::shared_ptr` 是否存在，其 `expired()` 方法能在资源未被释放时，会返回 `false`，否则返回 `true`；除此之外，它也可以用于获取指向原始对象的 `std::shared_ptr` 指针，其 `lock()` 方法在原始对象未被释放时，返回一个指向原始对象的 `std::shared_ptr` 指针，进而访问原始对象的资源，否则返回`nullptr`。
+`std::weak_ptr` does not provide `operator*` or `operator->`, so it cannot directly operate on the resource. It can be used to check whether the corresponding `std::shared_ptr`-managed object still exists. Its `expired()` method returns `false` when the resource has not been released, and returns `true` otherwise. It can also be used to obtain a `std::shared_ptr` that points to the original object: `lock()` returns such a `std::shared_ptr` when the original object is still alive, allowing the resource to be accessed; otherwise it returns `nullptr`.
 
 ### **How to choose?**
 
-如果程序要使用**多个指向同一个对象的指针**，应选择`shared_ptr`。这样的情况包括：
+If a program needs **multiple pointers to the same object**, choose `shared_ptr`. Typical cases include:
 
-* 有一个指针数组，并使用一些辅助指针来标示特定的元素，如最大的元素和最小的元素；
-* 两个对象包含都指向第三个对象的指针；
-* STL容器包含指针。很多STL算法都支持复制和赋值操作，这些操作可用于`shared_ptr`，但不能用于`unique_ptr`（编译器发出warning）和`auto_ptr`（行为不确定）。如果你的编译器没有提供`shared_ptr`，可使用**Boost库**提供的`shared_ptr`。
+* There is an array of pointers, and additional helper pointers are used to mark specific elements, such as the largest or smallest element.
+* Two objects both contain pointers to a third object.
+* An STL container stores pointers. Many STL algorithms require copy and assignment operations. These operations are supported by `shared_ptr`, but not by `unique_ptr` in copy contexts, and `auto_ptr` has problematic ownership-transfer behavior. If the compiler does not provide `shared_ptr`, the `shared_ptr` implementation from **Boost** can be used.
 
-如果程序不需要多个指向同一个对象的指针，则可使用`unique_ptr`。
+If the program does not need multiple pointers to the same object, use `unique_ptr`.
 
-如果函数使用`new`分配内存，并返还指向该内存的指针，将其返回类型声明为`unique_ptr`是不错的选择。这样，所有权转让给接受返回值的`unique_ptr`，而该智能指针将负责调用`delete`。可将`unique_ptr`存储到STL容器，**只要不调用将一个`unique_ptr`复制或赋给另一个**算法（`如sort()`）。例如，可在程序中使用类似于下面的代码段
+If a function allocates memory with `new` and returns a pointer to that memory, declaring its return type as `unique_ptr` is a good choice. Ownership is transferred to the `unique_ptr` that receives the return value, and that smart pointer becomes responsible for calling `delete`. A `unique_ptr` can also be stored in an STL container, **as long as no algorithm tries to copy or assign one `unique_ptr` to another non-temporary `unique_ptr`**. For example:
 
 ```cpp
 unique_ptr<int> make_int(int n) {
     return unique_ptr<int>(new int(n));
 }
 void show(unique_ptr<int> &p1) {
-    cout << *a << ' ';
+    cout << *p1 << ' ';
 }
 int main() {
     ...
@@ -235,9 +235,9 @@ int main() {
 }
 ```
 
-其中`push_back`调用没有问题，因为它**返回一个临时`unique_ptr`**，该`unique_ptr`被赋给vp中的一个`unique_ptr`。另外，如果**按值而不是按引用**给`show()`传递对象，`for_each()`将非法，因为这将导致使用一个来自vp的非临时`unique_ptr`初始化p1，而这是不允许的。前面说过，编译器将发现错误使用`unique_ptr`的企图。
+The `push_back` call is valid because `make_int()` **returns a temporary `unique_ptr`**, and that temporary is moved into a `unique_ptr` stored in `vp`. However, if `show()` received its argument **by value instead of by reference**, the `for_each()` call would be illegal. It would try to initialize `p1` from a non-temporary `unique_ptr` inside `vp`, which is not allowed. As noted above, the compiler detects incorrect attempts to copy `unique_ptr`.
 
-在`unique_ptr`为右值时，可将其赋给`shared_ptr`，这与将一个`unique_ptr`赋给一个需要满足的条件相同。与前面一样，在下面的代码中，`make_int()`的返回类型为`unique_ptr<int>`：
+When a `unique_ptr` is an rvalue, it can be used to construct a `shared_ptr`. This follows the same ownership-transfer condition required when moving a `unique_ptr`. As before, in the following code `make_int()` returns `unique_ptr<int>`:
 
 ```cpp
 unique_ptr<int> pup(make_int(rand() % 1000));   // ok
@@ -245,6 +245,6 @@ shared_ptr<int> spp(pup);                       // not allowed, pup as lvalue
 shared_ptr<int> spr(make_int(rand() % 1000));   // ok
 ```
 
-模板`shared_ptr`包含一个显式构造函数，可用于将右值`unique_ptr`转换为`shared_ptr`。`shared_ptr`将接管原来归`unique_ptr`所有的对象。
+The `shared_ptr` template provides a constructor that can convert an rvalue `unique_ptr` into a `shared_ptr`. The `shared_ptr` takes over ownership of the object that was previously owned by the `unique_ptr`.
 
-在满足`unique_ptr`要求的条件时，也可使用`auto_ptr`，但`unique_ptr`是更好的选择。如果你的编译器没有`unique_ptr`，可考虑使用**Boost库提供的`scoped_ptr`**，它与`unique_ptr`类似。
+In old C++ code, `auto_ptr` could be used in some situations where exclusive ownership was needed, but `unique_ptr` is the better and modern choice. If the compiler does not provide `unique_ptr`, consider **Boost's `scoped_ptr`**, which has similar single-owner intent.

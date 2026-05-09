@@ -1,358 +1,360 @@
 ---
-description: RDMA 入门介绍
+description: Introductory notes on RDMA
 ---
 
-# 😍 Import
+# 😍 Introduction
 
-RDMA(RemoteDirect Memory Access)技术全称**远程直接内存访问**，就是为了解决网络传输中服务器端数据处理的延迟而产生的。它将数据直接从一台计算机的内存传输到另一台计算机，无需双方操作系统的介入。这允许高吞吐、低延迟的网络通信，尤其适合在大规模并行计算机集群中使用。
+RDMA (Remote Direct Memory Access) is a networking technology designed to reduce server-side data-processing latency during network transmission. It transfers data directly from the memory of one computer to the memory of another computer without involving the operating systems on either side in the data path. This enables high-throughput and low-latency network communication, especially in large-scale parallel computing clusters.
 
-RDMA通过网络把资料直接传入计算机的存储区，将数据从一个系统快速移动到远程系统存储器中，而不对操作系统造成任何影响，这样就不需要用到多少计算机的处理能力。它消除了外部存储器复制和上下文切换的开销，因而能解放内存带宽和CPU周期用于改进应用系统性能。
+RDMA sends data directly into a computer's memory region over the network, quickly moving data from one system into the memory of a remote system with minimal operating-system involvement. As a result, it consumes much less host CPU processing power. It removes the overhead of extra memory copies and context switches, freeing memory bandwidth and CPU cycles to improve application performance.
 
-本次详解我们从三个方面详细介绍RDMA：RDMA背景、RDMA相关工作、RDMA技术详解。
+This note introduces RDMA from three perspectives: RDMA background, related work, and RDMA technical details.
 
-### 一、背景介绍
+### 1. Background
 
 ![](https://tjcug.github.io/blog/images/pasted-59.png)
 
-#### 1.1 传统TCP/IP通信模式
+#### 1.1 Traditional TCP/IP Communication Model
 
-传统的TCP/IP网络通信，数据需要通过用户空间发送到远程机器的用户空间。
+In traditional TCP/IP network communication, data is transferred from the sender's user space to the receiver's user space through the kernel and the network protocol stack.
 
-**数据发送方：**
+**Sender side:**
 
-将数据从用户应用空间Buffer复制到内核空间的Socket Buffer中。
+Data is copied from the user-application buffer into the kernel-space socket buffer.
 
-然后Kernel空间中添加数据包头，进行数据封装。
+The kernel then adds packet headers and encapsulates the data.
 
-通过一系列多层网络协议（包括传输控制协议（TCP）、用户数据报协议（UDP）、互联网协议（IP）以及互联网控制消息协议（ICMP）等）的数据包处理工作，数据才被push到NIC网卡中的Buffer进行网络传输。
+After a series of packet-processing steps through multiple network protocols, including TCP, UDP, IP, ICMP, and others, the data is pushed into the NIC buffer for network transmission.
 
-**消息接受方：**
+**Receiver side:**
 
-接受从远程机器发送的数据包后，要将数据包从NIC buffer中复制数据到Socket Buffer。
+After receiving packets from the remote machine, the receiver copies data from the NIC buffer into the socket buffer.
 
-然后经过一些列的多层网络协议进行数据包的解析工作。
+The kernel then parses the packets through the multi-layer network protocol stack.
 
-解析后的数据被复制到相应位置的用户应用空间Buffer。
+The parsed data is copied into the corresponding user-application buffer.
 
-这个时候再进行系统上下文切换，用户应用程序才被调用。
+Only after that does the system perform a context switch and invoke the user application.
 
-以上就是传统的TCP/IP协议层的工作。
+This is the traditional TCP/IP protocol-layer workflow.
 
 ![](https://tjcug.github.io/blog/images/pasted-60.png)
 
-如今随着社会的发展，我们希望更快和更轻量级的网络通信。
+As systems evolve, we increasingly need faster and lighter-weight network communication.
 
-#### 1.2 通信网络定义
+#### 1.2 Network Communication Metrics
 
-计算机网络通信中最重要两个衡量指标主要是指**高带宽和低延迟**。
+The two most important metrics in computer network communication are **high bandwidth** and **low latency**.
 
-通信延迟主要是指：处理延迟和网络传输延迟。
+Communication latency mainly consists of processing latency and network transmission latency.
 
-处理延迟开销指的就是消息在发送和接收阶段的处理时间。
+Processing latency is the time spent processing a message on the send and receive sides.
 
-网络传输延迟指的就是消息在发送和接收方的网络传输时延。如果网络通信状况很好的情况下，网络基本上可以达到高带宽和低延迟。
+Network transmission latency is the time spent transmitting the message over the network between sender and receiver. When network conditions are good, the network itself can provide high bandwidth and low latency.
 
-#### 1.3 当今网络现状
+#### 1.3 Current Network Workloads
 
-消息通信主要分为两类消息：
+Message communication can be roughly divided into two categories:
 
-一类是`Large messages`，在这类消息通信中，**网络传输延迟**占整个通信中的主导位置。
+The first category is `large messages`. In this type of communication, **network transmission latency** dominates the total communication cost.
 
-一类消息是`Small messages`，在这类消息通信中，消息发送端和接受端的处理开销占整个通信的主导地位。
+The second category is `small messages`. In this type of communication, sender-side and receiver-side processing overhead dominates the total communication cost.
 
-然而在现实计算机网络中的通信场景中，主要是以发送小消息为主。所有说发送消息和接受消息的处理开销占整个通信的主导的地位。
+In real computer-network workloads, however, communication is mostly dominated by small messages. Therefore, message send and receive processing overhead becomes the dominant factor.
 
-具体来说，**处理开销**指的是buffer管理、在不同内存空间中消息复制、以及消息发送完成后的系统中断。
+More specifically, **processing overhead** includes buffer management, message copying across different memory spaces, and system interrupts after message transmission completes.
 
-#### 1.4 传统TCP/IP存在的问题
+#### 1.4 Problems in Traditional TCP/IP
 
-传统的TPC/IP存在的问题主要是指`I/O bottleneck`瓶颈问题。在高速网络条件下与网络I/O相关的主机处理的高开销限制了可以在机器之间发送的带宽。
+The main problem with traditional TCP/IP is the `I/O bottleneck`. Under high-speed network conditions, high host-side processing overhead related to network I/O limits the bandwidth that can be delivered between machines.
 
-这里的高额开销是数据移动操作和复制操作。
+This high overhead mainly comes from data movement and data copying.
 
-具体来讲，主要是传统的TCP/IP网络通信是通过**内核**发送消息。
+More specifically, traditional TCP/IP network communication sends messages through the **kernel**.
 
-`Messaging passing through kernel` 这种方式会导致很低的性能和很低的灵活性：
+`Message passing through the kernel` leads to low performance and low flexibility:
 
-性能低下的原因主要是由于网络通信通过内核传递，这种通信方式存在的很高的数据移动和数据复制的开销。并且现如今内存带宽性相较如CPU带宽和网络带宽有着很大的差异。
+Performance is low because kernel-mediated network communication introduces high data-movement and data-copying overhead. Modern memory bandwidth is also very different from CPU bandwidth and network bandwidth, making these copies especially expensive.
 
-很低的灵活性的原因主要是所有网络通信协议通过内核传递，这种方式很难去支持新的网络协议和新的消息通信协议以及发送和接收接口。
+Flexibility is low because all network communication protocols pass through the kernel. This makes it difficult to support new network protocols, new messaging protocols, and new send/receive interfaces.
 
-### 二、相关工作
+### 2. Related Work
 
-高性能网络通信历史发展主要有以下四个方面：`TCP Offloading Engine（TOE）`、`User-Net Networking(U-Net)`、`Virtual interface Architecture（VIA）`、`Remote Direct Memroy Access(RDMA)`。U-Net是第一个跨过内核网络通信的模式之一。VIA首次提出了标准化user-level的网络通信模式，其次它组合了U-Net接口和远程DMA设备。RDMA就是现代化高性能网络通信技术。
+The history of high-performance network communication mainly includes four directions: `TCP Offloading Engine (TOE)`, `User-Net Networking (U-Net)`, `Virtual Interface Architecture (VIA)`, and `Remote Direct Memory Access (RDMA)`. U-Net was one of the first models to bypass the kernel in network communication. VIA first proposed a standardized user-level networking model, combining the U-Net interface with remote DMA devices. RDMA is the modern high-performance networking technology that follows this line of work.
 
 #### 2.1 TCP Offloading Engine
 
-在主机通过网络进行通信的过程中，主机处理器需要耗费大量资源进行多层网络协议的数据包处理工作，这些协议包括传输控制协议（TCP）、用户数据报协议（UDP）、互联网协议（IP）以及互联网控制消息协议（ICMP）等。由于CPU需要进行繁重的封装网络数据包协议，为了将占用的这部分主机处理器资源解放出来专注于其他应用，人们发明了TOE（TCP/IP Offloading Engine）技术，将上述主机处理器的工作转移到网卡上。
+When hosts communicate over a network, the host processor spends substantial resources processing packets through multiple network protocols, including TCP, UDP, IP, ICMP, and others. Because the CPU performs heavy packet encapsulation and protocol processing, TOE (TCP/IP Offloading Engine) was introduced to move this work from the host processor to the network card, freeing CPU resources for other applications.
 
-这种技术需要特定网络接口-网卡支持这种Offloading操作。**这种特定网卡能够支持封装多层网络协议的数据包**，这个功能常见于高速以太网接口上，如吉比特以太网（GbE）或10吉比特以太网（10GbE）。
+This technology requires a specific network interface card that supports offloading. **Such a NIC can encapsulate packets for multiple network protocol layers**. This capability is common on high-speed Ethernet interfaces, such as Gigabit Ethernet (GbE) and 10 Gigabit Ethernet (10GbE).
 
-#### 2.2 User-Net Networking(U-Net)
+#### 2.2 User-Net Networking (U-Net)
 
-U-Net的设计目标是将**协议处理部分移动到用户空间去处理**。这种方式避免了用户空间将数据移动和复制到内核空间的开销。它的设计宗旨就是移动整个协议栈到用户空间中去，并且从数据通信路径中彻底删除内核。这种设计带来了高性能的提升和高 灵活性的提升。
+The design goal of U-Net is to **move protocol processing into user space**. This avoids the cost of moving and copying data from user space into kernel space. Its core idea is to move the entire protocol stack into user space and remove the kernel completely from the data-communication path. This design improves both performance and flexibility.
 
 ![](https://tjcug.github.io/blog/images/pasted-61.png)
 
-U-Net的virtual NI 为每个进程提供了一种拥有网络接口的错觉，内核接口只涉及到连接步骤。传统上的网络，内核控制整个网络通信，所有的通信都需要通过内核来传递。U-Net应用程序可以通过MUX直接访问网络，应用程序通过MUX直接访问内核，而不需要将数据移动和复制到内核空间中去。
+U-Net's virtual NI gives each process the illusion that it owns a network interface. The kernel interface is only involved during connection setup. In traditional networking, the kernel controls all network communication, and every communication operation must pass through the kernel. A U-Net application can access the network directly through the MUX, without moving and copying data into kernel space.
 
-### 三、RDMA详解
+### 3. RDMA Details
 
-RDMA(Remote Direct Memory Access)技术全称远程直接内存访问，就是为了解决网络传输中服务器端数据处理的延迟而产生的。
+RDMA (Remote Direct Memory Access) is a technology designed to reduce server-side data-processing latency during network transmission.
 
-RDMA通过网络把资料直接传入计算机的**存储区**，将数据从一个系统快速移动到**远程系统存储器**中，而不对操作系统造成任何影响，这样就不需要用到多少计算机的处理功能。它消除了外部存储器复制和上下文切换的开销，因而能解放内存带宽和CPU周期用于改进应用系统性能。
+RDMA sends data directly into a computer's **memory region** over the network, rapidly moving data from one system into the **memory of a remote system** without materially affecting the operating system. This greatly reduces the amount of host processing required. It removes the overhead of extra memory copies and context switches, freeing memory bandwidth and CPU cycles to improve application performance.
 
 ![](https://tjcug.github.io/blog/images/pasted-62.png)
 
-RDMA主要有以下三个特性：
+RDMA mainly has the following three characteristics:
 
-1. Low-Latency
+1. Low latency
 2. Low CPU overhead
-3. high bandwidth
+3. High bandwidth
 
-#### 3.1 RDMA 简介
+#### 3.1 RDMA Overview
 
-Remote：数据通过网络与远程机器间进行数据传输
+Remote: data is transferred over the network between local and remote machines.
 
-Direct：没有内核的参与，**有关发送传输的所有内容都卸载到网卡上**
+Direct: there is no kernel involvement in the data path; **the work related to send and transfer is offloaded to the NIC**.
 
-Memory：在用户空间虚拟内存与RNIC网卡**直接**进行数据传输不涉及到系统内核，没有额外的数据移动和复制
+Memory: data is transferred **directly** between user-space virtual memory and the RNIC without involving the system kernel or performing additional data movement and copying.
 
-Access: send、receive、read、write、atomic操作
+Access: send, receive, read, write, and atomic operations.
 
-#### 3.2 RDMA基本概念与术语
+#### 3.2 RDMA Concepts and Terms
 
-**3.2.1 基本术语**
+**3.2.1 Basic Terms**
 
-<mark style="color:purple;">①</mark> **Fabric**
+<mark style="color:purple;">1</mark> **Fabric**
 
-所谓Fabric，就是支持RDMA的局域网(LAN)。
+A fabric is a local-area network that supports RDMA.
 
 ```
 A local-area RDMA network is usually referred to as a fabric.
 ```
 
-<mark style="color:purple;">②</mark> **CA(Channel Adapter)：**
+<mark style="color:purple;">2</mark> **CA (Channel Adapter)**
 
-CA是Channel Adapter(通道适配器)的缩写。那么，CA就是将系统连接到Fabric的硬件组件。
+CA stands for Channel Adapter. A CA is the hardware component that connects a system to the fabric.
 
-在IBTA中，一个CA就是IB子网中的一个终端结点(End Node)。
+In IBTA terminology, a CA is an end node in an InfiniBand subnet.
 
-分为两种类型，一种是`HCA`，另一种叫做`TCA`，它们合称为`xCA`。
+There are two types: `HCA` and `TCA`. Together they are often called `xCA`.
 
-其中， `HCA(Host Channel Adapter)`是支持"verbs"接口的CA，`TCA(Target Channel Adapter)`可以理解为"weak CA"，不需要像HCA一样支持很多功能。
+An `HCA (Host Channel Adapter)` is a CA that supports the verbs interface. A `TCA (Target Channel Adapter)` can be understood as a "weak CA" and does not need to support as many functions as an HCA.
 
-而在IEEE/IETF中，CA的概念被实体化为`RNIC（RDMA Network Interface Card）`， iWARP就把一个CA称之为一个RNIC。
+In IEEE/IETF terminology, the CA concept is materialized as an `RNIC (RDMA Network Interface Card)`. In iWARP, a CA is called an RNIC.
 
-**简言之，在IBTA阵营中，CA即`HCA`或`TCA`； 而在iWARP阵营中，CA就是`RNIC`。 总之，无论是`HCA`、 `TCA`还是`RNIC`，它们都是CA， 它们的基本功能本质上都是生产或消费数据包(packet)。**
+**In short, in the IBTA ecosystem, a CA is an `HCA` or `TCA`; in the iWARP ecosystem, a CA is an `RNIC`. Whether it is an `HCA`, `TCA`, or `RNIC`, it is still a CA. Its basic function is essentially to produce or consume packets.**
 
 ```
 A channel adapter is the hardware component that connects a system to the fabric.
 ```
 
-<mark style="color:purple;">③</mark> **Verbs**：
+<mark style="color:purple;">3</mark> **Verbs**
 
-在RDMA的持续演进中，有一个组织叫做 OpenFabric Alliance 所做的贡献可谓功不可没。 Verbs这个词不好翻译，大致可以理解为访问RDMA硬件的“一组标准动作”。 每一个Verb可以理解为一个Function。
+During RDMA's evolution, the OpenFabrics Alliance made important contributions. The word "verbs" is difficult to translate directly. It can be roughly understood as a standard set of actions for accessing RDMA hardware. Each verb can be understood as a function.
 
-**3.2.2 核心概念**
+**3.2.2 Core Concepts**
 
-<mark style="color:purple;">①</mark> **Memory Registration(MR) | 内存注册**
+<mark style="color:purple;">1</mark> **Memory Registration (MR)**
 
-RDMA 就是用来对内存进行数据传输。那么怎样才能对内存进行传输？
+RDMA is used to transfer data between memory regions. How can memory be used for such transfers?
 
-很简单，**注册**。&#x20;
+The answer is simple: **registration**.
 
-因为RDMA硬件对用来做数据传输的内存是有特殊要求的。
+RDMA hardware has special requirements for memory used in data transfer.
 
-* 在数据传输过程中，应用程序不能修改数据所在的**内存**。
-* 操作系统不能对数据所在的**内存**进行`page out`操作 -- 物理地址和虚拟地址的映射必须是固定不变的。
+* During data transfer, the application must not modify the **memory** being used by the RDMA operation.
+* The operating system must not `page out` the **memory** containing the data. The mapping between virtual addresses and physical pages must remain stable.
 
-注意无论是DMA或者RDMA都要求**物理地址连续**，这是由DMA引擎所决定的。 那么怎么进行内存注册呢？
+More precisely, DMA and RDMA engines require stable physical-address translations, and hardware usually consumes either physical addresses or scatter-gather descriptors. Memory registration pins the memory and records the address-translation information required by the RNIC.
 
-* 创建两个 **`key`** ( `local` 和 `remote` )指向需要操作的内存区域 `Memory Region`
-* 注册的 `key`s 是数据传输请求的一部分
+How is memory registered?
 
-注册一个`Memory Region`之后，这个时候这个`Memory Region`也就有了它自己的属性：
+* Create two **`key`s**, `local` and `remote`, that refer to the memory region to be operated on.
+* The registered `key`s become part of the data-transfer request.
 
-* `context` : RDMA操作上下文
-* `addr` : MR被注册的Buffer地址
-* `length` : MR被注册的Buffer长度
-* `lkey`：MR被注册的本地key
-* `rkey`：MR被注册的远程key
+After a `Memory Region` is registered, it has its own attributes:
 
-对`Memrory Registration`：
+* `context`: RDMA operation context
+* `addr`: registered buffer address of the MR
+* `length`: registered buffer length of the MR
+* `lkey`: local key of the registered MR
+* `rkey`: remote key of the registered MR
 
-`Memory Registration`只是RDMA中对内存保护的一种措施，只有将要操作的内存注册到RDMA `Memory Region`中，这快操作的内存就交给RDMA 保护域来操作了。
+About `Memory Registration`:
 
-这个时候我们就可以对这快内存进行操作，至于操作的起始地址、操作Buffer的长度，可以根据程序的具体需求进行操作。我们只要保证接受方的Buffer 接受的长度**大于等于**发送的Buffer长度。
+`Memory Registration` is a memory-protection mechanism in RDMA. Only after a memory region is registered as an RDMA `Memory Region` is the memory handed over to the RDMA protection domain for RDMA operations.
 
-<mark style="color:purple;">②</mark> **Queues | 队列**
+At this point, operations can be performed on the memory region. The starting address and buffer length are determined by the program's specific needs. The main requirement is that the receiver's buffer length must be **greater than or equal to** the sender's buffer length.
 
-RDMA提供了**基于消息队列的点对点通信**，每个应用都可以直接获取自己的消息，无需操作系统和协议栈的介入。
+<mark style="color:purple;">2</mark> **Queues**
 
-RDMA一共支持三种队列，这些队列中管理着各种类型的消息。
+RDMA provides **message-queue-based point-to-point communication**. Each application can directly obtain its own messages without operating-system or protocol-stack intervention.
 
-三种队列分别是：发送队列(Send Queue 即 **SQ**)、接收队列(Receive Queue 即 **RQ**) 和 完成队列(Complete Queue 即 **CQ**)。其中，SQ 和 RQ 通常成对创建，被称为Queue Pairs(**QP**)，即：
+RDMA supports three queues. These queues manage different types of messages.
 
-1. 每一个应用程序可以有很多QP和CQ
-2. 每一个QP包括一个SQ和RQ
-3. 每一个CQ可以跟多个SQ或者RQ相关联。
+The three queues are the Send Queue (**SQ**), Receive Queue (**RQ**), and Completion Queue (**CQ**). SQ and RQ are usually created as a pair called a Queue Pair (**QP**):
 
-消息服务建立在通信双方本端和远端应用之间创建的**Channel-IO**连接之上。当应用需要通信时，就会创建一条Channel连接，每条Channel的首尾端点是两个 QP。QP会被映射到应用的虚拟地址空间，使得应用直接通过它访问RNIC网卡。
+1. Each application can have many QPs and CQs.
+2. Each QP contains one SQ and one RQ.
+3. Each CQ can be associated with multiple SQs or RQs.
 
-RDMA是基于消息的传输协议，数据传输都是异步操作。 RDMA操作其实很简单，可以理解为：
+The messaging service is built on a **Channel-IO** connection created between the local and remote applications. When an application needs to communicate, it creates a channel connection. The two endpoints of each channel are two QPs. QPs are mapped into the application's virtual address space, allowing the application to access the RNIC directly through them.
 
-1.  Host提交工作请求(Work Request 即 **WR**)到工作队列(Work Queue 即 **WQ**): WR中描述了应用希望传输到Channel对端的消息内容，WR通知QP中的某个工作队列WQ（即WQ可为SQ或者RQ）。
+RDMA is a message-based transport protocol, and all data transfers are asynchronous. An RDMA operation can be understood as follows:
 
-    工作队列的每一个元素叫做 Work Queue Element 即 **WQE**, 也就是WR在WQ中被转化的格式。
+1.  The host submits a Work Request (**WR**) to a Work Queue (**WQ**). The WR describes the message that the application wants to transfer to the remote endpoint of the channel, and it targets one work queue in the QP. The WQ can be either an SQ or an RQ.
 
-    WQE等待RNIC的异步调度解析，并从WQE指向的Buffer中拿到真正的消息发送到Channel对端。
-2. Host从完成队列(CQ)中获取工作完成(WC): 完成队列CQ用来知会用户WQ上的消息已经被处理完，CQ里的每一个元素叫做 Complete Queue Element 即 **CQE**, 也就是WC。
-3.  具有RDMA引擎的硬件(hardware)就是一个队列元素处理器。 RDMA硬件不断地从工作队列(WQ)中去取工作请求(WR)来执行，执行完了就给完成队列(CQ)中放置工作完成(WC)。
+    Each element in a work queue is called a Work Queue Element (**WQE**), which is the format into which a WR is converted inside the WQ.
 
-    从**生产者-消费者**的角度理解就是：
+    The WQE waits for asynchronous scheduling and parsing by the RNIC. The RNIC then obtains the actual message from the buffer pointed to by the WQE and sends it to the remote endpoint of the channel.
+2. The host obtains Work Completion (**WC**) from the Completion Queue (CQ). The CQ notifies the user that messages on the WQ have been processed. Each element in the CQ is called a Completion Queue Element (**CQE**), which is the same object represented to user space as a WC.
+3.  Hardware with an RDMA engine is a queue-element processor. RDMA hardware continuously fetches Work Requests (WRs) from Work Queues (WQs), executes them, and places Work Completions (WCs) into Completion Queues (CQs).
 
-    1. Host生产WR, 把WR放到WQ中去
-    2. RDMA硬件消费WR
-    3. RDMA硬件生产WC, 把WC放到CQ中去
-    4. Host消费WC
+    From a **producer-consumer** perspective:
+
+    1. The host produces WRs and places them into the WQ.
+    2. RDMA hardware consumes WRs.
+    3. RDMA hardware produces WCs and places them into the CQ.
+    4. The host consumes WCs.
 
 ![img](https://s2.loli.net/2022/08/25/RvNoKOmFsAif4J6.jpg)
 
 <figure><img src="../../.gitbook/assets/image (2) (2).png" alt=""><figcaption></figcaption></figure>
 
-#### **3.2.3 其他**
+#### **3.2.3 Other Concepts**
 
-RDMA有两种基本操作：
+RDMA has two basic operation classes:
 
-* `Memory verbs`: 包括RDMA read、write 和 atomic 操作。这些操作**指定远程地址进行操作并且绕过接收者的CPU**。
-* `Messaging verbs`: 包括RDMA send、receive操作。这些动作**涉及响应者的CPU，发送的数据被写入由响应者的CPU先前发布的接受所指定的地址**。
+* `Memory verbs`: RDMA read, write, and atomic operations. These operations **operate on specified remote addresses and bypass the receiver's CPU**.
+* `Messaging verbs`: RDMA send and receive operations. These operations **involve the responder's CPU; the sent data is written to an address previously specified by a receive posted by the responder's CPU**.
 
-RDMA传输分为可靠和不可靠的，并且可以连接和不连接的（数据报）。
+RDMA transports can be reliable or unreliable, and they can be connected or unconnected datagram transports.
 
-凭借可靠的传输，NIC使用确认来保证消息的按序传送。不可靠的传输不提供这样的保证。
+With reliable transport, the NIC uses acknowledgments to guarantee in-order message delivery. Unreliable transport does not provide this guarantee.
 
-然而，像InfiniBand这样的现代RDMA实现使用了一个无损链路层，它可以防止使用链路层流量控制的基于拥塞的损失，以及使用链路层重传的基于位错误的损失。因此，不可靠的传输很少会丢弃数据包。
+However, modern RDMA implementations such as InfiniBand use a lossless link layer. Link-level flow control prevents congestion-based loss, and link-level retransmission handles bit-error-based loss. Therefore, unreliable transports rarely drop packets in practice.
 
-**目前的RDMA硬件提供一种数据报传输：不可靠的数据报（UD），并且不支持memory verbs。**
+**Current RDMA hardware provides one datagram transport: Unreliable Datagram (UD), and UD does not support memory verbs.**
 
 ![](https://tjcug.github.io/blog/images/pasted-63.png)
 
-细说**数据传输**：
+Detailed **data transfer** operations:
 
-<mark style="color:purple;">①</mark> **RDMA Send | RDMA发送(/接收)操作 （Send/Recv）**
+<mark style="color:purple;">1</mark> **RDMA Send / Receive (Send/Recv)**
 
-跟TCP/IP的send/recv是类似的，不同的是RDMA是**基于消息的数据传输协议**（而不是基于字节流的传输协议），所有数据包的组装都在RDMA硬件上完成的，也就是说OSI模型中的**下面4层**(传输层，网络层，数据链路层，物理层)都在RDMA硬件上完成。
+This is similar to TCP/IP send/recv. The difference is that RDMA is a **message-based data-transfer protocol**, not a byte-stream protocol. Packet assembly is completed by RDMA hardware. In other words, the lower four layers of the OSI model, transport, network, data link, and physical layers, are handled by RDMA hardware.
 
-<mark style="color:purple;">②</mark> **RDMA Read | RDMA读操作 (Pull)**
+<mark style="color:purple;">2</mark> **RDMA Read (Pull)**
 
-RDMA读操作本质上就是Pull操作, 把远程系统内存里的数据拉回到本地系统的内存里。
+An RDMA read is essentially a pull operation. It pulls data from remote system memory back into local system memory.
 
-<mark style="color:purple;">③</mark> **RDMA Write | RDMA写操作 (Push)**
+<mark style="color:purple;">3</mark> **RDMA Write (Push)**
 
-RDMA写操作本质上就是Push操作，把本地系统内存里的数据推送到远程系统的内存里。
+An RDMA write is essentially a push operation. It pushes data from local system memory into remote system memory.
 
-<mark style="color:purple;">④</mark> **RDMA Write with Immediate Data | 支持立即数的RDMA写操作**
+<mark style="color:purple;">4</mark> **RDMA Write with Immediate Data**
 
-支持立即数的RDMA写操作本质上就是给远程系统Push带外(OOB)数据, 这跟TCP里的带外数据是类似的。
+RDMA write with immediate data is essentially a push of out-of-band (OOB) data to the remote system, similar to out-of-band data in TCP.
 
-可选地，immediate 4字节值可以与数据缓冲器一起发送。&#x20;
+Optionally, a 4-byte immediate value can be sent together with the data buffer.
 
-该值作为接收通知的一部分呈现给接收者，并且不包含在数据缓冲器中。
+This value is presented to the receiver as part of the receive notification and is not included in the data buffer itself.
 
-#### 3.3 RDMA三种不同的硬件实现
+#### 3.3 Three RDMA Hardware Implementations
 
-目前RDMA有三种不同的**硬件实现**。分别是 `InfiniBand`、`iWarp(internet Wide Area RDMA Protocol)`、`RoCE(RDMA over Converged Ethernet)`。
+There are currently three different RDMA **hardware implementations**: `InfiniBand`, `iWARP (Internet Wide Area RDMA Protocol)`, and `RoCE (RDMA over Converged Ethernet)`.
 
 ![](https://tjcug.github.io/blog/images/pasted-64.png)
 
-目前，大致有三类RDMA**网络**，分别是 `Infiniband`、`RoCE`、`iWARP`。
+Broadly speaking, there are three types of RDMA **networks**: `InfiniBand`, `RoCE`, and `iWARP`.
 
-其中，`Infiniband` 是一种专为RDMA设计的网络，从**硬件级别**保证可靠传输 ；`Infiniband` 支持RDMA的新一代网络协议。 由于这是一种新的网络技术，因此需要支持该技术的NIC和交换机。
+`InfiniBand` is a network designed specifically for RDMA. It guarantees reliable transmission at the **hardware level** and supports a next-generation network protocol for RDMA. Because it is a separate network technology, it requires NICs and switches that support InfiniBand.
 
-而`RoCE`和 `iWARP`都是基于以太网的RDMA技术，支持相应的verbs接口，如上图所示。
+`RoCE` and `iWARP` are Ethernet-based RDMA technologies that support the corresponding verbs interface, as shown in the figure above.
 
-<mark style="color:blue;background-color:blue;">**`RoCE`**</mark>，一个允许在以太网上执行RDMA的网络协议。 其较低的网络标头是以太网标头，其较高的网络标头（包括数据）是InfiniBand标头。 这支持在标准以太网基础设施（交换机）上使用RDMA。 只有网卡应该是特殊的，支持RoCE。从图中不难发现，`RoCE`协议存在 `RoCEv1` 和 `RoCEv2` **两个版本**，主要区别`RoCEv1`是基于以太网**链路层**实现的RDMA协议(交换机需要支持PFC等流控技术，在物理层保证可靠传输)，而`RoCEv2`是以太网TCP/IP协议中UDP层实现。
+<mark style="color:blue;background-color:blue;">**`RoCE`**</mark> is a network protocol that allows RDMA over Ethernet. Its lower network header is an Ethernet header, while its higher network header, including the data, is an InfiniBand header. This allows RDMA to run over standard Ethernet infrastructure such as switches. Only the NIC needs to be special and support RoCE. As the figure shows, the `RoCE` protocol has two versions: `RoCEv1` and `RoCEv2`. The main difference is that `RoCEv1` implements RDMA at the Ethernet **link layer**. In practice it relies on lossless Ethernet features such as PFC to avoid packet loss. `RoCEv2` runs over UDP/IP, so it is routable at Layer 3, but production deployments still typically require a carefully configured low-loss or lossless Ethernet fabric.
 
-`iWARP`，一个允许在TCP上执行RDMA的网络协议。 IB和RoCE中存在的功能在iWARP中不受支持。 这支持在标准以太网基础设施（交换机）上使用RDMA。 只有网卡应该是特殊的，并且支持iWARP（如果使用CPU卸载），否则所有iWARP堆栈都可以在SW中实现，并且丧失了大部分RDMA性能优势。
+`iWARP` is a network protocol that allows RDMA over TCP. Some functions available in InfiniBand and RoCE are not supported in iWARP. It supports RDMA over standard Ethernet infrastructure such as switches. Only the NIC needs to be special and support iWARP if CPU offload is used. Otherwise, the whole iWARP stack can be implemented in software, but that loses most of RDMA's performance advantages.
 
-从性能上，很明显`Infiniband`网络最好，但网卡和交换机是价格也很高，然而`RoCEv2`和`iWARP`仅需使用特殊的网卡就可以了，价格也相对便宜很多。
+In terms of performance, `InfiniBand` is clearly the strongest network, but its NICs and switches are expensive. `RoCEv2` and `iWARP` require only special NICs and are therefore much cheaper.
 
 ![](https://tjcug.github.io/blog/images/pasted-65.png)
 
 ![](https://tjcug.github.io/blog/images/pasted-66.png)
 
-#### 3.4 RDMA技术
+#### 3.4 RDMA Technology
 
 ![](https://tjcug.github.io/blog/images/pasted-67.png)
 
-传统上的RDMA技术设计内核封装多层网络协议并且涉及内核数据传输。RDMA通过专有的RDMA网卡**RNIC**，绕过内核直接从用户空间访问RDMA enabled NIC网卡。RDMA提供一个专有的verbs interface而不是传统的TCP/IP Socket interface。
+Traditional network communication requires the kernel to encapsulate multiple network protocol layers and participate in data transfer. RDMA uses a dedicated RDMA NIC, the **RNIC**, to bypass the kernel and access an RDMA-enabled NIC directly from user space. RDMA exposes a dedicated verbs interface rather than the traditional TCP/IP socket interface.
 
-要使用RDMA**首先要建立从RDMA到应用程序内存的数据路径** ，可以通过RDMA专有的verbs interface接口来建立这些数据路径，一旦数据路径建立后，就可以直接访问用户空间buffer。
+To use RDMA, an application must **first establish a data path between the RDMA hardware and application memory**. These data paths can be established through the RDMA verbs interface. Once the data path is established, the hardware can directly access user-space buffers.
 
-#### 3.5 RDMA整体系统架构图
+#### 3.5 Overall RDMA System Architecture
 
-![RDMA整体框架架构图](https://tjcug.github.io/blog/images/pasted-68.png)
+![RDMA overall architecture](https://tjcug.github.io/blog/images/pasted-68.png)
 
-从图中可以看出，RDMA在应用程序用户空间，提供了一系列verbs interface接口操作RDMA硬件。
+The figure shows that RDMA provides a series of verbs interfaces in application user space for operating RDMA hardware.
 
-RDMA绕过内核直接从用户空间访问RDMA 网卡(RNIC)。
+RDMA bypasses the kernel and accesses the RDMA NIC (RNIC) directly from user space.
 
-RNIC网卡中包括Cached Page Table Entry，页表就是用来将虚拟页面映射到相应的物理页面。
+The RNIC contains cached page table entries. Page tables are used to map virtual pages to corresponding physical pages.
 
-#### 3.6 RDMA技术详解
+#### 3.6 RDMA Workflow
 
-RDMA 的工作过程如下:
+RDMA works as follows:
 
-1.  当一个应用执行RDMA 读或写请求时，不执行任何数据复制。
+1.  When an application issues an RDMA read or write request, no data copy is performed.
 
-    在不需要任何内核内存参与的条件下，RDMA 请求从运行在用户空间中的应用中发送到**本地NIC**( 网卡)。
-2. NIC 读取缓冲的内容，并通过网络传送到**远程NIC**。
-3.  在网络上传输的RDMA 信息**包含**目标虚拟地址、内存钥匙和数据本身。
+    Without requiring any kernel-memory participation, the RDMA request is sent from the user-space application to the **local NIC**.
+2. The NIC reads the buffer contents and transmits them over the network to the **remote NIC**.
+3.  The RDMA message transmitted over the network **contains** the target virtual address, memory key, and the data itself.
 
-    请求既可以完全在用户空间中处理(通过轮询用户级完成排列) ，又或者在应用一直睡眠到请求完成时的情况下通过系统中断处理。
+    The request can either be processed completely in user space through polling a user-level completion queue, or be handled through a system interrupt when the application sleeps until the request completes.
 
-    RDMA 操作使应用可以从一个远程应用的内存中读数据或向这个内存写数据。
-4.  目标NIC 确认内存钥匙，直接将数据写人应用缓存中。
+    RDMA operations allow an application to read data from, or write data to, the memory of a remote application.
+4.  The target NIC validates the memory key and writes the data directly into the application buffer.
 
-    用于操作的远程虚拟内存地址包含在RDMA 信息中。
+    The remote virtual memory address used for the operation is included in the RDMA message.
 
-#### 3.7 RDMA操作细节
+#### 3.7 RDMA Operation Details
 
-**单边操作**传输方式是RDMA与传统网络传输的最大不同，只需提供直接访问远程的虚拟地址，无须远程应用的参与其中，这种方式适用于批量数据传输。
+**One-sided operations** are the largest difference between RDMA and traditional network transfer. They only require direct access to a remote virtual address and do not require participation from the remote application. This mode is suitable for bulk data transfer.
 
-READ和WRITE是单边操作，只需要本端明确信息的**源和目的地址**，远端应用不必感知此次通信，数据的读或写都通过RDMA在RNIC与应用Buffer之间完成，再由远端RNIC封装成消息返回到本端。
+READ and WRITE are one-sided operations. The local side only needs clear information about the **source and destination addresses**. The remote application does not need to be aware of the communication. Data reads or writes are completed by RDMA between the RNIC and the application buffer, and the remote RNIC packages the result message back to the local side.
 
-**双边操作**与传统网络的底层Buffer Pool类似，收发双方的参与过程并无差别，区别在零拷贝、Kernel Bypass，实际上对于RDMA，这是一种复杂的消息传输模式，多用于传输短的控制消息。
+**Two-sided operations** are similar to the lower-level buffer-pool model in traditional networking. The participation process of sender and receiver is not fundamentally different. The difference lies in zero copy and kernel bypass. In RDMA, this is a relatively complex message-transfer mode and is often used for short control messages.
 
-**3.7.1 RDAM单边操作 (RDMA READ)**
+**3.7.1 RDMA One-Sided Operation (RDMA READ)**
 
-对于单边操作，以存储网络环境下的存储为例，数据的流程如下：
+For a one-sided operation, using storage in a storage-network environment as an example, the data flow is:
 
-1. 首先A、B建立连接，QP已经创建并且初始化。
-2. 数据被存档在B的buffer地址`VB`，注意`VB`应该提前**注册**到B的RNIC (并且它是一个`Memory Region`) ，并拿到返回的`local key`，相当于RDMA操作这块buffer的权限。
-3. B把数据地址`VB`，`key`封装到专用的报文传送到A，这相当于B把数据buffer的操作权交给了A。同时B在它的WQ中注册进一个WR，以用于接收数据传输的A返回的状态。
-4. A在收到B的送过来的数据`VB`和`key`后，RNIC会把它们连同自身存储地址`VA`到封装`RDMA READ`请求，将这个消息请求发送给B，这个过程A、B两端不需要任何软件参与，就可以将B的数据存储到B的VA虚拟地址。
-5. B在存储完成后，会向A返回整个数据传输的状态信息。
+1. First, A and B establish a connection. The QP has already been created and initialized.
+2. The data is stored at buffer address `VB` on B. Note that `VB` should be registered with B's RNIC in advance, and it is a `Memory Region`. Registration returns a `local key`, which is equivalent to permission for RDMA to operate on this buffer.
+3. B packages data address `VB` and the `key` into a dedicated message and sends it to A. This is equivalent to B handing the operation rights of its data buffer to A. At the same time, B registers a WR in its WQ to receive the status returned by A after the data transfer.
+4. After A receives `VB` and the `key` from B, A's RNIC packages them together with A's own storage address `VA` into an `RDMA READ` request and sends the request to B. During this process, neither A nor B needs software participation. The data from B can be stored into A's virtual address `VA`.
+5. After storage completes, B returns the status information of the entire data transfer to A.
 
-**3.7.2 RDMA 单边操作 (RDMA WRITE)**
+**3.7.2 RDMA One-Sided Operation (RDMA WRITE)**
 
-对于单边操作，以存储网络环境下的存储为例，数据的流程如下：
+For a one-sided operation, using storage in a storage-network environment as an example, the data flow is:
 
-1. 首先A、B建立连接，QP已经创建并且初始化。
-2. 数据remote目标存储buffer地址`VB`，注意`VB`应该提前注册到B的RNIC(并且它是一个`Memory Region`)，并拿到返回的`local key`，相当于RDMA操作这块buffer的权限。
-3. B把数据地址`VB`，`key`封装到专用的报文传送到A，这相当于B把数据buffer的操作权交给了A。同时B在它的WQ中注册进一个WR，以用于接收数据传输的A返回的状态。
-4. A在收到B的送过来的数据`VB`和`key`后，RNIC会把它们连同自身发送地址`VA`到封装`RDMA WRITE`请求，这个过程A、B两端不需要任何软件参与，就可以将A的数据发送到B的VB虚拟地址。
-5. A在发送数据完成后，会向B返回整个数据传输的状态信息。
+1. First, A and B establish a connection. The QP has already been created and initialized.
+2. The remote target storage buffer address is `VB`. Note that `VB` should be registered with B's RNIC in advance, and it is a `Memory Region`. Registration returns a `local key`, which is equivalent to permission for RDMA to operate on this buffer.
+3. B packages data address `VB` and the `key` into a dedicated message and sends it to A. This is equivalent to B handing the operation rights of its data buffer to A. At the same time, B registers a WR in its WQ to receive the status returned by A after the data transfer.
+4. After A receives `VB` and the `key` from B, A's RNIC packages them together with A's own send address `VA` into an `RDMA WRITE` request. During this process, neither A nor B needs software participation. A's data can be sent to B's virtual address `VB`.
+5. After A finishes sending the data, it returns the status information of the entire data transfer to B.
 
-**3.7.3 RDMA 双边操作 (RDMA SEND/RECEIVE)**
+**3.7.3 RDMA Two-Sided Operation (RDMA SEND/RECEIVE)**
 
-RDMA中SEND/RECEIVE是双边操作，即必须要远端的应用感知参与才能完成收发。
+In RDMA, SEND/RECEIVE is a two-sided operation. The remote application must be aware of and participate in the operation for send and receive to complete.
 
-在实际中，SEND/RECEIVE多用于连接**控制类报文**，而**数据报文**多是通过READ/WRITE来完成的。\
-对于双边操作为例，主机A向主机B(下面简称A、B)发送数据的流程如下：
+In practice, SEND/RECEIVE is often used for connection **control messages**, while **data messages** are usually transferred through READ/WRITE.\
+For a two-sided operation, using host A sending data to host B as an example:
 
-1. 首先，A和B都要创建并初始化好各自的QP，CQ
-2. A和B分别向自己的WQ中注册WQE，对于A，WQ=SQ，WQE描述指向一个等到被发送的数据；对于B，WQ=RQ，WQE描述指向一块用于存储数据的Buffer。
-3. A的RNIC异步调度轮到A的WQE，解析到这是一个SEND消息，从Buffer中直接向B发出数据。数据流到达B的RNIC后，B的WQE被消耗，并把数据直接存储到WQE指向的存储位置。
-4. AB通信完成后，A的CQ中会产生一个完成消息CQE表示发送完成。与此同时，B的CQ中也会产生一个完成消息表示接收完成。每个WQ中WQE的处理完成都会产生一个CQE。
+1. First, both A and B create and initialize their own QPs and CQs.
+2. A and B each post WQEs to their own WQs. For A, WQ = SQ, and the WQE describes data waiting to be sent. For B, WQ = RQ, and the WQE describes a buffer used to store received data.
+3. A's RNIC asynchronously schedules A's WQE, parses it as a SEND message, and sends data directly from the buffer to B. After the data flow reaches B's RNIC, B's WQE is consumed, and the data is stored directly into the memory location pointed to by that WQE.
+4. After A and B complete communication, A's CQ receives a CQE indicating send completion. At the same time, B's CQ also receives a CQE indicating receive completion. Every completed WQE in a WQ produces a CQE.

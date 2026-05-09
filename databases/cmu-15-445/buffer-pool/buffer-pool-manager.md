@@ -2,17 +2,17 @@
 
 ### Task2 BUFFER POOL MANAGER[#](https://www.cnblogs.com/JayL-zxl/p/14311883.html#task2-buffer-pool-manager) <a href="#task2-buffer-pool-manager" id="task2-buffer-pool-manager"></a>
 
-#### 0. 任务描述[#](https://www.cnblogs.com/JayL-zxl/p/14311883.html#0-%E4%BB%BB%E5%8A%A1%E6%8F%8F%E8%BF%B0-1) <a href="#0-ren-wu-miao-shu-1" id="0-ren-wu-miao-shu-1"></a>
+#### 0. Task Description [#](https://www.cnblogs.com/JayL-zxl/p/14311883.html#0-%E4%BB%BB%E5%8A%A1%E6%8F%8F%E8%BF%B0-1) <a href="#0-task-description" id="0-task-description"></a>
 
-接下来，您需要在系统中实现缓冲池管理器(`BufferPoolManager`)。`BufferPoolManager`负责从`DiskManager`获取数据库页面并将它们存储在内存中。`BufferPoolManage`还可以在有要求它这样做时，或者当它需要驱逐一个页以便为新页腾出空间时，将脏页写入磁盘。为了确保您的实现能够正确地与系统的其余部分一起工作，我们将为您提供一些已经填写好的功能。您也不需要实现实际读写数据到磁盘的代码(在我们的实现中称为`DiskManager`)。我们将为您提供这一功能。
+Next, you need to implement the buffer pool manager (`BufferPoolManager`) in the system. `BufferPoolManager` is responsible for fetching database pages from `DiskManager` and storing them in memory. `BufferPoolManager` can also write dirty pages back to disk when requested, or when it needs to evict a page to make room for a new page. To ensure that your implementation works correctly with the rest of the system, some functions are already provided. You also do not need to implement the actual disk read/write logic, which is handled by `DiskManager` in this project.
 
-系统中的所有内存页面均由`Page`对象表示。`BufferPoolManager`不需要了解这些页面的内容。 但是，作为系统开发人员，重要的是要了解`Page`对象只是缓冲池中用于存储内存的容器，因此并不特定于唯一页面。 也就是说，每个`Page`对象都包含一块内存，`DiskManager`会将其用作复制从磁盘读取的物理页面内容的位置。 `BufferPoolManager`将在将其来回移动到磁盘时重用相同的Page对象来存储数据。 这意味着在系统的整个生命周期中，相同的`Page`对象可能包含不同的物理页面。`Page`对象的标识符（`page_id`）跟踪其包含的物理页面。 如果`Page`对象不包含物理页面，则必须将其`page_id`设置为`INVALID_PAGE_ID`。
+All in-memory pages in the system are represented by `Page` objects. `BufferPoolManager` does not need to understand the contents of those pages. However, as a system implementer, it is important to understand that a `Page` object is only a memory container inside the buffer pool; it is not permanently tied to one logical page. Each `Page` object contains a memory region where `DiskManager` can copy the contents of a physical page read from disk. `BufferPoolManager` reuses the same `Page` objects as pages move between memory and disk. Therefore, over the lifetime of the system, the same `Page` object may contain different physical pages. The `page_id` of a `Page` object tracks which physical page it currently contains. If a `Page` object does not contain a physical page, its `page_id` must be set to `INVALID_PAGE_ID`.
 
-每个Page对象还维护一个计数器，以显示“固定”该页面的线程数。`BufferPoolManager`不允许释放固定的页面。每个`Page`对象还跟踪它的脏标记。您的工作是判断页面在解绑定之前是否已经被修改（修改则把脏标记置为1）。`BufferPoolManager`必须将脏页的内容写回磁盘，然后才能重用该对象。
+Each `Page` object also maintains a counter that records how many users have pinned the page. `BufferPoolManager` must not evict a pinned page. Each `Page` object also tracks a dirty flag. Your job is to determine whether a page has been modified before it is unpinned; if so, mark the page dirty. Before reusing a dirty `Page` object, `BufferPoolManager` must write its contents back to disk.
 
-`BufferPoolManager`实现将使用在此分配的前面步骤中创建的`LRUReplacer`类。它将使用`LRUReplacer`来跟踪何时访问页对象，以便在必须释放一个帧以为从磁盘复制新的物理页腾出空间时，它可以决定取消哪个页对象
+The `BufferPoolManager` implementation uses the `LRUReplacer` class implemented in the previous step of this assignment. It uses `LRUReplacer` to track page-object access so that, when a frame must be freed to make room for a physical page copied from disk, the system can decide which page object to evict.
 
-你需要实现在(`src/buffer/buffer_pool_manager.cpp`):的以下函数
+You need to implement the following functions in `src/buffer/buffer_pool_manager.cpp`:
 
 * `FetchPageImpl(page_id)`
 * `NewPageImpl(page_id)`
@@ -21,46 +21,46 @@
 * `DeletePageImpl(page_id)`
 * `FlushAllPagesImpl()`
 
-#### 1. 分析[#](https://www.cnblogs.com/JayL-zxl/p/14311883.html#1-%E5%88%86%E6%9E%90) <a href="#1-fen-xi" id="1-fen-xi"></a>
+#### 1. Analysis [#](https://www.cnblogs.com/JayL-zxl/p/14311883.html#1-%E5%88%86%E6%9E%90) <a href="#1-analysis" id="1-analysis"></a>
 
-**1.1 为什么需要pin**[**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#11-%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81pin)
+**1.1 Why pinning is needed** [**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#11-%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81pin)
 
-其实大抵可以如下图
+The basic idea is shown in the figure below.
 
 <figure><img src="../../../.gitbook/assets/image (34).png" alt=""><figcaption></figcaption></figure>
 
-考虑这样一种情况。一个块被放入缓冲区，进程从缓冲区内存中读取块的内容。但是，当这个块被读取的时候，如果一个并发进程将这个块驱逐出来，并用一个不同的块替换它，读取旧块内容的进程(reader)将看到不正确的数据;如果块被驱逐时正在写入它，那么写入者最终会破坏替换块的内容。
+Consider this case. A block is placed into the buffer, and a process reads the block contents from buffer memory. While that block is being read, if another concurrent process evicts the block and replaces it with a different block, the reader of the old block will see incorrect data. If the block is being written while it is evicted, the writer may corrupt the contents of the replacement block.
 
-因此，在进程从缓冲区块读取数据之前，确保该块不会被逐出是很重要的。为此，进程在块上执行一个pin操作;缓冲区管理器从不清除固定的块（pin值不为0的块）。当进程完成读取数据时，它应该执行一个unpin操作，允许在需要时将块取出。
+Therefore, before a process reads data from a buffered block, it must ensure that the block cannot be evicted. To do that, the process performs a `pin` operation on the block. The buffer manager never evicts pinned blocks, meaning blocks whose pin count is not zero. When the process finishes reading or writing the data, it should perform an `unpin` operation so the block may be evicted later if needed.
 
-因此我们需要一个`pin_couter`来记录pin的数量。其实也就是引用计数的思想。
+Therefore, we need a `pin_counter` to record the number of pins. Conceptually, this is the same idea as reference counting.
 
-**1.2 如何管理页和访问页**[**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#12-%E5%A6%82%E4%BD%95%E7%AE%A1%E7%90%86%E9%A1%B5%E5%92%8C%E8%AE%BF%E9%97%AE%E9%A1%B5)
+**1.2 How to manage and access pages** [**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#12-%E5%A6%82%E4%BD%95%E7%AE%A1%E7%90%86%E9%A1%B5%E5%92%8C%E8%AE%BF%E9%97%AE%E9%A1%B5)
 
-一句话基地址+偏移量
+In one sentence: base address plus offset.
 
-> page(基地值)+frame\_id(偏移量) 实际上就是数组寻址
+> `page` as the base address plus `frame_id` as the offset is essentially array addressing.
 >
-> 同时 DBMS 会维护一个 page table，负责记录每个 page 在内存中的位置，以及是否被写过（Dirty Flag），是否被引用或引用计数（Pin/Reference Counter）等元信息，如下图所示：
+> At the same time, the DBMS maintains a page table that records each page's in-memory location and metadata such as whether it has been written (`Dirty Flag`) and whether it is referenced or pinned (`Pin/Reference Counter`), as shown below:
 
-这里用了hash表来实现`page_table`来映射`page_id`和`frame_i`
+Here, a hash table implements `page_table`, mapping `page_id` to `frame_id`.
 
 <figure><img src="../../../.gitbook/assets/image (28).png" alt=""><figcaption></figcaption></figure>
 
-#### 2. 实现[#](https://www.cnblogs.com/JayL-zxl/p/14311883.html#2-%E5%AE%9E%E7%8E%B0) <a href="#2-shi-xian" id="2-shi-xian"></a>
+#### 2. Implementation [#](https://www.cnblogs.com/JayL-zxl/p/14311883.html#2-%E5%AE%9E%E7%8E%B0) <a href="#2-implementation" id="2-implementation"></a>
 
-**2.1 find\_replace()函数**[**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#21-find\_replace%E5%87%BD%E6%95%B0)
+**2.1 The `find_replace()` function** [**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#21-find\_replace%E5%87%BD%E6%95%B0)
 
-1. 如果空闲链表非空，则不需要进行替换算法。直接返回一个空闲frame就okay啦。这个情况是buffer pool未满
-2. 如果空闲链表为空，则表示当前buffer pool已经满了，这个时候必须要执行LRU算法
+1. If the free list is not empty, no replacement algorithm is needed. Return a free frame directly. This is the case where the buffer pool is not full.
+2. If the free list is empty, the buffer pool is full, so the LRU replacement algorithm must be used.
 
-**寻找替换frame过程**
+**Process for finding a replacement frame**
 
-1. 调用前面实现的`Victim`函数获取牺牲帧的`frame id`
-2. 在`pages_`中找到对应的牺牲页，如果该页dirty则需要写回磁盘，并且reset pin count
-3. 然后在page\_table中删除对应映射关系 \[page\_id --> frame\_id]
+1. Call the previously implemented `Victim` function to obtain the victim frame's `frame_id`.
+2. Find the corresponding victim page in `pages_`. If the page is dirty, write it back to disk and reset the pin count.
+3. Then remove the corresponding mapping from `page_table`: `[page_id -> frame_id]`.
 
-> 一定要注意2和3的顺序不能颠倒、不然没有办法找到对应的牺牲页
+> Be careful not to reverse steps 2 and 3; otherwise you cannot find the corresponding victim page.
 
 ```
 bool BufferPoolManager::find_replace(frame_id_t *frame_id) {
@@ -102,18 +102,18 @@ bool BufferPoolManager::find_replace(frame_id_t *frame_id) {
 }
 ```
 
-**2.2 FetchPageImpl 实现**[**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#22-fetchpageimpl-%E5%AE%9E%E7%8E%B0)
+**2.2 Implementing `FetchPageImpl`** [**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#22-fetchpageimpl-%E5%AE%9E%E7%8E%B0)
 
 ```
 Page *BufferPoolManager::FetchPageImpl(page_id_t page_id)
 ```
 
-这个函数就是我们要拿到一个`page`。这个函数可以分为三种情况分析
+This function fetches a `page`. The logic can be analyzed in several cases:
 
-1. 如果该页在缓冲池中直接访问并且记得把它的`pin_count++`，然后把调用`Pin`函数通知`replacer`
-2. 否则调用`find_replace`函数，无论缓冲池是否有空闲，都可以获得可用的`frame_id`
-3. 当然如果替换页为空，择要
-4. 然后建立新的`page_table`映射关系
+1. If the page is already in the buffer pool, access it directly, increment its `pin_count`, and call `Pin` to notify the replacer.
+2. Otherwise, call `find_replace` to obtain an available `frame_id`, regardless of whether it comes from the free list or from replacement.
+3. If no replacement frame is available, return `nullptr`.
+4. Then create the new `page_table` mapping.
 
 ```
  latch_.lock();
@@ -158,35 +158,35 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id)
   return newPage;
 ```
 
-**2.3 UnpinPageImpl 实现**[**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#23-unpinpageimpl-%E5%AE%9E%E7%8E%B0)
+**2.3 Implementing `UnpinPageImpl`** [**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#23-unpinpageimpl-%E5%AE%9E%E7%8E%B0)
 
 ```
 bool BufferPoolManager::UnpinPageImpl(page_id_t page_id, bool is_dirty) 
 ```
 
-函数定义如上。
+The function signature is shown above.
 
-这个函数就是如果我们这个进程已经完成了对这个页的操作。我们需要`unpin`操作
+This function is used when a process has finished operating on a page and needs to `unpin` it.
 
-1. 如果这个页的`pin_couter>0`我们直接--
-2. 如果这个页的`pin _couter==0`我们需要给它加到`Lru_replacer`中。因为没有人引用它。所以它可以成为被替换的候选人
+1. If the page's `pin_counter > 0`, decrement it directly.
+2. If the page's `pin_counter == 0`, add it to the `LRUReplacer`. Since nobody references it, it can become a replacement candidate.
 
 ```
 bool BufferPoolManager::UnpinPageImpl(page_id_t page_id, bool is_dirty) {
   latch_.lock();
-  // 1. 如果page_table中就没有
+  // 1. page_id is not in page_table
   auto iter = page_table_.find(page_id);
   if (iter == page_table_.end()) {
     latch_.unlock();
     return false;
   }
-  // 2. 找到要被unpin的page
+  // 2. find the page to unpin
   frame_id_t unpinned_Fid = iter->second;
   Page *unpinned_page = &pages_[unpinned_Fid];
   if (is_dirty) {
     unpinned_page->is_dirty_ = true;
   }
-  // if page的pin_count == 0 则直接return
+  // if the page's pin_count is already 0, return directly
   if (unpinned_page->pin_count_ == 0) {
     latch_.unlock();
     return false;
@@ -200,16 +200,16 @@ bool BufferPoolManager::UnpinPageImpl(page_id_t page_id, bool is_dirty) {
 }
 ```
 
-**2.4 FlushPageImpl 实现**[**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#24-flushpageimpl-%E5%AE%9E%E7%8E%B0)
+**2.4 Implementing `FlushPageImpl`** [**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#24-flushpageimpl-%E5%AE%9E%E7%8E%B0)
 
 ```
 bool BufferPoolManager::FlushPageImpl(page_id_t page_id)
 ```
 
-这个函数是要把一个`page`写入磁盘。
+This function writes a `page` to disk.
 
-1. 首先找到这一个页在缓冲池之中的位置
-2. 写入磁盘
+1. First find the page's location in the buffer pool.
+2. Write it to disk.
 
 ```
   // Make sure you call DiskManager::WritePage!
@@ -225,17 +225,17 @@ bool BufferPoolManager::FlushPageImpl(page_id_t page_id)
   return false;
 ```
 
-**2.5 NewPageImpl 实现**[**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#25-newpageimpl-%E5%AE%9E%E7%8E%B0)
+**2.5 Implementing `NewPageImpl`** [**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#25-newpageimpl-%E5%AE%9E%E7%8E%B0)
 
 ```
 Page *BufferPoolManager::NewPageImpl(page_id_t *page_id) 
 ```
 
-分配一个新的page。
+Allocate a new page.
 
-1. 利用`find_replace`函数在我们的缓冲池找到合适的地方建立page\_id --> frame\_id的映射
-2. 更新 新页的元数据\
-   这里注意新创建的页要写回磁盘
+1. Use `find_replace` to find a suitable frame in the buffer pool and create the `page_id -> frame_id` mapping.
+2. Update the new page's metadata.\
+   Note that the newly created page should be written back to disk.
 
 ```
 Page *BufferPoolManager::NewPageImpl(page_id_t *page_id) {
@@ -273,27 +273,27 @@ Page *BufferPoolManager::NewPageImpl(page_id_t *page_id) {
   // maybe meet below case:
   // 1. NewPage
   // 2. unpin(false)
-  // 3. 由于其他页的操作导致该页被从buffer_pool中移除
-  // 4. 这个时候在FetchPage， 就拿不到这个page了。
-  // 所以这里先把它写回磁盘
+  // 3. operations on other pages cause this page to be removed from the buffer pool
+  // 4. at that point, FetchPage cannot retrieve this page
+  // Therefore, write it back to disk first
   disk_manager_->WritePage(victim_page->GetPageId(), victim_page->GetData());
   latch_.unlock();
   return victim_page;
 }
 ```
 
-**2.6 DeletePageImpl 实现**[**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#26-deletepageimpl-%E5%AE%9E%E7%8E%B0)
+**2.6 Implementing `DeletePageImpl`** [**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#26-deletepageimpl-%E5%AE%9E%E7%8E%B0)
 
 ```
 bool BufferPoolManager::DeletePageImpl(page_id_t page_id)
 ```
 
-这里是要我们把缓冲池中的page移出
+This function removes a page from the buffer pool.
 
-1. 如果这个page根本就不在缓冲池则直接返回
-2. 如果这个page 的引用计数大于0(pin\_counter>0)表示我们不能返回
-3. 如果这个page被修改过则要写回磁盘
-4. 否则正常移除就好了。（在hash表中erase）
+1. If the page is not in the buffer pool at all, return directly.
+2. If the page's reference count is greater than 0 (`pin_counter > 0`), it cannot be deleted.
+3. If the page has been modified, write it back to disk.
+4. Otherwise, remove it normally by erasing it from the hash table.
 
 ```
 bool BufferPoolManager::DeletePageImpl(page_id_t page_id) {
@@ -335,11 +335,11 @@ bool BufferPoolManager::DeletePageImpl(page_id_t page_id) {
 }
 ```
 
-#### 3. 源码解析[#](https://www.cnblogs.com/JayL-zxl/p/14311883.html#3-%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90) <a href="#3-yuan-ma-jie-xi" id="3-yuan-ma-jie-xi"></a>
+#### 3. Source Code Analysis [#](https://www.cnblogs.com/JayL-zxl/p/14311883.html#3-%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90) <a href="#3-source-code-analysis" id="3-source-code-analysis"></a>
 
 **3.1 ResetMemory()**[**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#31-resetmemory)
 
-这个非常简单就是一个简单的内存分配。给我们的frame分配内存区域
+This is straightforward memory allocation. It allocates the memory region for each frame.
 
 **3.2 ReadPage**[**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#32-readpage)
 
@@ -349,15 +349,15 @@ void DiskManager::ReadPage(page_id_t page_id, char *page_data)
 
 ```
 void DiskManager::ReadPage(page_id_t page_id, char *page_data) {
-  int offset = page_id * PAGE_SIZE; //PAGE_SIZE=4kb 先计算偏移。判断是否越界（因为文件大小有限制）
+  int offset = page_id * PAGE_SIZE; // PAGE_SIZE = 4 KB; first compute the offset and check bounds
   // check if read beyond file length
   if (offset > GetFileSize(file_name_)) {
     LOG_DEBUG("I/O error reading past end of file");
     // std::cerr << "I/O error while reading" << std::endl;
   } else {
     // set read cursor to offset
-    db_io_.seekp(offset); //把读写位置移动到偏移位置处
-    db_io_.read(page_data, PAGE_SIZE); //把数据读到page_data中
+    db_io_.seekp(offset); // move the file cursor to the offset
+    db_io_.read(page_data, PAGE_SIZE); // read data into page_data
     if (db_io_.bad()) {
       LOG_DEBUG("I/O error while reading");
       return;
@@ -368,7 +368,7 @@ void DiskManager::ReadPage(page_id_t page_id, char *page_data) {
       LOG_DEBUG("Read less than a page");
       db_io_.clear();
       // std::cerr << "Read less than a page" << std::endl;
-      memset(page_data + read_count, 0, PAGE_SIZE - read_count); //如果读取的数据小于4kb剩下的补0
+      memset(page_data + read_count, 0, PAGE_SIZE - read_count); // if less than 4 KB is read, pad the rest with zeros
     }
   }
 }
@@ -378,24 +378,24 @@ void DiskManager::ReadPage(page_id_t page_id, char *page_data) {
 
 ```
 void DiskManager::WritePage(page_id_t page_id, const char *page_data) {
-  size_t offset = static_cast<size_t>(page_id) * PAGE_SIZE; //先计算偏移
+  size_t offset = static_cast<size_t>(page_id) * PAGE_SIZE; // compute the offset first
   // set write cursor to offset
-  num_writes_ += 1; //记录写的次数
+  num_writes_ += 1; // count writes
   db_io_.seekp(offset);
-  db_io_.write(page_data, PAGE_SIZE); //向offset处写data
+  db_io_.write(page_data, PAGE_SIZE); // write data at the offset
   // check for I/O error
   if (db_io_.bad()) {
     LOG_DEBUG("I/O error while writing");
     return;
   }
   // needs to flush to keep disk file in sync
-  db_io_.flush(); //刷新缓冲区
+  db_io_.flush(); // flush the stream buffer
 }
 ```
 
-**3.4 DiskManager 构造函数**
+**3.4 `DiskManager` constructor**
 
-就是获取文件指针
+This constructor obtains and initializes the file streams.
 
 ```
 DiskManager::DiskManager(const std::string &db_file)
@@ -421,7 +421,7 @@ DiskManager::DiskManager(const std::string &db_file)
     }
   }
 
-  db_io_.open(db_file, std::ios::binary | std::ios::in | std::ios::out); //获取文件指针。并且打开输入输出流
+  db_io_.open(db_file, std::ios::binary | std::ios::in | std::ios::out); // open the input/output stream for the database file
   // directory or file does not exist
   if (!db_io_.is_open()) {
     db_io_.clear();
@@ -438,9 +438,9 @@ DiskManager::DiskManager(const std::string &db_file)
 }
 ```
 
-#### 4. 测试[#](https://www.cnblogs.com/JayL-zxl/p/14311883.html#4-%E6%B5%8B%E8%AF%95) <a href="#4-ce-shi" id="4-ce-shi"></a>
+#### 4. Testing [#](https://www.cnblogs.com/JayL-zxl/p/14311883.html#4-%E6%B5%8B%E8%AF%95) <a href="#4-testing" id="4-testing"></a>
 
-**4.1 本地测试**[**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#41-%E6%9C%AC%E5%9C%B0%E6%B5%8B%E8%AF%95)
+**4.1 Local test** [**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#41-%E6%9C%AC%E5%9C%B0%E6%B5%8B%E8%AF%95)
 
 ```bash
  cd build
@@ -450,10 +450,10 @@ DiskManager::DiskManager(const std::string &db_file)
 
 <figure><img src="../../../.gitbook/assets/image (32).png" alt=""><figcaption></figcaption></figure>
 
-**4.2 cmu官网测试**[**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#42-cmu%E5%AE%98%E7%BD%91%E6%B5%8B%E8%AF%95)
+**4.2 CMU official test** [**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#42-cmu%E5%AE%98%E7%BD%91%E6%B5%8B%E8%AF%95)
 
-**后面发现原来不是cmu自己的学生也可以用它们的软件进行测试。修改了好久同时得到了大佬的帮助。才成功实现满分**[**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#%E5%90%8E%E9%9D%A2%E5%8F%91%E7%8E%B0%E5%8E%9F%E6%9D%A5%E4%B8%8D%E6%98%AFcmu%E8%87%AA%E5%B7%B1%E7%9A%84%E5%AD%A6%E7%94%9F%E4%B9%9F%E5%8F%AF%E4%BB%A5%E7%94%A8%E5%AE%83%E4%BB%AC%E7%9A%84%E8%BD%AF%E4%BB%B6%E8%BF%9B%E8%A1%8C%E6%B5%8B%E8%AF%95%E4%BF%AE%E6%94%B9%E4%BA%86%E5%A5%BD%E4%B9%85%E5%90%8C%E6%97%B6%E5%BE%97%E5%88%B0%E4%BA%86%E5%A4%A7%E4%BD%AC%E7%9A%84%E5%B8%AE%E5%8A%A9%E6%89%8D%E6%88%90%E5%8A%9F%E5%AE%9E%E7%8E%B0%E6%BB%A1%E5%88%86)
+**I later found that even non-CMU students could use their grading software for testing. After many revisions and help from more experienced people, I finally got full marks.** [**#**](https://www.cnblogs.com/JayL-zxl/p/14311883.html#%E5%90%8E%E9%9D%A2%E5%8F%91%E7%8E%B0%E5%8E%9F%E6%9D%A5%E4%B8%8D%E6%98%AFcmu%E8%87%AA%E5%B7%B1%E7%9A%84%E5%AD%A6%E7%94%9F%E4%B9%9F%E5%8F%AF%E4%BB%A5%E7%94%A8%E5%AE%83%E4%BB%AC%E7%9A%84%E8%BD%AF%E4%BB%B6%E8%BF%9B%E8%A1%8C%E6%B5%8B%E8%AF%95%E4%BF%AE%E6%94%B9%E4%BA%86%E5%A5%BD%E4%B9%85%E5%90%8C%E6%97%B6%E5%BE%97%E5%88%B0%E4%BA%86%E5%A4%A7%E4%BD%AC%E7%9A%84%E5%B8%AE%E5%8A%A9%E6%89%8D%E6%88%90%E5%8A%9F%E5%AE%9E%E7%8E%B0%E6%BB%A1%E5%88%86)
 
-cmu的测试网站如下
+The CMU testing site is:
 
 {% embed url="https://www.gradescope.com/courses/195440" %}

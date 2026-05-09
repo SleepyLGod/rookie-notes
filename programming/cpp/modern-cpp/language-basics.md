@@ -1,16 +1,16 @@
 # Modern C++ Language Basics
 
 ---
-description: 一些C++11/14/17小点
+description: Selected C++11/14/17 language notes
 ---
 
-# 😅 Miscellaneous
+# Miscellaneous
 
-> 首先要放最全面的学习资料：
+> Start with the most comprehensive learning resources:
 >
-> ****[**本人最喜欢的C++介绍频道**](https://www.youtube.com/user/CppCon/videos)****
+> ****[**My favorite C++ talk channel**](https://www.youtube.com/user/CppCon/videos)****
 >
-> 官方文档：
+> Official documentation:
 >
 > [https://en.cppreference.com/w/cpp/compiler\_support](https://en.cppreference.com/w/cpp/compiler\_support)
 >
@@ -18,28 +18,28 @@ description: 一些C++11/14/17小点
 
 ### `long long int`
 
-`long long int` 并不是 C++11 最先引入的，其实早在 C99， `long long int` 就已经被纳入 C 标准中，所以大部分的编译器早已支持。&#x20;
+`long long int` was not first introduced by C++11. It had already been added to the C standard in C99, so most compilers supported it before C++11.&#x20;
 
-C++11 的工作则是正式把它纳入标准库， 规定了一个 `long long int` 类型至少具备 64 位的比特数。
+C++11 formally incorporated it into the C++ standard and requires `long long int` to provide at least 64 bits.
 
-### noexcept 的修饰和操作
+### `noexcept` as a Specifier and Operator
 
-C++ 相比于 C 的一大优势就在于 C++ 本身就定义了一套完整的异常处理机制。 然而在 C++11 之前，几乎没有人去使用在函数名后书写异常声明表达式， 从 C++11 开始，这套机制被弃用，所以我们不去讨论也不去介绍以前这套机制是如何工作如何使用， 你更不应该主动去了解它。
+One major advantage of C++ over C is that C++ defines a full exception-handling mechanism. Before C++11, however, dynamic exception specifications written after function declarations were rarely used. Starting in C++11, that mechanism was deprecated, so this note does not discuss the old form or how it worked; it is not something worth learning proactively for modern C++.
 
-C++11 将**异常的声明**简化为以下两种情况：
+C++11 simplifies exception declarations into two practical cases:
 
-1. 函数可能抛出任何异常
-2. 函数不能抛出任何异常
+1. A function may throw exceptions.
+2. A function must not throw exceptions.
 
-并使用 `noexcept` 对这两种行为进行限制，例如：
+`noexcept` is used to mark the second behavior. For example:
 
-`void may_throw(); // 可能抛出异常`&#x20;
+`void may_throw(); // may throw exceptions`&#x20;
 
-`void no_throw() noexcept; // 不可能抛出异常`
+`void no_throw() noexcept; // must not throw exceptions`
 
-使用 `noexcept` 修饰过的函数如果抛出异常，编译器会使用 `std::terminate()` 来立即终止程序运行。
+If a function declared `noexcept` throws an exception, the runtime calls `std::terminate()` and immediately terminates the program.
 
-`noexcept` 还能够做操作符，用于**操作一个表达式**，当表达式无异常时，返回 `true`，否则返回 `false`。
+`noexcept` can also be used as an operator on an expression. It returns `true` when the expression is known not to throw, and `false` otherwise.
 
 ```cpp
 #include <iostream>  
@@ -67,40 +67,40 @@ int main()
 }
 ```
 
-`noexcept` 修饰完一个函数之后能够起到**封锁异常扩散**的功效，如果内部产生异常，外部也不会触发。例如：
+After a function is marked `noexcept`, it becomes an exception boundary: if an exception escapes from inside it, callers do not catch that exception because the program terminates instead. For example:
 
 ```cpp
 try {  
     may_throw();  
 } catch (...) {  
-    std::cout << "捕获异常, 来自 may_throw()" << std::endl;  
+    std::cout << "caught exception from may_throw()" << std::endl;
 }  
 try {  
     non_block_throw();  
 } catch (...) {  
-    std::cout << "捕获异常, 来自 non_block_throw()" << std::endl;  
+    std::cout << "caught exception from non_block_throw()" << std::endl;
 }  
 try {  
-    block_throw();  // 函数被noexcept修饰
+    block_throw();  // the function is declared noexcept
 } catch (...) {  
-    std::cout << "捕获异常, 来自 block_throw()" << std::endl;  
+    std::cout << "caught exception from block_throw()" << std::endl;
 }  
 ```
 
-最终输出为：
+The final output is:
 
 ```
-捕获异常, 来自 may_throw()  
-捕获异常, 来自 non_block_throw()  
+caught exception from may_throw()
+caught exception from non_block_throw()
 ```
 
-### 字面量
+### Literals
 
-#### 原始字符串字面量
+#### Raw String Literals
 
-传统 C++ 里面要编写一个充满特殊字符的字符串其实是非常痛苦的一件事情， 比如一个包含 HTML 本体的字符串需要添加大量的转义符， 例如一个Windows 上的文件路径经常会：`C:\\File\\To\\Path`。
+In traditional C++, writing strings that contain many special characters is painful. For example, a string containing HTML often needs many escape characters, and a Windows file path is usually written as `C:\\File\\To\\Path`.
 
-C++11 提供了原始字符串字面量的写法，可以在一个字符串前方使用 <mark style="color:red;">**`R`**</mark> 来修饰这个字符串， 同时，将原始字符串使用括号包裹，例如：
+C++11 provides raw string literals. You can prefix a string with <mark style="color:red;">**`R`**</mark> and wrap the raw content in parentheses:
 
 ```cpp
 #include <iostream>  
@@ -112,11 +112,11 @@ int main() {
 }  
 ```
 
-#### 自定义字面量
+#### User-Defined Literals
 
-C++11 引进了自定义字面量的能力，通过**重载双引号后缀运算符**实现：
+C++11 introduced user-defined literals, implemented by overloading literal suffix operators:
 
-字符串字面量自定义必须设置如下的**参数列表**
+Custom string literals must use the following parameter list:
 
 ```cpp
 std::string operator"" _wow1(const char *wow1, size_t len) {  
@@ -134,16 +134,16 @@ int main() {
 }  
 ```
 
-自定义字面量支持四种字面量：
+User-defined literals support four literal categories:
 
-1. **整型字面量**：重载时必须使用 `unsigned long long`、`const char *`、模板字面量算符参数，在上面的代码中使用的是前者；
-2. **浮点型字面量**：重载时必须使用 `long double`、`const char *`、模板字面量算符；
-3. **字符串字面量**：必须使用 `(const char *, size_t)` 形式的参数表；
-4. **字符字面量**：参数只能是 `char`, `wchar_t`, `char16_t`, `char32_t` 这几种类型。
+1. **Integer literals**: overloads must use `unsigned long long`, `const char *`, or a literal operator template parameter. The example above uses the first form.
+2. **Floating-point literals**: overloads must use `long double`, `const char *`, or a literal operator template.
+3. **String literals**: overloads must use the `(const char *, size_t)` parameter form.
+4. **Character literals**: the parameter type can only be `char`, `wchar_t`, `char16_t`, or `char32_t`.
 
-### 内存对齐
+### Memory Alignment
 
-C++ 11 引入了两个新的关键字 **`alignof`** 和 **`alignas`** 来支持对内存对齐进行控制。 `alignof` 关键字能够获得一个与平台相关的 `std::size_t` 类型的值，用于**查询**该平台的对齐方式。 当然我们有时候并不满足于此，甚至希望自定定义结构的对齐方式，同样，C++ 11 还引入了 `alignas` 来**重新修饰**某个结构的对齐方式。我们来看两个例子：
+C++11 introduced two keywords, **`alignof`** and **`alignas`**, for controlling memory alignment. `alignof` returns a platform-dependent `std::size_t` value that lets us **query** a type's alignment requirement. Sometimes querying is not enough and we want to define the alignment of a structure ourselves. For that, C++11 introduced `alignas`, which can **specify** the alignment requirement of a type or object. Consider two examples:
 
 ```cpp
 #include <iostream>  
@@ -166,46 +166,46 @@ int main() {
 }  
 ```
 
-其中 `std::max_align_t` 要求每个标量类型的对齐方式严格一样，因此它几乎是最大标量没有差异， 进而大部分平台上得到的结果为 `long double`，因此我们这里得到的 `AlignasStorage` 的对齐要求是 8 或 16。
+`std::max_align_t` is a type whose alignment requirement is at least as strict as that of every scalar type. On many platforms this corresponds to the alignment of `long double`, so `AlignasStorage` commonly ends up requiring 8-byte or 16-byte alignment.
 
-### C艹11 的扬弃
+### C++11 Deprecations and Replacements
 
-*   不再允许字符串字面值常量赋值给一个 `char *`。如果需要用字符串字面值常量赋值和初始化一个 `char *`，应该使用 `const char *` 或者 `auto`。
+*   Assigning a string literal to `char *` is no longer allowed in modern C++. If you need to initialize from a string literal, use `const char *` or `auto`.
 
-    例如：
+    For example:
 
     ```
-    char *str = "hello world!";  // 将出现弃用警告
+    char *str = "hello world!";  // emits a deprecation warning or error
     ```
-* C++98 异常说明、 `unexpected_handler`、`set_unexpected()` 等相关特性被弃用，应该使用 `noexcept`。
-* `auto_ptr` 被弃用。
-* `register` 关键字被弃用，可以使用但不再具备任何实际含义。
-* `bool` 类型的 `++` 操作被弃用。
-* 如果一个类有析构函数，为其生成拷贝构造函数和拷贝赋值运算符的特性被弃用了。
-* C 语言风格的类型转换被弃用（即在变量前使用 `(convert_type)`），应该使用 `static_cast`、`reinterpret_cast`、`const_cast` 来进行类型转换。
-* 特别地，在最新的 C++17 标准中弃用了一些可以使用的 C 标准库，例如 `<ccomplex>`、`<cstdalign>`、`<cstdbool>` 与 `<ctgmath>` 等
+* C++98 dynamic exception specifications, `unexpected_handler`, `set_unexpected()`, and related features were deprecated. Use `noexcept`.
+* `auto_ptr` was deprecated.
+* The `register` keyword was deprecated. It may still be parsed in older language modes, but it no longer has practical meaning.
+* The `++` operation on `bool` was deprecated and later removed.
+* Implicit generation of a copy constructor and copy-assignment operator for a class that declares a destructor was deprecated.
+* C-style casts, written as `(convert_type)` before an expression, should be avoided in favor of `static_cast`, `reinterpret_cast`, and `const_cast`.
+* C++17 removed or deprecated some C compatibility headers such as `<ccomplex>`, `<cstdalign>`, `<cstdbool>`, and `<ctgmath>`.
 
-### 常量
+### Constants
 
 #### nullptr
 
-`nullptr` 出现的目的是为了替代 `NULL`。在某种意义上来说，传统 C++ 会把 `NULL`、`0` 视为同一种东西，这取决于编译器如何定义 `NULL`，有些编译器会将 `NULL` 定义为 `((void*)0)`，有些则会直接将其定义为 `0`。
+`nullptr` was introduced to replace `NULL`. In traditional C++, `NULL` and `0` are often treated as the same thing, depending on how the compiler or standard library defines `NULL`. Some C environments define `NULL` as `((void*)0)`, while C++ implementations commonly define it as `0` or `0L`.
 
-C++ **不允许**直接将 `void *` 隐式转换到其他类型。但如果编译器尝试把 `NULL` 定义为 `((void*)0)`，那么在下面这句代码中：`char *ch = NULL;` 中没有了 `void *` 隐式转换的 C++ 只好将 `NULL` 定义为 `0`。而这依然会产生新的问题，将 `NULL` 定义成 `0` 将导致 `C++` 中重载特性发生混乱。
+C++ **does not allow** an implicit conversion from `void *` to arbitrary pointer types. If `NULL` were defined as `((void*)0)`, code such as `char *ch = NULL;` would fail under C++'s conversion rules. Therefore C++ implementations typically define `NULL` as an integer null pointer constant. That creates another problem: defining `NULL` as `0` can interact badly with overload resolution.
 
-比如 `void f(char*)` 和 `void f(int)`，`f(NULL)` 会调用后者。
+For example, if both `void f(char*)` and `void f(int)` exist, `f(NULL)` may call the integer overload.
 
-C++11 引入了 `nullptr` 关键字，专门用来区分空指针、`0`。而 `nullptr` 的类型为 `nullptr_t`，能够隐式的转换为任何指针或成员指针的类型，也能和他们进行相等或者不等的比较。
+C++11 introduced the `nullptr` keyword to distinguish null pointers from the integer value `0`. The type of `nullptr` is `std::nullptr_t`. It can be implicitly converted to any pointer or pointer-to-member type, and it can be compared for equality or inequality with such pointer values.
 
 #### constexpr
 
-如果编译器能够在编译时就把 1 + 2 类似的常量表达式直接优化并植入到程序运行时，将能增加程序的性能。
+If the compiler can evaluate constant expressions such as `1 + 2` at compile time and embed the result into the generated program, runtime performance can improve.
 
-这里有个小🌰
+Here is a small example:
 
 ```cpp
 #include <iostream>
-#define LEN 10 // const 
+#define LEN 10 // constant-like macro
 
 int len_foo() {
     int i = 2; 
@@ -221,19 +221,19 @@ constexpr int fibonacci(const int n) {
 }
 
 int main() {
-    char arr_1[10];                      // 合法
-    char arr_2[LEN];                     // 合法
+    char arr_1[10];                      // valid
+    char arr_2[LEN];                     // valid
 
     int len = 10;
-    // char arr_3[len];                  // 非法！！！！！
+    // char arr_3[len];                  // invalid
 
     const int len_2 = len + 1;
     constexpr int len_2_constexpr = 1 + 2 + 3;
-    // char arr_4[len_2];                // 非法！！！！！
-    char arr_4[len_2_constexpr];         // 合法
+    // char arr_4[len_2];                // invalid
+    char arr_4[len_2_constexpr];         // valid
 
-    // char arr_5[len_foo()+5];          // 非法！！！！！
-    char arr_6[len_foo_constexpr() + 1]; // 合法 🐶
+    // char arr_5[len_foo()+5];          // invalid
+    char arr_6[len_foo_constexpr() + 1]; // valid
 
     std::cout << fibonacci(10) << std::endl;
     // 1, 1, 2, 3, 5, 8, 13, 21, 34, 55
@@ -242,39 +242,39 @@ int main() {
 }
 ```
 
-上面的例子中，`char arr_4[len_2]` 可能比较令人困惑，因为 `len_2` 已经被定义为了常量。
+In the example above, `char arr_4[len_2]` may look confusing because `len_2` has already been declared as a constant.
 
-**为什么 `char arr_4[len_2]` 仍然是非法的呢？**
+**Why is `char arr_4[len_2]` still invalid?**
 
-这是因为 **C++ 标准中数组的长度必须是一个常量表达式**，而对于 `len_2` 而言，这是一个 `const` 常数，而不是一个常量表达式，因此（即便这种行为在大部分编译器中都支持，但是）它是一个非法的行为，我们需要使用 C++11 引入的 `constexpr` 特性来解决这个问题。
+The reason is that **the C++ standard requires an array bound to be a constant expression**. `len_2` is a `const` object, but it is not a constant expression because its initializer depends on the runtime variable `len`. Even if many compilers accept similar code as an extension, it is not standard C++. C++11's `constexpr` addresses this distinction.
 
-**『** 下面说说常量和常量表达式：
+**Notes on constants and constant expressions:**
 
-常量是固定值，在程序执行期间不会改变。**常量表达式** 定义能在**编译**时求值的表达式。这种表达式能用做非类型模板实参、数组大小，并用于其他要求常量表达式的语境。
+A constant is a fixed value that does not change during program execution. A **constant expression** is an expression that can be evaluated at **compile time**. Constant expressions can be used as non-type template arguments, array bounds, and in other contexts that require compile-time values.
 
-但是常量不是常量表达式，只有**用常量表达式初始化的常量**，才能成为常量表达式，**用非常量表达式初始化的常量**比如上文的`len_2`仅仅是常量。如果常量的初始值不是常量表达式,则该常量不是常量表达式。
+A constant is not automatically a constant expression. Only a constant initialized by a constant expression can itself be used as a constant expression. A constant initialized from a non-constant expression, such as `len_2` above, is merely a constant object. If a constant's initializer is not a constant expression, the constant is not usable as a constant expression.
 
-* 定义一个常量变量，只需要把`const`放到变量类型的前面**或者后面**就可以了
-* 定义`const`变量而不初始化会导致编译错误
-* 常量变量的初始化可以来自于普通变量
-*   C++有两种类型地常量：编译时间常量和运行时间常量：
+* To define a constant variable, place `const` before or after the variable type.
+* Defining a `const` variable without initializing it causes a compilation error.
+* A constant variable may be initialized from an ordinary variable.
+*   C++ has two broad categories of constants: compile-time constants and runtime constants.
 
-    运行时间常量表示只有在程序运行的时候才会初始化，编译时间常量是在编译时间就被初始化了；
+    Runtime constants are initialized only when the program runs. Compile-time constants are initialized during compilation.
 
-    在大多数场景下，编译时间常量还是运行时间常量是可以互换的。
+    In many contexts, compile-time constants and runtime constants can be used in similar ways.
 
-    然而在一些特殊场景下，C++需要一些编译时间常量，为了作出区分，C++11新定义了一个关键字`constexpr`定义编译时间常量。
+    In special contexts, however, C++ requires compile-time constants. C++11 introduced `constexpr` to make that distinction explicit.
 
-再顺便提一嘴符号常量:
+A related practice is to define symbolic constants:
 
-在多数程序里，一个符号常量需要从头用到尾。这种包括数学或者物理上的一些常数。与其每次都定义一遍，比如直接在一个核心位置定义一次，其他地方随时使用。这样，如果你需要改动的话，只需要改动一个地方就OK了。
+In many programs, a symbolic constant is used throughout the codebase, such as a mathematical or physical constant. Instead of redefining it repeatedly, define it once in a central place and reuse it elsewhere. If the value needs to change, only one location needs to be updated.
 
-在C++里有很多种方式来实现这一点，但是下面的是最容易的：
+There are many ways to do this in C++, but the following is one of the simplest:
 
-* 创建一个头文件来包含这些常量
-* 在这个头文件里定义一个命名空间
-* 在你的命名空间里加上你的所有常量
-* 当你使用的时候#include你的头文件
+* Create a header file that contains the constants.
+* Define a namespace in that header.
+* Put all related constants in the namespace.
+* Include the header wherever the constants are needed.
 
 ```cpp
 #ifndef CONSTANTS_H
@@ -290,24 +290,24 @@ namespace constants {
 #endif
 ```
 
-使用范围操作符`::`来引用
+Use the scope-resolution operator `::` to reference the constants:
 
 ```objectivec
 #include "constants.h"
 double circumference = 2 * radius * constants::pi;
 ```
 
-如果你同时有物理学的常量和app的调优值，你可以弄两个文件。一个是永远不变的物理常量，另一个是可能有变化的调优值。这样物理常量你可以到处使用了。**』**
+If you have both physical constants and application tuning values, split them into two files: one for physical constants that should never change, and another for tuning values that may change. The physical constants can then be reused broadly without being mixed with application policy.
 
-接下来回到上面的函数：
+Returning to the earlier function example:
 
-而对于 `arr_5` 来说，C++98 之前的编译器无法得知 `len_foo()` 在运行期实际上是返回一个常数，这也就导致了非法的产生。
+For `arr_5`, pre-C++11 compilers had no way to know that `len_foo()` effectively returns a constant value at runtime, which makes the array bound invalid as a standard constant expression.
 
-C++11 提供了 `constexpr` 让用户**显式的声明函数或对象构造函数**在编译期会成为常量表达式，这个关键字明确的告诉编译器应该去验证 `len_foo` 在编译期就应该是一个常量表达式。
+C++11 provides `constexpr`, allowing users to **explicitly declare that a function or object constructor can produce a constant expression**. The keyword tells the compiler to verify that the function can be evaluated at compile time when used in a constant-expression context.
 
-此外，`constexpr` 修饰的函数可以使用递归。
+In addition, `constexpr` functions can use recursion.
 
-从 C++**14** 开始，`constexpr` 函数可以**在内部使用局部变量、循环和分支等简单语句**，例如下面的代码在 C++**11** 的标准下是**不能**够通过编译的：、
+Starting in C++**14**, `constexpr` functions can **use simple statements such as local variables, loops, and branches** internally. The following code, for example, does **not** compile as a C++**11** `constexpr` function:
 
 ```cpp
 constexpr int fibonacci(const int n) {
@@ -317,54 +317,54 @@ constexpr int fibonacci(const int n) {
 }
 ```
 
-为此，我们可以写出上面的简化的版本来使得函数从 C++11 开始即可用。
+For C++11, we therefore write the simplified expression-form version shown earlier.
 
-### 变量
+### Variables
 
-在传统 C++ 中，变量的声明虽然能够位于任何位置，甚至于 `for` 语句内能够声明一个临时变量 `int`，但始终没有办法在 `if` 和 `switch` 语句中声明一个临时的变量。例如：
+In traditional C++, variable declarations can appear in many locations, and a temporary `int` can even be declared inside a `for` statement. However, there was no way to declare an initializer variable directly inside an `if` or `switch` statement. For example:
 
 ```cpp
 int main() {
     std::vector<int> vec = {1, 2, 3, 4};
 
-    // 在 c++17 之前
+    // before C++17
     const std::vector<int>::iterator itr = std::find(vec.begin(), vec.end(), 2);
     if (itr != vec.end()) {
         *itr = 3;
     }
 
-    // 需要重新定义一个新的变量
+    // need to define a new variable
     const std::vector<int>::iterator itr2 = std::find(vec.begin(), vec.end(), 3);
     if (itr2 != vec.end()) {
         *itr2 = 4;
     }
 
-    // 将输出 1, 4, 3, 4
+    // prints 1, 4, 3, 4
     for (std::vector<int>::iterator element = vec.begin(); element != vec.end(); 
         ++element)
         std::cout << *element << std::endl;
 }
 ```
 
-在上面的代码中，我们可以看到 `itr` 这一变量是定义在整个 `main()` 的作用域内的，这导致当我们需要再次遍历整个 `std::vectors` 时，需要重新命名另一个变量。
+In the code above, `itr` is defined in the whole `main()` scope. When we need to search the same `std::vector` again, we must introduce another variable name.
 
-**C++17 消除了这一限制，使得我们可以在 `if`（或 `switch`）中完成这一操作：**
+**C++17 removes this limitation by allowing an initializer inside `if` and `switch`:**
 
 ```cpp
-// 将临时变量放到 if 语句内
+// place the temporary variable inside the if statement
 if (const std::vector<int>::iterator itr = std::find(vec.begin(), vec.end(), 3);
     itr != vec.end()) {
     *itr = 4;
 }
 ```
 
-#### 初始化列表
+#### Initializer Lists
 
-最常见的就是在对象进行初始化时进行使用
+The most common use case is object initialization.
 
-传统 C++ 中，不同的对象有着不同的初始化方法，例如普通数组、 POD （**P**lain **O**ld **D**ata，即没有构造、析构和虚函数的类或结构体） 类型都可以使用 `{}` 进行初始化，也就是我们所说的初始化列表。 而对于类对象的初始化，要么需要通过拷贝构造、要么就需要使用 `()` 进行。 这些不同方法都针对各自对象，不能通用。
+In traditional C++, different objects use different initialization forms. Ordinary arrays and POD (**P**lain **O**ld **D**ata, meaning classes or structs without constructors, destructors, or virtual functions) can be initialized with `{}`, which is what we call an initializer list. Class objects, however, are initialized either through copy construction or with `()`. These forms apply to different categories and are not unified.
 
-为解决这个问题，C++11 首先把初始化列表的概念绑定到类型上，称其为 <mark style="color:green;background-color:green;">`std::initializer_list`</mark>，允许构造函数或其他函数像参数一样使用初始化列表，这就为**类对象的初始化与普通数组和 POD 的初始化**方法提供了统一的桥梁，例如：
+To solve this, C++11 first binds the concept of an initializer list to a type, <mark style="color:green;background-color:green;">`std::initializer_list`</mark>. Constructors and ordinary functions can then accept initializer lists as parameters, creating a bridge between **class-object initialization** and **ordinary array/POD initialization**. For example:
 
 ```cpp
 #include <initializer_list>
@@ -382,7 +382,7 @@ public:
     }
 };
 int main() {
-    // after C++11
+    // since C++11
     MagicFoo magicFoo = {1, 2, 3, 4, 5};
 
     std::cout << "magicFoo: ";
@@ -393,9 +393,9 @@ int main() {
 }
 ```
 
-这种构造函数被叫做初始化列表构造函数，具有这种构造函数的类型将在初始化时被特殊关照。
+This kind of constructor is called an initializer-list constructor. Types that provide such a constructor receive special treatment during initialization.
 
-初始化列表除了用在对象构造上，还能将其作为普通函数的形参，例如：
+Initializer lists can be used not only for object construction, but also as ordinary function parameters:
 
 ```cpp
 public:
@@ -409,17 +409,17 @@ public:
 magicFoo.foo({6,7,8,9});
 ```
 
-其次，C++11 还提供了统一的语法来初始化任意的对象，例如：
+C++11 also provides a unified syntax for initializing arbitrary objects:
 
 ```
 Foo foo2 {3, 4};
 ```
 
-#### 结构化绑定
+#### Structured Bindings
 
-结构化绑定提供了类似其他语言中提供的多返回值的功能。C++11 新增了 `std::tuple` 容器用于构造一个元组，进而囊括多个返回值。但缺陷是，C++11/14 并没有提供一种简单的方法直接从元组中拿到并定义元组中的元素，尽管我们可以使用 `std::tie` 对元组进行拆包，但我们依然必须非常清楚这个元组包含多少个对象，各个对象是什么类型，非常麻烦。
+Structured bindings provide a feature similar to multiple return values in other languages. C++11 added `std::tuple`, which can package multiple return values. The limitation is that C++11/14 did not provide a simple way to directly extract and define the elements of a tuple. Although `std::tie` can unpack a tuple, the programmer still needs to know exactly how many objects the tuple contains and what their types are.
 
-C++**17** 完善了这一设定，给出的结构化绑定可以让我们写出这样的代码：
+C++**17** improves this with structured bindings, allowing code like this:
 
 ```cpp
 #include <iostream>
@@ -436,33 +436,33 @@ int main() {
 }
 ```
 
-### 类型推导
+### Type Deduction
 
-C++11 引入了 `auto` 和 `decltype` 这两个关键字实现了类型推导，让编译器来操心变量的类型。
+C++11 introduced `auto` and `decltype` for type deduction, allowing the compiler to infer variable types.
 
-这使得 C++ 也具有了和其他现代编程语言一样，某种意义上提供了无需操心变量类型的使用习惯。
+This gives C++ a programming style closer to other modern languages in which programmers do not always need to spell out variable types manually.
 
 #### auto
 
-`auto` 在很早以前就已经进入了 C++，但是他始终作为一个存储类型的指示符存在，与 `register` 并存。在传统 C++ 中，如果一个变量没有声明为 `register` 变量，将自动被视为一个 `auto` 变量。而随着 `register` 被弃用（在 C++17 中作为保留关键字，以后使用，目前不具备实际意义），对 `auto` 的语义变更也就非常自然了。
+`auto` has existed in C++ for a long time, but it originally served as a storage-class specifier alongside `register`. In traditional C++, if a variable was not declared as `register`, it was automatically treated as an `auto` variable. As `register` became deprecated and, in C++17, reserved for future use with no practical meaning, changing the meaning of `auto` became natural.
 
-使用 `auto` 进行类型推导的一个最为常见而且显著的例子就是迭代器。你应该在前面的小节里看到了传统 C++ 中冗长的迭代写法：
+One of the most common and visible uses of `auto` is iterator type deduction. Earlier sections showed the verbose traditional C++ iterator style:
 
 ```cpp
-// 在 C++11 之前
-// 由于 cbegin() 将返回 vector<int>::const_iterator
-// 所以 itr 也应该是 vector<int>::const_iterator 类型
+// before C++11
+// because cbegin() returns vector<int>::const_iterator,
+// itr should also have type vector<int>::const_iterator
 for(vector<int>::const_iterator it = vec.cbegin(); itr != vec.cend(); ++it)
 ```
 
-而有了 `auto` 之后可以：
+With `auto`, this can be written more directly:
 
 ```cpp
 class MagicFoo {
 public:
     std::vector<int> vec;
     MagicFoo(std::initializer_list<int> list) {
-        // 从 C++11 起, 使用 auto 关键字进行类型推导
+        // since C++11, use auto for type deduction
         for (auto it = list.begin(); it != list.end(); ++it) {
             vec.push_back(*it);
         }
@@ -479,44 +479,44 @@ int main() {
 }
 ```
 
-一些其他的常见用法：
+Some other common usages:
 
 ```cpp
-auto i = 5;              // i 被推导为 int
-auto arr = new auto(10); // arr 被推导为 int *
+auto i = 5;              // i is deduced as int
+auto arr = new auto(10); // arr is deduced as int *
 ```
 
-从 **C++ 20** 起，`auto` 甚至能用于函数传参，考虑下面的例子：
+Starting in **C++20**, `auto` can even be used in function parameters. Consider this example:
 
 ```cpp
 int add(auto x, auto y) {
     return x+y;
 }
 
-auto i = 5; // 被推导为 int
-auto j = 6; // 被推导为 int
+auto i = 5; // deduced as int
+auto j = 6; // deduced as int
 std::cout << add(i, j) << std::endl;
 
 ```
 
-**注意**：`auto` 还不能用于推导数组类型：
+**Note**: `auto` still cannot be used to deduce an array type in this form:
 
 ```cpp
-auto auto_arr2[10] = {arr}; // 错误, 无法推导数组元素类型
+auto auto_arr2[10] = {arr}; // error: cannot deduce array element type
 ```
 
 #### decltype(auto)
 
-`decltype(auto)` 是 C++14 开始提供的一个略微复杂的用法。
+`decltype(auto)` is a slightly more advanced feature introduced in C++14.
 
-简单来说，`decltype(auto)` 主要用于对转发函数或封装的返回类型进行推导，它使我们无需显式的指定 `decltype` 的参数表达式。考虑看下面的例子，当我们需要对下面两个函数进行封装时：
+In short, `decltype(auto)` is mainly used to deduce the return type of forwarding functions or wrapper functions. It avoids explicitly writing the expression parameter to `decltype`. Consider this example, where we need to wrap the following two functions:
 
 ```cpp
 std::string  lookup1();
 std::string& lookup2();
 ```
 
-在 C++11 中，封装实现是如下形式：
+In C++11, the wrappers would look like this:
 
 ```cpp
 std::string look_up_a_string_1() {
@@ -527,7 +527,7 @@ std::string& look_up_a_string_2() {
 }
 ```
 
-而有了 `decltype(auto)`，我们可以让编译器完成这一件烦人的参数转发：
+With `decltype(auto)`, the compiler can handle this tedious return-type forwarding:
 
 ```cpp
 decltype(auto) look_up_a_string_1() {
@@ -538,13 +538,13 @@ decltype(auto) look_up_a_string_2() {
 }
 ```
 
-### 控制流
+### Control Flow
 
 #### if constexpr
 
-&#x20;C++11 引入了 `constexpr` 关键字，它将表达式或函数编译为常量结果。一个很自然的想法是，如果我们把这一特性引入到条件判断中去，让代码在编译时就完成分支判断，岂不是能让程序效率更高？
+&#x20;C++11 introduced `constexpr`, which allows expressions or functions to produce compile-time constant results. A natural extension is to bring that idea into conditional branching: if a branch can be selected at compile time, the generated program can avoid irrelevant runtime code.
 
-**C++17** 将 `constexpr` 这个关键字引入到 `if` 语句中，**允许在代码中声明常量表达式的判断条件**，考虑下面的代码：
+**C++17** introduced `constexpr` into `if` statements, **allowing a branch condition to be evaluated as a constant expression**. Consider this code:
 
 ```cpp
 template<typename T>
@@ -560,7 +560,7 @@ int main() {
     std::cout << print_type_info(3.14) << std::endl;
 }
 
-// 在编译时，实际代码就会表现为如下：
+// at compile time, the effective generated code behaves like this:
 /*
 int print_type_info(const int& t) {
     return t + 1;
@@ -575,9 +575,9 @@ int main() {
 */
 ```
 
-#### 区间for迭代
+#### Range-Based `for`
 
-**C++11** 引入了基于范围的迭代写法
+**C++11** introduced range-based iteration syntax:
 
 ```cpp
 int main() {

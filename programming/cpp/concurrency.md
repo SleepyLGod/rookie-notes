@@ -6,7 +6,7 @@ description: https://changkun.de/modern-cpp/en-us/07-thread/#7-1-Basic-of-Parall
 
 ### Basic
 
-`std::thread` 用于创建一个执行的线程实例，所以它是一切并发编程的基础，使用时需要包含 `<thread>` 头文件， 它提供了很多基本的线程操作，例如 `get_id()` 来获取所创建线程的线程 ID，使用 `join()` 来加入一个线程等等，例如：
+`std::thread` is used to create a thread of execution, so it is the foundation of C++ concurrent programming. To use it, include the `<thread>` header. It provides many basic thread operations, such as `get_id()` for obtaining the ID of the created thread and `join()` for joining a thread. For example:
 
 ```cpp
 #include <iostream>
@@ -23,11 +23,11 @@ int main() {
 
 ### Mutex and Critical Section
 
-`std::mutex` 是 C++11 中最基本的 `mutex` 类，通过实例化 `std::mutex` 可以创建互斥量， 而通过其成员函数 `lock()` 可以进行上锁，`unlock()` 可以进行解锁。 但是在实际编写代码的过程中，最好不去直接调用成员函数， 因为调用成员函数就需要在每个临界区的出口处调用 `unlock()`，当然，还包括异常。&#x20;
+`std::mutex` is the most basic mutex class in C++11. Instantiating `std::mutex` creates a mutex. Its member function `lock()` locks the mutex, and `unlock()` unlocks it. In real code, however, it is better not to call these member functions directly, because then every exit path of the critical section must call `unlock()`, including exception paths.
 
-这时候 C++11 还为互斥量提供了一个 RAII 语法的模板类 `std::lock_guard`。 RAII 在不失代码简洁性的同时，很好的保证了代码的异常安全性。
+For this reason, C++11 provides the RAII-style template class `std::lock_guard` for mutexes. RAII keeps code concise while providing good exception safety.
 
-在 RAII 用法下，对于临界区的互斥量的创建只需要在作用域的开始部分，例如：
+With RAII, the mutex guard for a critical section only needs to be created at the beginning of the scope:
 
 ```cpp
 #include <iostream>
@@ -40,10 +40,10 @@ void critical_section(int change_v) {
     static std::mutex mtx;
     std::lock_guard<std::mutex> lock(mtx);
 
-    // 执行竞争操作
+    // Execute the competing operation.
     v = change_v;
 
-    // 离开此作用域后 mtx 会被释放
+    // mtx is released after leaving this scope.
 }
 
 int main() {
@@ -56,25 +56,25 @@ int main() {
 }
 ```
 
-由于 C++ 保证了所有栈对象在生命周期结束时会被销毁，所以这样的代码也是异常安全的。 无论 `critical_section()` 正常返回、还是在中途抛出异常，都会引发堆栈回退，也就自动调用了 `unlock()`。
+Because C++ guarantees that stack objects are destroyed when their lifetime ends, this code is exception-safe. Whether `critical_section()` returns normally or throws an exception in the middle, stack unwinding destroys the guard and calls `unlock()` automatically.
 
-而 **`std::unique_lock`** 则是相对于 `std::lock_guard` 更灵活的锁管理工具， `std::unique_lock` 的对象会以独占所有权（没有其他的 `unique_lock` 对象同时拥有某个 `mutex` 对象的所有权） 的方式管理 `mutex` 对象上的上锁和解锁操作。简单作用域加锁优先使用 `std::lock_guard`；需要延迟加锁、手动 `unlock`、移动锁对象或配合条件变量时，再使用 `std::unique_lock`。
+**`std::unique_lock`** is a more flexible lock-management tool than `std::lock_guard`. A `std::unique_lock` object manages lock and unlock operations on a `mutex` with exclusive ownership: no other `unique_lock` object owns that mutex at the same time. For simple scoped locking, prefer `std::lock_guard`. Use `std::unique_lock` when delayed locking, manual `unlock`, moving the lock object, or use with a condition variable is required.
 
-`std::lock_guard` 不能显式的调用 `lock` 和 `unlock`， 而 `std::unique_lock` 可以在声明后的任意位置调用， 可以缩小锁的作用范围，提供更高的并发度。
+`std::lock_guard` cannot explicitly call `lock` or `unlock`, while `std::unique_lock` can call them at arbitrary points after construction. This can reduce the locked scope and provide higher concurrency.
 
-如果你用到了条件变量 `std::condition_variable::wait` 则必须使用 `std::unique_lock` 作为参数。
+If you use `std::condition_variable::wait`, you must use `std::unique_lock` as the argument.
 
-### Futher
+### Future
 
-期物（Future）表现为 `std::future`，它提供了一个访问异步操作结果的途径，这句话很不好理解。 为了理解这个特性，我们需要先理解一下在 C++11 之前的多线程行为。
+A future, represented by `std::future`, provides a way to access the result of an asynchronous operation. This sentence is not immediately intuitive. To understand this feature, first consider multi-threaded behavior before C++11.
 
-试想，如果我们的主线程 A 希望新开辟一个线程 B 去执行某个我们预期的任务，并返回我一个结果。 而这时候，线程 A 可能正在忙其他的事情，无暇顾及 B 的结果， 所以我们会很自然的希望能够在某个特定的时间获得线程 B 的结果。
+Suppose main thread A wants to create a new thread B to execute an expected task and return a result. At that moment, thread A may be busy with other work and cannot care about B's result immediately. Naturally, we want to obtain thread B's result at some specific later time.
 
-在 C++11 的 `std::future` 被引入之前，通常的做法是： 创建一个线程 A，在线程 A 里启动任务 B，当准备完毕后发送一个事件，并将结果保存在全局变量中。 而主函数线程 A 里正在做其他的事情，当需要结果的时候，调用一个线程等待函数来获得执行的结果。
+Before C++11 introduced `std::future`, a common approach was to create a thread, start task B inside it, send an event when it was ready, and store the result in a global variable. The main thread continued doing other work and called a thread-waiting function when it needed the result.
 
-而 C++11 提供的 `std::future` 简化了这个流程，可以用来获取异步任务的结果。 自然地，我们很容易能够想象到把它作为一种简单的线程同步手段，即屏障（**barrier**）。
+`std::future` in C++11 simplifies this process and can be used to obtain the result of an asynchronous task. Naturally, it can also serve as a simple thread-synchronization mechanism, namely a **barrier**.
 
-为了看一个例子，我们这里额外使用 `std::packaged_task`，它可以用来封装任何可以调用的目标，从而用于实现异步的调用。 举例来说：
+To see an example, use `std::packaged_task`. It can wrap any callable target and can therefore be used to implement asynchronous calls:
 
 ```cpp
 #include <iostream>
@@ -82,26 +82,26 @@ int main() {
 #include <thread>
 
 int main() {
-    // 将一个返回值为7的 lambda 表达式封装到 task 中
-    // std::packaged_task 的模板参数为要封装函数的类型
+    // Wrap a lambda expression that returns 7 into task.
+    // The template parameter of std::packaged_task is the function type to wrap.
     std::packaged_task<int()> task([](){return 7;});
-    // 获得 task 的期物
-    std::future<int> result = task.get_future(); // 在一个线程中执行 task
-    std::thread(std::move(task)).detach(); // move: 移动构造函数
+    // Obtain the future of task.
+    std::future<int> result = task.get_future(); // Execute task in a thread.
+    std::thread(std::move(task)).detach(); // move: move constructor
     std::cout << "waiting...";
-    result.wait(); // 在此设置屏障，阻塞到期物的完成
-    // 输出执行结果
+    result.wait(); // Set a barrier here and block until the future is ready.
+    // Print the execution result.
     std::cout << "done!" << std:: endl << "future result is "
               << result.get() << std::endl;
     return 0;
 }
 ```
 
-在封装好要调用的目标后，可以使用 `get_future()` 来获得一个 `std::future` 对象，以便之后实施线程同步。
+After wrapping the target to call, use `get_future()` to obtain a `std::future` object for later thread synchronization.
 
 ### Condition Variable
 
-条件变量 `std::condition_variable` 用于让线程在某个条件尚未满足时阻塞等待，并在其他线程修改状态后被唤醒。它的核心价值是避免忙等，并正确处理“等待条件变化”这种同步模式；它不是专门为“解决死锁”而生。`std::condition_variable` 的 `notify_one()` 用于唤醒一个等待线程；`notify_all()` 则是通知所有等待线程。下面是一个生产者和消费者模型的例子：
+`std::condition_variable` lets a thread block while a condition has not yet been satisfied and be awakened after another thread modifies the state. Its core value is avoiding busy-waiting and correctly handling the synchronization pattern "wait until a condition changes"; it is not specifically designed to "solve deadlocks". `std::condition_variable::notify_one()` wakes one waiting thread, while `notify_all()` notifies all waiting threads. The following is a producer-consumer example:
 
 ```cpp
 #include <queue>
@@ -116,9 +116,9 @@ int main() {
     std::queue<int> produced_nums;
     std::mutex mtx;
     std::condition_variable cv;
-    bool notified = false;  // 通知信号
+    bool notified = false;  // notification flag
 
-    // 生产者
+    // Producer
     auto producer = [&]() {
         for (int i = 0; ; i++) {
             std::this_thread::sleep_for(std::chrono::milliseconds(900));
@@ -126,19 +126,20 @@ int main() {
             std::cout << "producing " << i << std::endl;
             produced_nums.push(i);
             notified = true;
-            cv.notify_all(); // 此处也可以使用 notify_one
+            cv.notify_all(); // notify_one could also be used here.
         }
     };
-    // 消费者
+    // Consumer
     auto consumer = [&]() {
         while (true) {
             std::unique_lock<std::mutex> lock(mtx);
-            while (!notified) {  // 避免虚假唤醒
+            while (!notified) {  // avoid spurious wakeups
                 cv.wait(lock);
             }
-            // 短暂取消锁，使得生产者有机会在消费者消费空前继续生产
+            // Temporarily release the lock so the producer can keep producing
+            // before the consumer drains the queue.
             lock.unlock();
-            // 消费者慢于生产者
+            // Consumer is slower than producer.
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             lock.lock();
             while (!produced_nums.empty()) {
@@ -149,7 +150,7 @@ int main() {
         }
     };
 
-    // 分别在不同的线程中运行
+    // Run in separate threads.
     std::thread p(producer);
     std::thread cs[2];
     for (int i = 0; i < 2; ++i) {
@@ -163,11 +164,11 @@ int main() {
 }
 ```
 
-值得一提的是，在生产者中我们虽然可以使用 `notify_one()`，但实际上并不建议在此处使用， 因为在多消费者的情况下，我们的消费者实现中简单放弃了锁的持有，这使得可能让其他消费者 争夺此锁，从而更好的利用多个消费者之间的并发。话虽如此，但实际上因为 `std::mutex` 的排他性， 我们根本无法期待多个消费者能真正意义上的并行消费队列的中生产的内容，我们仍需要粒度更细的手段。
+It is worth noting that although `notify_one()` could be used in the producer, it is not recommended in this specific example. With multiple consumers, the consumer implementation simply releases the lock for a while, allowing other consumers to compete for it and better exploit concurrency between consumers. That said, because `std::mutex` is exclusive, we still cannot expect multiple consumers to truly consume the queue contents in parallel. Finer-grained techniques are still needed.
 
-### 原子操作与内存模型
+### Atomic Operations and the Memory Model
 
-细心的读者可能会对前一小节中生产者消费者模型的例子可能存在编译器优化导致程序出错的情况产生疑惑。 例如，布尔值 `notified` 没有被 `volatile` 修饰，编译器可能对此变量存在优化，例如将其作为一个寄存器的值， 从而导致消费者线程永远无法观察到此值的变化。这是一个好问题，为了解释清楚这个问题，我们需要进一步讨论 从 C++ 11 起引入的内存模型这一概念。我们首先来看一个问题，下面这段代码输出结果是多少？
+Careful readers may wonder whether the producer-consumer example in the previous section could be broken by compiler optimization. For example, the boolean `notified` is not marked `volatile`, so the compiler might optimize it, perhaps keeping it as a register value and causing the consumer thread to never observe changes to it. This is a good question. To explain it clearly, we need to discuss the memory model introduced in C++11. First look at this question: what does the following code print?
 
 ```cpp
 #include <thread>
@@ -195,24 +196,24 @@ int main() {
 }
 ```
 
-从直观上看，`t2` 中 `a = 5;` 这一条语句似乎总在 `flag = 1;` 之前得到执行，而 `t1` 中 `while (flag != 1)` 似乎保证了 `std::cout << "b = " << b << std::endl;` 不会再标记被改变前执行。从逻辑上看，似乎 `b` 的值应该等于 5。 但实际情况远比此复杂得多，或者说这段代码本身属于未定义的行为，因为对于 `a` 和 `flag` 而言，他们在两个并行的线程中被读写， 出现了竞争。除此之外，即便我们忽略竞争读写，仍然可能受 CPU 的乱序执行，编译器对指令的重排的影响， 导致 `a = 5` 发生在 `flag = 1` 之后。从而 `b` 可能输出 0。
+Intuitively, `a = 5;` in `t2` appears to execute before `flag = 1;`, and `while (flag != 1)` in `t1` appears to ensure that `std::cout << "b = " << b << std::endl;` will not execute before the flag changes. Logically, `b` seems like it should be 5. In reality, the situation is much more complex. More precisely, this program has undefined behavior, because `a` and `flag` are read and written from two parallel threads without synchronization, creating data races. In addition, even if we ignored the racing reads and writes, CPU out-of-order execution and compiler instruction reordering could still cause `a = 5` to occur after `flag = 1`, so `b` might print 0.
 
-#### 原子操作
+#### Atomic Operations
 
-`std::mutex` 可以解决上面出现的并发读写的问题，但互斥锁是操作系统级的功能， 这是因为一个互斥锁的实现通常包含两条基本原理：
+`std::mutex` can solve the concurrent read/write problem above, but a mutex is an operating-system-level facility. A typical mutex implementation involves two basic principles:
 
-1. 提供线程间自动的状态转换，即『锁住』这个状态
-2. 保障在互斥锁操作期间，所操作变量的内存与临界区外进行隔离
+1. It provides an automatic inter-thread state transition, namely the "locked" state.
+2. It ensures that memory operated on while holding the mutex is isolated from memory outside the critical section during mutex operations.
 
-这是一组非常强的同步条件，换句话说当最终编译为 CPU 指令时会表现为非常多的指令（我们之后再来看如何实现一个简单的互斥锁）。 这对于一个仅需原子级操作（没有中间态）的变量，似乎太苛刻了。
+These are very strong synchronization conditions. In other words, once compiled into CPU instructions, they may translate into many instructions. We will later look at how to implement a simple mutex. For a variable that only needs an atomic operation, meaning it has no intermediate state, this seems too heavy.
 
-关于同步条件的研究有着非常久远的历史，我们在这里不进行赘述。读者应该明白，现代 CPU 体系结构提供了 CPU 指令级的原子操作， 因此在 C++11 中多线程下共享变量的读写这一问题上，还引入了 `std::atomic` 模板，使得我们实例化一个原子类型，将一个 原子类型读写操作从一组指令，最小化到单个 CPU 指令。例如：
+Synchronization conditions have been studied for a very long time, and this note does not expand on that history. Readers should understand that modern CPU architectures provide instruction-level atomic operations. Therefore, C++11 introduced the `std::atomic` template for shared variable reads and writes under multi-threading. It lets us instantiate an atomic type and reduce an atomic read/write operation from a group of instructions to a single CPU-level atomic operation when the platform supports it. For example:
 
 ```cpp
 std::atomic<int> counter;
 ```
 
-并为整数或浮点数的原子类型提供了基本的数值成员函数，举例来说， 包括 `fetch_add`, `fetch_sub` 等，同时通过重载方便的提供了对应的 `+`，`-` 版本。 比如下面的例子：
+For atomic integer or floating-point types, C++ provides basic numeric member functions such as `fetch_add` and `fetch_sub`. It also overloads operators to conveniently provide corresponding `+` and `-` forms. For example:
 
 ```cpp
 #include <atomic>
@@ -226,8 +227,8 @@ int main() {
         count.fetch_add(1);
     });
     std::thread t2([](){
-        count++;        // 等价于 fetch_add
-        count += 1;     // 等价于 fetch_add
+        count++;        // equivalent to fetch_add
+        count += 1;     // equivalent to fetch_add
     });
     t1.join();
     t2.join();
@@ -236,7 +237,7 @@ int main() {
 }
 ```
 
-当然，并非所有的类型都能提供原子操作，这是因为原子操作的可行性取决于具体的 CPU 架构，以及所实例化的类型结构是否能够满足该 CPU 架构对内存对齐 条件的要求，因而我们总是可以通过 `std::atomic<T>::is_lock_free` 来检查该原子类型是否需支持原子操作，例如：
+Of course, not every type can provide lock-free atomic operations. Whether atomic operations are feasible depends on the specific CPU architecture and whether the instantiated type layout satisfies that architecture's memory-alignment requirements. Therefore, we can use `std::atomic<T>::is_lock_free` to check whether an atomic type is lock-free, for example:
 
 ```cpp
 #include <atomic>
@@ -255,15 +256,15 @@ int main() {
 }
 ```
 
-#### 一致性模型
+#### Consistency Models
 
-并行执行的多个线程，从某种宏观层面上讨论，可以粗略的视为一种分布式系统。 在分布式系统中，任何通信乃至本地操作都需要消耗一定时间，甚至出现不可靠的通信。
+At a coarse level, multiple parallel threads can be viewed roughly as a distributed system. In a distributed system, any communication and even local operation takes some time, and communication can even be unreliable.
 
-如果我们强行将一个变量 `v` 在多个线程之间的操作设为原子操作，即任何一个线程在操作完 `v` 后， 其他线程均能**同步**感知到 `v` 的变化，则对于变量 `v` 而言，表现为顺序执行的程序，它并没有由于引入多线程 而得到任何效率上的收益。对此有什么办法能够适当的加速呢？答案便是削弱原子操作的在进程间的同步条件。
+If we force operations on a variable `v` across multiple threads to be atomic, and require every other thread to **synchronously** observe changes to `v` as soon as any thread finishes operating on it, then for `v`, the program behaves as if it executed sequentially. It gains no efficiency from introducing multiple threads. How can this be accelerated appropriately? The answer is to weaken synchronization conditions between threads for atomic operations.
 
-从原理上看，每个线程可以对应为一个集群节点，而线程间的通信也几乎等价于集群节点间的通信。 削弱进程间的同步条件，通常我们会考虑四种不同的一致性模型：
+In principle, each thread can correspond to a cluster node, and communication between threads is almost equivalent to communication between cluster nodes. When weakening inter-thread synchronization conditions, we usually consider four different consistency models:
 
-<mark style="background-color:green;">**线性一致性**</mark>：又称强一致性或原子一致性。它要求任何一次读操作都能读到某个数据的最近一次写的数据，并且所有线程的操作顺序与全局时钟下的顺序是一致的。
+<mark style="background-color:green;">**Linearizability**</mark>: also called strong consistency or atomic consistency. It requires every read operation to read the most recent write of the data, and the operation order of all threads must be consistent with global-clock order.
 
 ```
         x.store(1)      x.load()
@@ -274,9 +275,9 @@ T2 -------------------+------------->
                 x.store(2)
 ```
 
-在这种情况下线程 `T1`, `T2` 对 `x` 的两次写操作是原子的，且 `x.store(1)` 是严格的发生在 `x.store(2)` 之前，`x.store(2)` 严格的发生在 `x.load()` 之前。 值得一提的是，线性一致性对全局时钟的要求是难以实现的，这也是人们不断研究比这个一致性更弱条件下其他一致性的算法的原因。
+In this situation, the two writes to `x` by threads `T1` and `T2` are atomic. `x.store(1)` strictly happens before `x.store(2)`, and `x.store(2)` strictly happens before `x.load()`. It is worth noting that the global-clock requirement of linearizability is difficult to implement. This is why people continue to study algorithms under weaker consistency conditions.
 
-<mark style="background-color:green;">**顺序一致性**</mark>：同样要求**任何一次读操作**都能读到数据最近一次写入的数据，但未要求与全局时钟的顺序一致。
+<mark style="background-color:green;">**Sequential consistency**</mark>: this also requires **every read operation** to read the most recent write of the data, but it does not require consistency with global-clock order.
 
 ```
         x.store(1)  x.store(3)   x.load()
@@ -286,7 +287,7 @@ T1 ---------+-----------+----------+----->
 T2 ---------------+---------------------->
               x.store(2)
 
-或者
+or
 
         x.store(1)  x.store(3)   x.load()
 T1 ---------+-----------+----------+----->
@@ -296,9 +297,9 @@ T2 ------+------------------------------->
       x.store(2)
 ```
 
-在顺序一致性的要求下，`x.load()` 必须读到最近一次写入的数据，因此 `x.store(2)` 与 `x.store(1)` 并无任何先后保障，即 只要 `T2` 的 `x.store(2)` 发生在 `x.store(3)` 之前即可。
+Under sequential consistency, `x.load()` must read the latest written data. Therefore, there is no ordering guarantee between `x.store(2)` and `x.store(1)`; it is only required that `T2`'s `x.store(2)` happen before `x.store(3)`.
 
-<mark style="background-color:green;">**因果一致性**</mark>：它的要求进一步降低，只需要有因果关系的操作顺序得到保障，而非因果关系的操作顺序则不做要求。
+<mark style="background-color:green;">**Causal consistency**</mark>: the requirement is further weakened. Only the order of causally related operations must be preserved. Operations without causal relationship do not have an ordering requirement.
 
 ```
       a = 1      b = 2
@@ -308,7 +309,7 @@ T1 ----+-----------+---------------------------->
 T2 ------+--------------------+--------+-------->
       x.store(3)         c = a + b    y.load()
 
-或者
+or
 
       a = 1      b = 2
 T1 ----+-----------+---------------------------->
@@ -317,7 +318,7 @@ T1 ----+-----------+---------------------------->
 T2 ------+--------------------+--------+-------->
       x.store(3)          y.load()   c = a + b
 
-亦或者
+or
 
      b = 2       a = 1
 T1 ----+-----------+---------------------------->
@@ -328,9 +329,9 @@ T2 ------+--------------------+--------+-------->
 
 ```
 
-上面给出的三种例子都是属于因果一致的，因为整个过程中，只有 `c` 对 `a` 和 `b` 产生依赖，而 `x` 和 `y` 在此例子中表现为没有关系（但实际情况中我们需要更详细的信息才能确定 `x` 与 `y` 确实无关）
+All three examples above are causally consistent, because in the whole process only `c` depends on `a` and `b`, while `x` and `y` appear unrelated in this example. In real situations, however, more detailed information is needed to determine whether `x` and `y` are truly unrelated.
 
-<mark style="background-color:green;">**最终一致性**</mark>：是**最弱**的一致性要求，它只保障某个操作在未来的某个时间节点上会被观察到，但并未要求被观察到的时间。因此我们甚至可以对此条件稍作加强，例如规定某个操作被观察到的时间总是有界的。当然这已经不在我们的讨论范围之内了。
+<mark style="background-color:green;">**Eventual consistency**</mark>: this is the **weakest** consistency requirement. It only guarantees that an operation will be observed at some future time, without specifying when it will be observed. We can strengthen this condition slightly, for example by requiring that the time for an operation to be observed is always bounded. But that is outside the scope of this discussion.
 
 ```
     x.store(3)  x.store(4)
@@ -341,21 +342,22 @@ T2 ---------+------------+--------------------+--------+-------->
          x.read      x.read()           x.read()   x.read()
 ```
 
-在上面的情况中，如果我们假设 x 的初始值为 0，则 `T2` 中四次 `x.read()` 结果可能但不限于以下情况：
+In the situation above, if we assume the initial value of `x` is 0, the four `x.read()` results in `T2` may include, but are not limited to, the following:
 
-| <pre><code>3 4 4 4 // x 的写操作被很快观察到
-0 3 3 4 // x 的写操作被观察到的时间存在一定延迟
-0 0 0 4 // 最后一次读操作读到了 x 的最终值，但此前的变化并未观察到
-0 0 0 0 // 在当前时间段内 x 的写操作均未被观察到，        
-        // 但未来某个时间点上一定能观察到 x 为 4 的情况
+| <pre><code>3 4 4 4 // writes to x are observed quickly
+0 3 3 4 // observing writes to x has some delay
+0 0 0 4 // the final read observes the final value of x,
+        // but earlier changes were not observed
+0 0 0 0 // no writes to x are observed in the current time period,
+        // but at some future time x must be observed as 4
 </code></pre> |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 
-#### 内存顺序
+#### Memory Ordering
 
-为了追求极致的性能，实现各种强度要求的一致性，C++11 为原子操作定义了六种不同的**内存顺序** `std::memory_order` 的选项，表达了四种多线程间的同步模型：
+To pursue maximum performance and implement consistency requirements of different strengths, C++11 defines six different **memory order** options under `std::memory_order` for atomic operations. These express four synchronization models between threads:
 
-<mark style="background-color:green;">**宽松模型**</mark>：在此模型下，单个线程内的原子操作都是顺序执行的，不允许指令重排，但**不同线程**间原子操作的顺序是任意的。类型通过 `std::memory_order_relaxed` 指定。我们来看一个例子：
+<mark style="background-color:green;">**Relaxed model**</mark>: under this model, atomic operations within a single thread execute in order and instruction reordering is not allowed for that thread's atomic operations, but the order of atomic operations between **different threads** is arbitrary. This is specified with `std::memory_order_relaxed`. Consider this example:
 
 ```cpp
 std::atomic<int> counter = {0};
@@ -372,10 +374,10 @@ for (auto& t : vt) {
 std::cout << "current counter:" << counter << std::endl;
 ```
 
-<mark style="background-color:green;">**释放/消费模型**</mark>：在此模型中，我们开始限制进程间的操作顺序，如果某个线程需要修改某个值，但另一个线程会对该值的某次操作产生依赖，即后者依赖前者。具体而言，线程 A 完成了三次对 `x` 的写操作，线程 `B` 仅依赖其中第三次 `x` 的写操作，与 `x` 的前两次写行为无关，则当 `A` 主动 `x.release()` 时候（即使用 `std::memory_order_release`），选项 `std::memory_order_consume` 能够确保 `B` 在调用 `x.load()` 时候观察到 `A` 中第三次对 `x` 的写操作。我们来看一个例子：
+<mark style="background-color:green;">**Release/consume model**</mark>: in this model, we begin to constrain operation order between threads. If one thread modifies a value and another thread has a dependency on one operation on that value, then the latter depends on the former. Specifically, suppose thread A performs three writes to `x`, and thread B depends only on A's third write to `x`, not on the first two writes. When A performs `x.release()`, meaning it uses `std::memory_order_release`, the `std::memory_order_consume` option ensures that B observes A's third write to `x` when B calls `x.load()`. Here is an example:
 
 ```cpp
-// 初始化为 nullptr 防止 consumer 线程从野指针进行读取
+// Initialize to nullptr to prevent the consumer thread from reading from a wild pointer.
 std::atomic<int*> ptr(nullptr);
 int v;
 std::thread producer([&]() {
@@ -394,11 +396,11 @@ producer.join();
 consumer.join();
 ```
 
-<mark style="background-color:green;">**释放/获取模型**</mark>：在此模型下，我们可以进一步加紧对不同线程间原子操作的顺序的限制，在释放 `std::memory_order_release` 和获取 `std::memory_order_acquire` 之间规定时序，即发生在释放（release）操作之前的**所有**写操作，对其他线程的任何获取（acquire）操作都是可见的，亦即发生顺序（happens-before）。
+<mark style="background-color:green;">**Release/acquire model**</mark>: this model further tightens ordering constraints for atomic operations across different threads. It defines an ordering between release, `std::memory_order_release`, and acquire, `std::memory_order_acquire`: **all** writes before the release operation are visible to any acquire operation in another thread, establishing a happens-before relationship.
 
-可以看到，`std::memory_order_release` 确保了它之前的写操作不会发生在释放操作之后，是一个向后的屏障（backward），而 `std::memory_order_acquire` 确保了它之前的写行为不会发生在该获取操作之后，是一个向前的屏障（forward）。对于选项 `std::memory_order_acq_rel` 而言，则结合了这两者的特点，唯一确定了一个内存屏障，使得当前线程对内存的读写不会被重排并越过此操作的前后：
+`std::memory_order_release` ensures that writes before it do not occur after the release operation; it is a backward barrier. `std::memory_order_acquire` ensures that reads and writes after it do not occur before the acquire operation; it is a forward barrier. `std::memory_order_acq_rel` combines both properties and defines a memory barrier that prevents the current thread's memory reads and writes from being reordered across this operation in either direction.
 
-我们来看一个例子：
+Consider this example:
 
 ```cpp
 std::vector<int> v;
@@ -408,9 +410,9 @@ std::thread release([&]() {
     flag.store(1, std::memory_order_release);
 });
 std::thread acqrel([&]() {
-    int expected = 1; // must before compare_exchange_strong
+    int expected = 1; // must be before compare_exchange_strong
     while(!flag.compare_exchange_strong(expected, 2, std::memory_order_acq_rel))
-        expected = 1; // must after compare_exchange_strong
+        expected = 1; // must be after compare_exchange_strong
     // flag has changed to 2
 });
 std::thread acquire([&]() {
@@ -423,9 +425,9 @@ acqrel.join();
 acquire.join();
 ```
 
-在此例中我们使用了 `compare_exchange_strong` 比较交换原语（Compare-and-swap primitive），它有一个更弱的版本，即 `compare_exchange_weak`，它允许即便交换成功，也仍然返回 `false` 失败。其原因是因为在某些平台上虚假故障导致的，具体而言，当 CPU 进行上下文切换时，另一线程加载同一地址产生的不一致。除此之外，`compare_exchange_strong` 的性能可能稍差于 `compare_exchange_weak`，但大部分情况下，鉴于其使用的复杂度而言，`compare_exchange_weak` 应该被有限考虑。
+This example uses the compare-and-swap primitive `compare_exchange_strong`. It has a weaker version, `compare_exchange_weak`, which may return `false` even when the exchange could succeed. This is due to spurious failure on some platforms, specifically inconsistencies that can arise when the CPU performs a context switch and another thread loads the same address. In addition, `compare_exchange_strong` may have slightly worse performance than `compare_exchange_weak`. In most cases, given the complexity of its use, `compare_exchange_weak` should be considered first when the code is prepared to retry in a loop.
 
-<mark style="background-color:green;">**顺序一致模型**</mark>：在此模型下，原子操作满足顺序一致性，进而可能对性能产生损耗。可显式的通过 `std::memory_order_seq_cst` 进行指定。最后来看一个例子：
+<mark style="background-color:green;">**Sequentially consistent model**</mark>: in this model, atomic operations satisfy sequential consistency, which may reduce performance. It can be specified explicitly with `std::memory_order_seq_cst`. Finally, consider this example:
 
 ```cpp
 std::atomic<int> counter = {0};
@@ -442,4 +444,4 @@ for (auto& t : vt) {
 std::cout << "current counter:" << counter << std::endl;
 ```
 
-这个例子与第一个**宽松模型**的例子本质上没有区别，仅仅只是将原子操作的内存顺序修改为了 `memory_order_seq_cst`，有兴趣的读者可以自行编写程序测量这两种不同内存顺序导致的性能差异。
+This example is essentially the same as the first **relaxed model** example. The only difference is that the memory order of the atomic operation is changed to `memory_order_seq_cst`. Interested readers can write a program to measure the performance difference caused by these two memory orders.

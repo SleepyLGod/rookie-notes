@@ -1,77 +1,77 @@
 ---
-description: RDMA之RoCE & Soft-RoCE
+description: RDMA RoCE and Soft-RoCE
 ---
 
 # 😅 RoCE
 
-我们知道，支持RDMA的网卡都比较昂贵，拿Mellanox（现在是NVIDIA）来说，在其官网上最新一代支持Infiniband的网卡——[ConnectX-6](https://link.zhihu.com/?target=https%3A//store.mellanox.com/categories/infiniband/infiniband-vpi-adapters/connectx-6-vpi.html%23)最便宜的单端口型号也要795刀，这对于我们学生来说是一笔不小的开销。
+RDMA-capable NICs are expensive. Taking Mellanox, now NVIDIA, as an example, the cheapest single-port model of its latest-generation InfiniBand-capable NIC on the official site, [ConnectX-6](https://link.zhihu.com/?target=https%3A//store.mellanox.com/categories/infiniband/infiniband-vpi-adapters/connectx-6-vpi.html%23), costs 795 USD. For students, this is not a small expense.
 
-RDMA技术实际应用的话是得依赖网卡来完成大部分工作的，但是好在我们有Soft-RoCE。它通过软件代替硬件来将IB传输层的报文加在普通UDP报文中，从而得以让普通网卡也可以发送RoCE报文，这对于为我们学习IB传输层协议，以及编写调试基于Verbs的RDMA程序提供了一种非常低成本的方案。
+In real applications, RDMA technology depends on NICs to complete most of the work. Fortunately, we have Soft-RoCE. It uses software instead of hardware to wrap IB transport-layer packets inside ordinary UDP packets, allowing ordinary NICs to send RoCE packets. This provides a very low-cost way to study the IB transport protocol and to write and debug Verbs-based RDMA programs.
 
-本篇文章将介绍RoCE是什么、它的由来以及Soft-RoCE的实现原理等。
+This note introduces what RoCE is, where it comes from, and how Soft-RoCE works.
 
-RoCE全称是 `RDMA over Converged Ethernet`，即基于融合以太网的RDMA。
+RoCE stands for `RDMA over Converged Ethernet`, meaning RDMA over converged Ethernet.
 
-用通俗的话讲，就是基于传统以太网的部分下层协议，在其基础上实现Infiniband的部分上层协议。
+In plain terms, it implements part of InfiniBand's upper-layer protocols on top of some lower-layer protocols from traditional Ethernet.
 
-### RoCE的协议层次 <a href="#h_361740115_1" id="h_361740115_1"></a>
+### RoCE Protocol Layers <a href="#h_361740115_1" id="h_361740115_1"></a>
 
-下面这张图之前出现过，它比较清晰的划分出了这几种协议的关系：
+The following figure appeared earlier. It clearly shows the relationship between these protocols:
 
 <figure><img src="https://pic2.zhimg.com/v2-106078a152d4926ac8234022bd629c79_b.jpg" alt=""><figcaption></figcaption></figure>
 
-可能还不够直观，我们把`RoCE v2`的一个报文展开来看（没有画出物理层协议）：\
+This may still not be intuitive enough, so expand one `RoCE v2` packet, without drawing the physical-layer protocol:\
 
 
 <figure><img src="https://pic1.zhimg.com/v2-17e04efb14c550ad0be456b7b71209b4_b.jpg" alt=""><figcaption></figcaption></figure>
 
-首先是二层的以太网链路帧，然后是IP报文头和UDP报文头，最后是各层级协议的校验。而Infiniband传输层报文实际上是UDP层的负载，也就是深蓝色背景的部分。UDP报文头中有一个字段Destination Port Number（目的端口号），对于RoCE v2来说固定是4791，当对端网卡收到报文后，会根据该字段识别是普通的以太网数据包，还是RoCE数据包，或者是其他协议的数据包，然后再进行解析。深蓝色背景的IB传输层部分又分成了IB报头，实际的用户数据（Payload）以及校验部分。IB传输层实际上有很多种报头以及对应的格式，我们以后再介绍。
+First comes the Layer 2 Ethernet frame, then the IP header and UDP header, and finally checksums for the protocol layers. The InfiniBand transport-layer packet is actually the UDP payload, shown as the dark-blue part. The UDP header has a Destination Port Number field. For RoCE v2, this value is fixed at 4791. After the peer NIC receives the packet, it uses this field to identify whether the packet is an ordinary Ethernet packet, a RoCE packet, or another protocol packet, and then parses it accordingly. The dark-blue IB transport-layer part is further divided into the IB header, actual user data or Payload, and the checksum portion. The IB transport layer has many header types and corresponding formats, which can be introduced later.
 
-**为什么**我们有了Infiniband协议之后，还要设计RoCE协议呢？最主要的原因还是成本问题：由于Infiniband协议本身定义了一套全新的层次架构，从链路层到传输层，都无法与现有的以太网设备兼容。也就是说，如果某个数据中心因为性能瓶颈，想要把数据交换方式从以太网切换到Infiniband技术，那么需要购买全套的Infiniband设备，包括网卡、线缆、交换机和路由器等等。商用级设备由于对可靠性有比较高的要求，所以这一套下来是非常昂贵的。
+**Why** design RoCE after we already have the InfiniBand protocol? The main reason is cost. InfiniBand defines a completely new layered architecture. From link layer to transport layer, it is incompatible with existing Ethernet devices. In other words, if a data center hits a performance bottleneck and wants to switch its data-exchange method from Ethernet to InfiniBand, it needs to buy a full set of InfiniBand devices, including NICs, cables, switches, routers, and so on. Commercial devices have high reliability requirements, so the full set is very expensive.
 
-而 RoCE 协议的出现降低了这一成本：它复用以太网基础设施，在以太网上承载 RDMA 语义。这里不能理解成“只需要购买支持 RoCE 的网卡就可以上线生产”。RoCE 对丢包和拥塞比较敏感，生产部署通常还需要端点和交换机侧的 QoS、PFC/ECN、buffer、MTU 等配置；RoCE v1 不能跨三层路由，RoCE v2 则通过 UDP/IP 封装支持三层网络。
+The RoCE protocol reduces this cost by reusing Ethernet infrastructure and carrying RDMA semantics over Ethernet. This must not be misunderstood as "only buying RoCE-capable NICs is enough for production." RoCE is sensitive to packet loss and congestion. Production deployments usually also require QoS, PFC/ECN, buffer, MTU, and related configuration on endpoints and switches. RoCE v1 cannot cross Layer 3 routing, while RoCE v2 supports Layer 3 networks through UDP/IP encapsulation.
 
-所以RoCE相比于Infiniband，主要还是省钱，当然性能上相比Infiniband还是有一些损失，毕竟人家是全套重新设计的。
+Therefore, compared with InfiniBand, RoCE mainly saves cost. Of course, it still has some performance loss compared with InfiniBand, because InfiniBand is a full-stack redesign.
 
-至于iWARP，相比于RoCE协议栈更复杂，并且由于TCP的限制，只能支持可靠传输，即无法支持UD等传输类型。所以目前iWARP的发展并不如RoCE和Infiniband。
+As for iWARP, its protocol stack is more complex than RoCE, and because of TCP constraints it only supports reliable transport and cannot support transport types such as UD. Therefore, iWARP has not developed as well as RoCE and InfiniBand.
 
 ### Soft-RoCE <a href="#h_361740115_3" id="h_361740115_3"></a>
 
-虽然RoCE相比Infiniband具有兼容性优势，价格也便宜，但是**实际应用**的时候**依然需要专用的网卡支持**。有的读者可能会问，普通 UDP/IP 协议栈不是由软件实现的吗，只是在 UDP 层负载中承载 RDMA transport，为什么会对硬件有依赖？
+Although RoCE has compatibility advantages over InfiniBand and is cheaper, **real applications** still **require dedicated NIC support**. Some readers may ask: if the ordinary UDP/IP protocol stack is implemented in software, and RDMA transport is only carried in the UDP payload, why does it depend on hardware?
 
-RoCE本身确实可以由软件实现，也就是本节即将介绍的Soft-RoCE，但是商用的时候，几乎不会有人用软件实现的RoCE。RDMA技术本身的一大特点就是“硬件卸载”，即把本来软件（CPU）做的事情放到硬件中实现以达到加速的目的。CPU主要是用来计算的，让它去处理协议封包和解析以及搬运数据，这是对计算资源的浪费。所以 RoCE 网卡主要卸载的是 RDMA transport 处理、内存地址转换和数据放置等路径；RoCEv2 使用 UDP/IP 封装，但不能简单说成把 TCP/IP 协议栈放进硬件。
+RoCE itself can indeed be implemented in software, namely Soft-RoCE, which this section introduces. But in commercial deployments, almost nobody uses software-implemented RoCE. One major feature of RDMA is "hardware offload": work that would otherwise be done by software, or CPU, is moved into hardware for acceleration. CPUs are mainly used for computation; asking them to process protocol encapsulation, parsing, and data movement wastes compute resources. Therefore, RoCE NICs mainly offload RDMA transport processing, memory-address translation, data placement, and related paths. RoCEv2 uses UDP/IP encapsulation, but it should not be simplified as putting the TCP/IP protocol stack into hardware.
 
-我们说回Soft-RoCE，它由IBM和Mellanox牵头的IBTA RoCE工作组实现。本身的设计初衷有几点：
+Returning to Soft-RoCE, it was implemented by the IBTA RoCE working group led by IBM and Mellanox. Its original design goals include:
 
-* 降低RoCE部署成本
+* Lowering RoCE deployment cost
 
-Soft-RoCE可以使不具备RoCE能力的硬件和支持RoCE的硬件间进行基于IB语义的交流，这样可以免于替换网络中的一些非关键节点的旧型号网卡。
+Soft-RoCE allows hardware without RoCE capability to communicate with RoCE-capable hardware using IB semantics. This avoids replacing older NICs on some non-critical nodes in the network.
 
-* 相比TCP提升性能？
+* Improving performance compared with TCP?
 
-虽然软件实现IB传输层带来了一定的开销，但是相比基于Socket-TCP/IP的传统通信方式，Soft-RoCE因为减少了系统调用（只在软件通知硬件下发了新SQ WQE时才会使用系统调用），发送端的零拷贝以及接收端的只需要单次拷贝等原因，_仍然带来了性能上的提升？_。
+Although implementing the IB transport layer in software introduces overhead, compared with traditional Socket-TCP/IP communication, Soft-RoCE _may still provide a performance improvement?_ because it reduces system calls, only using a system call when software notifies hardware that a new SQ WQE has been posted, provides zero copy on the sender side, and requires only a single copy on the receiver side.
 
-> 注意：根据网友们的反馈以及我自己实测，Soft-RoCE的性能不及TCP。主要是几个原因：\
-> 1\. IB传输层MTU最大为4096，256 Bytes的Header + 4096 Bytes的Payload，Header所占比例较高；而TCP的MTU可以很大，相当于提高了有效载荷。\
-> 2\. 网卡往往可以为TCP提供硬件加速功能。\
-> 3\. Soft-RoCE用CPU去计算CRC，这是一件很慢的事情。\
+> Note: According to feedback from others and my own tests, Soft-RoCE performs worse than TCP. The main reasons are:\
+> 1. The maximum IB transport-layer MTU is 4096. With a 256-byte header plus a 4096-byte payload, the header ratio is high. TCP's MTU can be much larger, effectively increasing payload efficiency.\
+> 2. NICs often provide hardware acceleration for TCP.\
+> 3. Soft-RoCE uses the CPU to compute CRC, which is slow.\
 > \
-> 这里提供我能想到的提升性能的思路：\
-> 1\. **在编程时做多线程，每个线程绑定一个核**，并且每个线程间不要共享使用QP，因为会出现抢锁。\
-> 2\. 使用WR List代替单个WR，即每次Post Send时下发多个WR组成的WR链表，减少敲Doorbell时的系统调用开销。\
-> 3\. 将网卡的MTU值设置为大于4096 + 256，可以避免链路层切包的开销。\
-> 4\. 如果是RXE对接测试，可以通过修改RXE驱动关闭CRC校验，并提高RoCE的MTU值，但是这样违反了协议，貌似没什么意义。\
+> Here are possible performance-improvement ideas I can think of:\
+> 1. **Use multiple threads when programming, bind each thread to one core**, and avoid sharing QPs between threads because lock contention can occur.\
+> 2. Use a WR List instead of a single WR. That is, post a linked list of multiple WRs each time Post Send is called, reducing the system-call overhead of ringing the Doorbell.\
+> 3. Set the NIC MTU to be larger than 4096 + 256, which avoids link-layer packet splitting overhead.\
+> 4. If this is RXE-to-RXE testing, one can modify the RXE driver to disable CRC checking and increase the RoCE MTU, but this violates the protocol and seems not very meaningful.\
 > \
-> 附社区讨论该问题的链接：[Soft-RoCE performance - Christian Blume (kernel.org)](https://link.zhihu.com/?target=https%3A//lore.kernel.org/linux-rdma/CAGP7Hd6PAYcX\_gMMh8jbpezeSSWQxqDrYwxEq1N-zjgT7563%2Bg%40mail.gmail.com/)
+> Community discussion link: [Soft-RoCE performance - Christian Blume (kernel.org)](https://link.zhihu.com/?target=https%3A//lore.kernel.org/linux-rdma/CAGP7Hd6PAYcX\_gMMh8jbpezeSSWQxqDrYwxEq1N-zjgT7563%2Bg%40mail.gmail.com/)
 
-* 便于开发和测试RDMA程序
+* Making RDMA program development and testing easier
 
-有了Soft-RoCE，我们基于Verbs API编写的程序，就可以不依赖于硬件执行起来，也可以很方便的跑在虚拟机里。
+With Soft-RoCE, programs written with the Verbs API can run without depending on RDMA hardware, and they can also run conveniently in virtual machines.
 
-#### 实现原理 <a href="#h_361740115_4" id="h_361740115_4"></a>
+#### Implementation Principle <a href="#h_361740115_4" id="h_361740115_4"></a>
 
-Soft-RoCE就是把本来应该卸载到硬件的封包和解析工作，又拿到软件来做。其本身是基于Linux内核的TCP/IP协议栈实现的，网卡本身并不感知收发的数据包是RoCE报文，其驱动程序按照IB规范中的报文格式将用户数据封装成IB传输层报文，然后把报文整体当做数据填入Socket Buffer当中，由网卡进行下一步收发包处理。
+Soft-RoCE moves packet encapsulation and parsing work that would normally be offloaded to hardware back into software. It is implemented on top of the Linux kernel TCP/IP protocol stack. The NIC itself is not aware that the packets being sent and received are RoCE packets. The driver encapsulates user data into IB transport-layer packets according to the IB specification, then treats the entire packet as data and fills it into the Socket Buffer. The NIC then performs the next send/receive packet-processing step.
 
-下面这张图取自[**IBTA对于Soft-RoCE的介绍文章**](https://www.roceinitiative.org/wp-content/uploads/2016/11/SoftRoCE\_Paper\_FINAL.pdf)，左边是需要硬件的普通RoCE，右边是Soft-RoCE。可以看出普通RoCE是把协议栈卸载到RoCE NIC网卡实现的，而Soft-RoCE则是在软件协议栈中实现的。
+The following figure is from the [**IBTA introduction to Soft-RoCE**](https://www.roceinitiative.org/wp-content/uploads/2016/11/SoftRoCE\_Paper\_FINAL.pdf). The left side is ordinary hardware RoCE, and the right side is Soft-RoCE. Ordinary RoCE offloads the protocol stack to the RoCE NIC, while Soft-RoCE implements it in the software protocol stack.
 
 <figure><img src="../../.gitbook/assets/image (24).png" alt=""><figcaption><p>Soft-RoCE implements the packet processing otherwise managed by the RoCE NIC.</p></figcaption></figure>

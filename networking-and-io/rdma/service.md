@@ -1,89 +1,89 @@
 # 🥳 Service
 
-我们在“[**Elements**](elements.md)”一文中提到过，**RDMA的基本通信单元是**[**QP**](elements.md#h\_141267386\_2)，而基于QP的通信模型有很多种，我们在RDMA领域称其为“服务类型”。IB协议中通过“可靠”和“连接”两个维度来描述一种服务类型。
+In "[**Elements**](elements.md)", we mentioned that **the basic RDMA communication unit is the** [**QP**](elements.md#h\_141267386\_2). There are many QP-based communication models, and in RDMA terminology these are called "service types". The IB protocol describes service types along two dimensions: reliability and connection.
 
-### 可靠
+### Reliability
 
-通信中的可靠性指的是通过一些机制保证发出去的数据包都能够被正常接收。IB协议中是这样描述可靠服务的：
+Reliability in communication means using certain mechanisms to ensure that transmitted packets can be received correctly. The IB protocol describes reliable service as follows:
 
 > **Reliable Service** provides a guarantee that messages are delivered from a requester to a responder at most once, in order and without corruption.
 
-即“可靠服务在发送和接受者之间保证了信息最多只会传递一次，并且能够保证其按照发送顺序完整的被接收”。
+In other words, a reliable service guarantees that a message is delivered from the requester to the responder at most once, and that it is received completely and in send order.
 
-IB通过以下三个机制来保证可靠性：
+IB uses the following three mechanisms to provide reliability.
 
-#### 应答机制
+#### Acknowledgment Mechanism
 
-假设A给B发了一个数据包，A怎样才能知道B收到了呢，自然是B回复一个“我收到了”消息给A。在通信领域我们一般称这个回复为应答包或者ACK（Acknowledge）。在IB协议的可靠服务类型中，使用了应答机制来保证数据包被对方收到。IB的可靠服务类型中，接收方不是每一个包都必须回复，也可以一次回复多个包的ACK，以后我们再展开讨论。
+Suppose A sends a packet to B. How can A know that B received it? Naturally, B replies to A with an "I received it" message. In communication systems, this reply is usually called an acknowledgment packet, or ACK. In reliable IB service types, acknowledgments are used to ensure that packets are received by the peer. In IB reliable service types, the receiver does not have to reply to every packet individually; it may acknowledge multiple packets at once. This can be discussed in more detail later.
 
 <figure><img src="https://pic4.zhimg.com/v2-e3d2e6b28c2bb6c445e55977d8f1603b_b.jpg" alt=""><figcaption></figcaption></figure>
 
-#### 数据校验机制
+#### Data-Checking Mechanism
 
-这个比较好理解，发端会对Header和Payload（有效载荷，也就是真正要收发的数据）通过一定的算法得到一个校验值放到数据包的末尾。对端收到数据包后，也会用相同的算法计算出校验值，然后与数据包中的校验值比对，如果不一致，说明数据中包含错误（一般是链路问题导致的），那么接收端就会丢弃这个数据包。IB协议使用的CRC校验，本文对CRC不做展开介绍。
+This mechanism is easy to understand. The sender computes a check value over the header and payload, meaning the actual data to be transmitted, using a certain algorithm, and appends that value to the end of the packet. After the peer receives the packet, it computes the check value using the same algorithm and compares it with the value in the packet. If they differ, the data contains an error, usually caused by a link problem, so the receiver discards the packet. The IB protocol uses CRC checking. This note does not expand on CRC.
 
 <figure><img src="https://pic1.zhimg.com/v2-ce187eb2837b4b01a078eea51f4432a0_b.jpg" alt=""><figcaption></figcaption></figure>
 
-#### 保序机制
+#### Ordering Mechanism
 
-保序指的是，保证先被发送到物理链路上的数据包一定要先于后发送的数据包被接收方收到。有一些业务对数据包的先后顺序是有严格要求的，比如语音或者视频。IB协议中有PSN（Packet Sequence Number，包序号）的概念，即每个包都有一个递增的编号。PSN可以用来检测是否丢包，比如收端收到了1，但是在没收到2的情况下就收到了3，那么其就会认为传输过程中发生了错误，之后会回复一个NAK给发端，让其重发丢失的包。
+Ordering means ensuring that packets sent earlier onto the physical link are received by the receiver before packets sent later. Some workloads have strict ordering requirements, such as voice or video. The IB protocol has the concept of PSN (Packet Sequence Number), meaning each packet has an increasing sequence number. PSN can be used to detect packet loss. For example, if the receiver receives packet 1 and then receives packet 3 without receiving packet 2, it considers an error to have occurred during transmission and replies with a NAK to the sender, asking it to retransmit the missing packet.
 
 <figure><img src="https://pic4.zhimg.com/v2-ebb4d1bce1f692e4bd9621886e13be87_b.jpg" alt=""><figcaption></figcaption></figure>
 
-不可靠服务，没有上述这些机制来保证数据包被正确的接收，属于“发出去就行，我不关心有没有被收到”的服务类型。
+Unreliable service does not have the mechanisms above to ensure that packets are received correctly. It is a "send it out; I do not care whether it is received" service type.
 
-### 连接与数据报
+### Connection and Datagram
 
-**连接（Connection）**在这里指的是一个抽象的逻辑概念，需要区别于物理连接，熟悉Socket的读者一定对这个其不陌生。连接是一条通信的“管道”，一旦管道建立好了，管道这端发出的数据一定会沿着这条管道到达另一端。
+**Connection** here is an abstract logical concept and should be distinguished from a physical connection. Readers familiar with sockets should already know this concept. A connection is a communication "pipe". Once the pipe is established, data sent from one end of the pipe will travel along that pipe to the other end.
 
-对于“连接”或者说“面向连接”的定义有很多种，有的侧重于保证消息顺序，有的侧重于消息的传递路径唯一，有的强调需要软硬件开销来维护连接，有的还和可靠性的概念有交集。本专栏既然是介绍RDMA技术，那么我们就看一下IB协议3.2.2节中对其的描述：
+There are many definitions of "connection" or "connection-oriented". Some emphasize message ordering, some emphasize a unique delivery path, some emphasize the software and hardware overhead required to maintain a connection, and some overlap with the concept of reliability. Since this series introduces RDMA, look at the description in Section 3.2.2 of the IB protocol:
 
 > IBA supports both connection oriented and datagram service. For connected service, each QP is associated with exactly one remote consumer. In this case the QP context is configured with the identity of the remote consumer’s queue pair. ... During the communication establishment process, this and other information is exchanged between the two nodes.
 
-即“IBA支持基于连接和数据报的服务。对于基于连接的服务来说，每个QP都和另一个远端节点相关联。在这种情况下，QP Context中包含有远端节点的QP信息。在建立通信的过程中，两个节点会交换包括稍后用于通信的QP在内的对端信息"。
+That is, IBA supports both connection-oriented and datagram services. For connected service, each QP is associated with exactly one remote node. In this case, the QP Context contains information about the remote node's QP. During communication establishment, the two nodes exchange peer information, including the QP that will later be used for communication.
 
-上面这端描述中的Context一般被翻译成上下文，QP Context（简称QPC）可以简单理解为是记录一个QP相关信息的表格。我们知道QP是两个队列，除了这两个队列之外，我们还需要把关于QP的信息记录到一张表里面，这些信息可能包括队列的深度，队列的编号等等，后面我们会展开讲。
+The word Context in the description above is usually translated as context. QP Context, or QPC, can be simply understood as a table that records information related to a QP. We know that a QP consists of two queues, but in addition to those two queues, information about the QP must also be recorded in a table. This information may include queue depth, queue number, and so on. Later notes will expand on this.
 
-可能还是有点抽象，我们用图说话：
+This may still feel abstract, so use a figure:
 
 <figure><img src="https://pic3.zhimg.com/v2-320b1db2b90c5334cb4200a0784a12ce_b.jpg" alt=""><figcaption></figcaption></figure>
 
-A、B和A、C节点的网卡在物理上是连接在一起的，A上面的QP2和B上面的QP7、A上面的QP4和B上面的QP2建立了逻辑上的连接，或者说“绑定到了一起”。**在连接服务类型中的每个QP，都和唯一的另一个QP建立了连接，也就是说QP下发的每个WQE的目的地都是唯一的**。拿上图来说，对于A的QP2下发的每个WQE，硬件都可以通过QPC得知其目的为B的QP7，就会把组装好的数据包发送给B，然后B会根据QP7下发的RQ WQE来存放数据；同理，对于A的QP4下发的每个WQE，A的硬件都知道应该把数据发给Node C的QP2。
+The NICs of nodes A, B, and C are physically connected. QP2 on A establishes a logical connection with QP7 on B, and QP4 on A establishes a logical connection with QP2 on C. In other words, they are "bound together". **In a connected service type, each QP establishes a connection with exactly one other QP, which means every WQE posted to that QP has a unique destination**. In the figure above, for every WQE posted to QP2 on A, hardware can use the QPC to know that the destination is QP7 on B. It sends the assembled packet to B, and B places the data according to the RQ WQE posted to QP7. Similarly, for every WQE posted to QP4 on A, A's hardware knows that the data should be sent to QP2 on node C.
 
-“连接”是如何维护的呢？其实就是在QPC里面的一个记录而已。如果A的QP2想断开与B的QP7的“连接”然后与其他QP相“连接”，只需要修改QPC就可以了。两个节点在建立连接的过程中，会交换稍后用于数据交互的QP Number，然后分别记录在QPC中。
+How is a "connection" maintained? It is essentially just a record inside the QPC. If QP2 on A wants to disconnect from QP7 on B and connect to another QP, it only needs to modify the QPC. During connection setup between two nodes, they exchange the QP Numbers that will later be used for data exchange and record them in their respective QPCs.
 
 \
 
 
-**数据报（Datagram）**与连接相反，发端和收端间不需要“建立管道”的步骤，只要发端到收端物理上是可以到达的，那么我就可能从任何路径发给任意的收端节点。IB协议对其的定义是这样的：
+**Datagram** is the opposite of connection. There is no need to "build a pipe" between sender and receiver. As long as the sender can physically reach the receiver, it may send to any receiving node through any path. The IB protocol defines it as follows:
 
 > For datagram service, a QP is not tied to a single remote consumer, but rather information in the WQE identifies the destination. A communication setup process similar to the connection setup process needs to occur with each destination to exchange that information.\
-> 即“对于数据报服务来说，QP不会跟一个唯一的远端节点绑定，而是通过WQE来指定目的节点。和连接类型的服务一样，建立通信的过程也需要两端交换对端信息，但是数据报服务对于每个目的节点都需要执行一次这个交换过程。”
+> In other words, for datagram service, a QP is not bound to one unique remote node. Instead, the WQE specifies the destination node. As with connected service, the communication setup process requires both endpoints to exchange peer information, but datagram service must perform this exchange for each destination node.
 
-我们举个例子：
+Here is an example:
 
 <figure><img src="https://pic3.zhimg.com/v2-4576be474bb2fe5ec748d4df9c2cbaa2_b.jpg" alt=""><figcaption></figcaption></figure>
 
-在数据报类型的QP的Context中，不包含对端信息，即每个QP不跟另一个QP绑定。**QP下发给硬件的每个WQE都可能指向不同的目的地**。比如节点A的QP2下发的第一个WQE，指示给节点C的QP3发数据；而下一个WQE，可以指示硬件发给节点B的QP7。
+In the Context of a datagram-type QP, peer information is not stored, meaning each QP is not bound to another QP. **Each WQE posted by the QP to hardware may point to a different destination**. For example, the first WQE posted to QP2 on node A instructs hardware to send data to QP3 on node C. The next WQE may instruct hardware to send data to QP7 on node B.
 
-与连接服务类型一样，本端QP可以和哪个对端QP发送数据，是在准备阶段提前通过某些方式相互告知的。这也是上文“数据报服务对于每个目的节点都需要执行一次这个交换过程”的含义。
+As with connected service types, which remote QP a local QP can send data to is communicated in advance during the preparation phase. This is the meaning of the statement above that "datagram service must perform this exchange for each destination node."
 
-#### 服务类型
+#### Service Types
 
-上面介绍的两个维度两两组合就形成了IB的四种基本服务类型：
+The two dimensions above combine pairwise into the four basic IB service types:
 
 <figure><img src="https://pic3.zhimg.com/v2-37597449e3e4290f3bdf40d5ec23cac6_b.jpg" alt=""><figcaption></figcaption></figure>
 
-RC和UD是应用最多也是最基础的两种服务类型，我们可以将他们分别类比成TCP/IP协议栈传输层的TCP和UDP。
+RC and UD are the most widely used and most fundamental service types. They can be roughly compared to TCP and UDP at the transport layer of the TCP/IP protocol stack.
 
-RC用于对数据完整性和可靠性要求较高的场景，更TCP一样，因为需要各种机制来保证可靠，所以开销自然会大一些。另外由于RC服务类型和每个节点间需要各自维护一个QP，假设有N个几点需要相互通信，那么需要**N \* (N - 1)**个QP，而QP和QPC本身是需要占用网卡资源或者内存的，当节点数很多时，存储资源消耗将会非常大。
+RC is used in scenarios with high requirements for data integrity and reliability. Like TCP, it needs various mechanisms to guarantee reliability, so its overhead is naturally higher. In addition, RC service requires each pair of nodes to maintain its own QP. If N nodes need to communicate with each other, **N * (N - 1)** QPs are required. QPs and QPCs consume NIC resources or memory, so when the number of nodes is large, storage-resource consumption becomes very high.
 
 <figure><img src="https://pic4.zhimg.com/v2-956d4da11726ee385308e010d82bc9bf_b.jpg" alt=""><figcaption></figcaption></figure>
 
-UD硬件开销小并且节省存储资源，比如N个节点需要相互通信，只需要创建**N**个QP就可以了，但是可靠性跟UDP一样没法保证。用户如果想基于UD服务类型实现可靠性，那么需要自己基于IB传输层实现应用层的可靠传输机制。
+UD has lower hardware overhead and saves storage resources. For example, if N nodes need to communicate with each other, only **N** QPs need to be created. However, reliability cannot be guaranteed, just like UDP. If users want to implement reliability on top of the UD service type, they need to implement application-layer reliable transmission mechanisms above the IB transport layer.
 
 <figure><img src="https://pic2.zhimg.com/v2-c4b783dad1632469091d54594c35fd71_b.jpg" alt=""><figcaption></figcaption></figure>
 
-除此之外，还有RD和UC类型，以及XRC（Extended Reliable Connection），SRD（Scalable Reliable Datagram）等更复杂的服务类型，我们将在协议解析部分对其进行详细的描述。
+Besides these, there are RD and UC service types, as well as more complex service types such as XRC (Extended Reliable Connection) and SRD (Scalable Reliable Datagram). These will be described in detail in the protocol-analysis section.
 
-更多关于QP类型选择的信息可以参考RDMAmojo上的 [**Which Queue Pair type to use?**](https://www.rdmamojo.com/2013/06/01/which-queue-pair-type-to-use/)  ****  这篇文章。
+For more information about choosing QP types, see the RDMAmojo article [**Which Queue Pair type to use?**](https://www.rdmamojo.com/2013/06/01/which-queue-pair-type-to-use/)  ****.

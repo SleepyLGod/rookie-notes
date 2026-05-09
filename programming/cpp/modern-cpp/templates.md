@@ -2,24 +2,24 @@
 
 ### template
 
-#### 外部模板
+#### Extern Templates
 
-传统 C++ 中，模板只有在使用时才会被编译器实例化。
+In traditional C++, templates are instantiated by the compiler only when they are used.
 
-换句话说，只要在每个编译单元（文件）中编译的代码中遇到了被完整定义的模板，都会实例化。这就产生了重复实例化而导致的编译时间的增加。并且，我们没有办法通知编译器不要触发模板的实例化。
+In other words, whenever compiled code in a translation unit sees a fully defined template and needs it, the compiler may instantiate it. This can produce repeated instantiations across translation units and increase compilation time. Before C++11, there was no direct way to tell the compiler not to instantiate a template in a given translation unit.
 
-为此，**C++11** 引入了外部模板，扩充了原来的强制编译器在特定位置实例化模板的语法，使我们能够显式的通知编译器**何时进行模板的实例化**：
+For this reason, **C++11** introduced extern templates. This extends the original syntax for forcing template instantiation at a specific location and lets us explicitly tell the compiler **where template instantiation should or should not happen**:
 
 ```cpp
-template class std::vector<bool>; // 强行实例化
-extern template class std::vector<double>; // 不在该当前编译文件中实例化模板 
+template class std::vector<bool>; // force instantiation
+extern template class std::vector<double>; // do not instantiate in this translation unit
 ```
 
-#### 尖括号 ">"
+#### Closing Angle Brackets `>`
 
-传统 C++ 的编译器中，`>>`一律被当做右移运算符来进行处理。但实际上我们很容易就写出了嵌套模板的代码：`std::vector<std::vector<int>> matrix;` 在传统C++中不能编译
+In traditional C++ compilers, `>>` was always parsed as the right-shift operator. This caused a problem for nested templates: code such as `std::vector<std::vector<int>> matrix;` did not compile in traditional C++ and had to be written with a separating space.
 
-C++11 开始，连续的右尖括号将变得合法，并且能够顺利通过编译。甚至于像下面这种写法都能够通过编译：
+Starting in C++11, consecutive closing angle brackets became legal and compile correctly. Even code like the following can compile:
 
 ```cpp
 template<bool T>
@@ -28,14 +28,14 @@ class MType {
 }
 int main() {
  ...
- std::vector<MType(1>2)>> m; // 合法, 但不建议写出这样的代码
+ std::vector<MType(1>2)>> m; // valid, but do not write code like this
 ```
 
-#### 类型别名模板
+#### Alias Templates
 
-仔细体会这句话：**模板是用来产生类型的。**
+Consider this statement carefully: **templates are used to generate types.**
 
-在传统 C++ 中，`typedef` 可以为类型定义一个新的名称，但是却没有办法为模板定义一个新的名称。因为，模板不是类型。例如：
+In traditional C++, `typedef` can define a new name for a type, but it cannot define a new name for a template because a template itself is not a type. For example:
 
 ```cpp
 template<typename T, typename U>
@@ -45,14 +45,14 @@ public:
     U magic;
 };
 
-// 不合法
+// invalid
 template<typename T>
 typedef MagicType<std::vector<T>, std::string> FakeDarkMagic;
 ```
 
-**C++11** 使用 `using` 引入了下面这种形式的写法，并且同时支持对传统 `typedef` 相同的功效：
+**C++11** introduced `using` aliases, which support both alias templates and the ordinary use cases previously handled by `typedef`:
 
-通常我们使用 `typedef` 定义别名的语法是：`typedef 原名称 新名称;`，但是对函数指针等别名的定义语法却不相同，这通常给直接阅读造成了一定程度的困难。
+Normally, a `typedef` alias is written as `typedef original_name new_name;`. However, function-pointer aliases and similar cases use a different-looking syntax, which often makes direct reading harder.
 
 ```cpp
 template<typename T, typename U>
@@ -74,44 +74,44 @@ int main() {
 }    
 ```
 
-#### 变长参数模板
+#### Variadic Templates
 
-在 C++11 之前，无论是类模板还是函数模板，都只能按其指定的样子， 接受一组固定数量的模板参数；
+Before C++11, both class templates and function templates accepted only a fixed number of template parameters specified by their declarations.
 
-而 C++11 加入了新的表示方法， 允许任意个数、任意类别的模板参数，同时也不需要在定义时将参数的个数固定。
+C++11 added new syntax that allows an arbitrary number of template parameters of arbitrary types, without fixing the number of parameters at definition time.
 
 ```cpp
 template<typename... Ts> class Magic;
 ```
 
-模板类 Magic 的对象，能够接受不受限制个数的 `typename` 作为模板的形式参数，例如下面的定义：
+An object of the template class `Magic` can accept an unrestricted number of `typename` template parameters. For example:
 
 ```cpp
-class Magic<int, 
-            std::vector<int>, 
-            std::map<std::string, std::vector<int>>> darkMagic;
+Magic<int,
+      std::vector<int>,
+      std::map<std::string, std::vector<int>>> darkMagic;
 ```
 
-既然是任意形式，所以个数为 `0` 的模板参数也是可以的：`class Magic<> nothing;`。
+Because the parameter pack can have arbitrary length, a template argument count of `0` is also allowed: `Magic<> nothing;`.
 
-如果不希望产生的模板参数个数为 `0`，可以手动的定义至少一个模板参数：
+If a zero-length parameter pack should not be allowed, define at least one required template parameter explicitly:
 
 ```cpp
 template<typename Require, typename... Args> class Magic2;
 ```
 
-变长参数模板也能被直接调整到到模板函数上。
+Variadic templates can also be applied directly to function templates.
 
-传统 C 中的 `printf` 函数， 虽然也能达成不定个数的形参的调用，但其并非类别安全。 而 C++11 除了能定义类别安全的变长参数函数外， 还可以使类似 `printf` 的函数能自然地处理非自带类别的对象。 除了在模板参数中能使用 `...` 表示不定长模板参数外， **函数参数**也使用同样的表示法代表不定长参数， 这也就为我们简单编写变长参数函数提供了便捷的手段，例如：
+The traditional C `printf` function supports calls with a variable number of arguments, but it is not type-safe. C++11 not only lets us define type-safe variadic functions, but also lets `printf`-like functions naturally handle user-defined object types. Besides using `...` in the template parameter list to represent a template parameter pack, **function parameters** use the same notation to represent a function parameter pack. This makes it convenient to write variadic functions:
 
 ```cpp
 template<typename... Args> 
-void printf(const std::string &str, Arg... args);
+void printf(const std::string &str, Args... args);
 ```
 
-那么我们定义了变长的模板参数，如何对参数进行解包呢？
+After defining variadic template parameters, how do we unpack them?
 
-首先，我们可以使用 `sizeof...` 来计算参数的个数，：
+First, we can use `sizeof...` to count the number of parameters:
 
 ```cpp
 template<typename... Args>
@@ -120,21 +120,21 @@ void magic(Args... args) {
 }
 ```
 
-我们可以传递任意个参数给 `magic` 函数：
+We can pass any number of arguments to the `magic` function.
 
-其次，对参数进行解包，到目前为止还没有一种简单的方法能够处理参数包，但有两种经典的处理手法：
+Second, we need to unpack the parameters. There is no single pre-C++17 syntax that magically handles every parameter pack, but there are several classic techniques:
 
-**1. 递归模板函数**
+**1. Recursive Template Functions**
 
-递归是非常容易想到的一种手段，也是最经典的处理方法。这种方法不断**递归地向函数传递模板参数**，进而达到递归遍历所有模板参数的目的：
+Recursion is the most obvious and classic approach. This method repeatedly **passes the remaining template parameters to another function call**, recursively traversing all template arguments:
 
 ```cpp
 template<typename T0>
-void printf0(T0 value) { // 单参数——递归最后一步
+void printf0(T0 value) { // single argument: final recursion step
     std::cout << value << std::endl;
 }
 template<typename T, typename... Ts>
-void printf0(T value, Ts... args) { // 多参数——递归开始
+void printf0(T value, Ts... args) { // multiple arguments: recursive case
     std::cout << value << std::endl;
     printf0(args...);
 }
@@ -144,9 +144,9 @@ int main() {
 }
 ```
 
-**2. 变参模板展开**
+**2. Variadic Template Expansion**
 
-你应该感受到了这很繁琐，在 C++17 中增加了变参模板展开的支持，于是你可以在一个函数中完成 `printf` 的编写：
+The recursive style is verbose. C++17 added better support for variadic expansion patterns, so the `printf` example can be written in a single function:
 
 ```cpp
 template<typename T0, typename... Ts>
@@ -158,15 +158,15 @@ void printf1(T0 t0, Ts... t) {
 }
 ```
 
-事实上，有时候我们虽然使用了变参模板，却不一定需要对参数做逐个遍历，
+In practice, even when we use variadic templates, we do not always need to traverse the parameters one by one.
 
-我们可以利用 **`std::bind`** 及完美转发等特性实现对函数和参数的绑定，从而达到成功调用的目的。
+We can also use features such as **`std::bind`** and perfect forwarding to bind functions and arguments and then perform the call.
 
-**3. 初始化列表展开**
+**3. Initializer-List Expansion**
 
-递归模板函数是一种标准的做法，但缺点显而易见的在于必须定义一个终止递归的函数。
+Recursive template functions are a standard technique, but their obvious drawback is that a separate recursion-termination function must be defined.
 
-这里介绍一种使用初始化列表展开的黑魔法：
+Here is a trick that uses initializer-list expansion:
 
 ```cpp
 template<typename T, typename... Ts>
@@ -178,17 +178,17 @@ auto printf2(T value, Ts... args) {
 }
 ```
 
-在这个代码中，额外使用了 C++11 中提供的初始化列表以及 Lambda 表达式的特性（下一节中将提到）。
+This code additionally uses initializer lists and lambda expressions introduced in C++11. Lambda expressions are covered in the next section.
 
-通过初始化列表，`(lambda 表达式, value)...` 将会被展开。
+Through the initializer list, `(lambda expression, value)...` is expanded.
 
-由于逗号表达式的出现，首先会执行前面的 lambda 表达式，完成参数的输出。&#x20;
+Because the comma expression is used, the lambda expression on the left executes first and prints the argument.&#x20;
 
-为了避免编译器警告，我们可以将 `std::initializer_list` 显式的转为 `void`。
+To avoid compiler warnings, we explicitly cast the `std::initializer_list` expression to `void`.
 
-#### 折叠表达式
+#### Fold Expressions
 
-**C++ 17** 中将变长参数这种特性进一步带给了表达式，考虑下面这个例子：
+**C++17** extends variadic parameter support to expressions through fold expressions. Consider this example:
 
 ```cpp
 template<typename ... T>
@@ -200,9 +200,9 @@ int main() {
 }
 ```
 
-#### 非类型模板参数推导
+#### Non-Type Template Parameter Deduction
 
-前面我们主要提及的是模板参数的一种形式：类型模板参数。
+So far, the main kind of template parameter discussed has been the type template parameter.
 
 ```cpp
 template <typename T, typename U>
@@ -211,9 +211,9 @@ auto add(T t, U u) {
 }
 ```
 
-其中模板的参数 `T` 和 `U` 为具体的类型。&#x20;
+Here, the template parameters `T` and `U` represent concrete types.&#x20;
 
-但还有一种常见模板参数形式可以让**不同字面量成为模板参数**，即非类型模板参数：
+There is another common form of template parameter that allows **literal values to become template parameters**: non-type template parameters.
 
 ```cpp
 template<typename T, int BufSize>
@@ -227,11 +227,11 @@ private:
 buffer_t<int, 100> buf;
 ```
 
-在这种模板参数形式下，我们可以将 `100` 作为模板的参数进行传递。&#x20;
+With this template-parameter form, we can pass `100` as a template argument.&#x20;
 
-在 **C++11** 引入了类型推导这一特性后，我们会很自然的问，既然此处的模板参数 以具体的字面量进行传递，能否让编译器辅助我们进行类型推导， 通过使用占位符 `auto` 从而不再需要明确指明类型？&#x20;
+After **C++11** introduced type deduction, a natural question arises: since this template argument is passed as a concrete literal, can the compiler deduce its type for us through the placeholder `auto`, so that we no longer need to explicitly specify the type?&#x20;
 
-幸运的是，**C++17** 引入了这一特性，我们的确可以 `auto` 关键字，让编译器辅助完成具体类型的推导， 例如：
+Fortunately, **C++17** introduced this feature. We can use the `auto` keyword and let the compiler deduce the concrete type:
 
 ```cpp
 template <auto value> 
@@ -241,15 +241,15 @@ void foo() {
 }
 
 int main() {
-    foo<10>();  // value 被推导为 int 类型
+    foo<10>();  // value is deduced as int
 }
 ```
 
-### 面向对象
+### Object-Oriented Features
 
-#### 委托构造
+#### Delegating Constructors
 
-C++11 引入了委托构造的概念，这使得可以**在同一个类中一个构造函数调用另一个构造函数**，从而达到简化代码的目的：
+C++11 introduced delegating constructors, allowing **one constructor to call another constructor in the same class**, which simplifies code:
 
 ```cpp
 class Base {
@@ -259,15 +259,15 @@ public:
     Base() {
         value1 = 1;
     }
-    Base(int value) : Base() { // 委托 Base() 构造函数
+    Base(int value) : Base() { // delegate to the Base() constructor
         value2 = value;
     }
 };
 ```
 
-#### 继承构造
+#### Inheriting Constructors
 
-传统 C++ 中，构造函数如果需要继承是需要将参数一一传递的，这将导致效率低下。C++11 利用关键字 `using` 引入了继承构造函数的概念：
+In traditional C++, if derived classes needed constructor behavior from a base class, they often had to forward constructor parameters manually, which was repetitive and inefficient. C++11 introduced inheriting constructors through the `using` keyword:
 
 ```cpp
 class Base {
@@ -293,30 +293,30 @@ int main() {
 }
 ```
 
-#### 显式禁用默认函数
+#### Explicitly Defaulted and Deleted Functions
 
-在传统 C++ 中，如果程序员没有提供，编译器会默认为对象生成默认构造函数、 复制构造、赋值算符以及析构函数。 另外，C++ 也为所有类定义了诸如 `new` `delete` 这样的运算符。 当程序员有需要时，可以重载这部分函数。
+In traditional C++, if the programmer does not provide them, the compiler may generate a default constructor, copy constructor, assignment operator, and destructor for a class. C++ also defines operators such as `new` and `delete` for all classes, and programmers can overload them when needed.
 
-这就引发了一些需求：**无法精确控制默认函数的生成行为**。&#x20;
+This creates a need that older C++ did not handle cleanly: **precise control over generation of default functions**.&#x20;
 
-例如禁止类的拷贝时，必须将复制构造函数与赋值算符声明为 `private`。 尝试使用这些未定义的函数将导致编译或链接错误，则是一种非常不优雅的方式。
+For example, to make a class non-copyable, older code commonly declared the copy constructor and assignment operator as `private` and left them undefined. Attempts to use those functions would then cause compilation or linking errors. This is an inelegant technique.
 
-并且，编译器产生的默认构造函数与用户定义的构造函数无法同时存在。 若用户定义了任何构造函数，编译器将不再生成默认构造函数， 但有时候我们却希望同时拥有这两种构造函数，这就造成了尴尬。
+Also, an implicitly generated default constructor and user-defined constructors do not always coexist. If the user defines any constructor, the compiler no longer implicitly generates a default constructor. Sometimes we want both, which creates friction.
 
-C++11 提供了上述需求的解决方案，允许**显式的声明采用或拒绝编译器自带的函数**。 例如：
+C++11 solves these problems by allowing code to **explicitly request or reject compiler-generated functions**. For example:
 
 ```cpp
 class Magic {
     public:
-    Magic() = default; // 显式声明使用编译器生成的构造
-    Magic& operator=(const Magic&) = delete; // 显式声明拒绝编译器生成构造
+    Magic() = default; // explicitly use the compiler-generated constructor
+    Magic& operator=(const Magic&) = delete; // explicitly reject the compiler-generated assignment operator
     Magic(int magic_number);
 }
 ```
 
-#### 显式虚函数重载
+#### Explicit Virtual Function Overrides
 
-在传统 C++ 中，经常容易发生意外重载虚函数的事情。例如：
+In traditional C++, accidental virtual-function overriding is easy. For example:
 
 ```cpp
 struct Base {
@@ -327,29 +327,29 @@ struct SubClass: Base {
 }
 ```
 
-`SubClass::foo` 可能并不是程序员尝试重载虚函数，只是恰好加入了一个具有相同名字的函数。另一个可能的情形是，当基类的虚函数被删除后，子类拥有旧的函数就不再重载该虚拟函数并摇身一变成为了一个普通的类方法，这将造成灾难性的后果。
+`SubClass::foo` may not be an intentional override; the programmer may simply have added a function with the same name by coincidence. Another possible case is that, after a base-class virtual function is removed, an old function in the derived class no longer overrides anything and silently becomes an ordinary member function. That can have serious consequences.
 
-C++11 引入了 `override` 和 `final` 这两个关键字来防止上述情形的发生。
+C++11 introduced the `override` and `final` keywords to prevent these cases.
 
 **override**
 
-当重载虚函数时，引入 `override` 关键字将显式的告知编译器进行重载
+When overriding a virtual function, the `override` keyword explicitly tells the compiler that an override is intended.
 
-编译器将检查基函数是否存在这样的虚函数，否则将无法通过编译：
+The compiler checks whether such a virtual function exists in the base class; otherwise the code fails to compile:
 
 ```cpp
 struct Base {
     virtual void foo(int);
 };
 struct SubClass: Base {
-    virtual void foo(int) override; // 合法
-    virtual void foo(float) override; // 非法, 父类没有此虚函数
+    virtual void foo(int) override; // valid
+    virtual void foo(float) override; // invalid: the base class has no such virtual function
 };
 ```
 
 **final**
 
-`final` 则是为了防止类**被继续继承**以及**终止虚函数继续重载**引入的。
+`final` was introduced to prevent a class from **being further inherited** and to **stop further overriding of a virtual function**.
 
 ```cpp
 struct Base {
@@ -357,23 +357,23 @@ struct Base {
 };
 
 struct SubClass1 final: Base {
-}; // 合法
+}; // valid
 
 struct SubClass2 : SubClass1 {
-}; // 非法, SubClass1 已 final
+}; // invalid: SubClass1 is final
 
 struct SubClass3: Base {
-    void foo(); // 非法, foo 已 final
+    void foo(); // invalid: foo is final
 };
 ```
 
-#### 强类型枚举
+#### Strongly Typed Enumerations
 
-传统 C++中，枚举类型并非类型安全，
+In traditional C++, enumeration types are not fully type-safe.
 
-枚举类型会被视作整数，则会让两种完全不同的枚举类型可以进行直接的比较（虽然编译器给出了检查，但并非所有），**甚至同一个命名空间中的不同枚举类型的枚举值名字不能相同**，这通常不是我们希望看到的结果。
+Enumeration values are treated like integers, which can allow direct comparisons between completely different enum types. Compilers provide some checks, but not all problematic cases are rejected. Also, **enumerator names from different enum types in the same namespace cannot be repeated**, which is often undesirable.
 
-C++11 引入了枚举类（enumeration class），并使用 `enum class` 的语法进行声明：
+C++11 introduced enumeration classes, declared with `enum class` syntax:
 
 ```cpp
 enum class new_enum : unsigned int {
@@ -384,11 +384,11 @@ enum class new_enum : unsigned int {
 };
 ```
 
-这样定义的枚举实现了类型安全:
+Enums defined this way are type-safe:
 
-首先他不能够被隐式的转换为整数，同时也不能够将其与整数数字进行比较， 更不可能对不同的枚举类型的枚举值进行比较。
+First, they cannot be implicitly converted to integers. They also cannot be compared directly with integer values, and enumerators from different enum classes cannot be compared directly.
 
-但相同枚举值之间如果指定的值相同，那么可以进行比较：
+However, enumerators from the same enum class can be compared, even if two names have the same assigned value:
 
 ```cpp
 if (new_enum::value3 == new_enum::value4) {
@@ -396,9 +396,9 @@ if (new_enum::value3 == new_enum::value4) {
 }
 ```
 
-在这个语法中，枚举类型后面使用了**冒号及类型关键字**来指定枚举中枚举值的类型`unsigned int`，这使得我们能够为枚举赋值（未指定时将默认使用 `int`）。
+In this syntax, the **colon followed by a type keyword** after the enum name specifies the underlying type of the enumerators, here `unsigned int`. This allows us to assign explicit enumerator values. If no underlying type is specified, `int` is used by default.
 
-而我们希望获得枚举值的值时，将必须显式的进行类型转换，不过我们可以通过重载 `<<` 这个算符来进行输出，可以收藏下面这个代码段：
+When we want to obtain the numeric value of an enumerator, we must perform an explicit cast. Alternatively, we can overload the `<<` operator for output. The following snippet is useful:
 
 ```cpp
 #include <iostream>
@@ -411,7 +411,7 @@ std::ostream& operator<<(
 }
 ```
 
-这时，下面的代码将能够被编译：
+With that overload, the following code can compile:
 
 ```cpp
 std::cout << new_enum::value3 << std::endl
