@@ -294,4 +294,4 @@ zip project2-submission.zip src/include/buffer/lru_replacer.h src/buffer/lru_rep
 	src/include/storage/index/index_iterator.h src/storage/index/index_iterator.cpp
 ```
 
-然后前往 [**https://www.gradescope.com**](https://www.gradescope.com/) 提交代码
+然后前往 [**Gradescope**](https://www.gradescope.com/) 提交代码

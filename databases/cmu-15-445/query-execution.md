@@ -113,4 +113,4 @@ zip project3-submission.zip src/include/buffer/lru_replacer.h src/buffer/lru_rep
 	src/include/storage/index/b_plus_tree_index.h src/storage/index/b_plus_tree_index.cpp
 ```
 
-然后前往 [**https://www.gradescope.com**](https://www.gradescope.com/) 提交代码
+然后前往 [**Gradescope**](https://www.gradescope.com/) 提交代码

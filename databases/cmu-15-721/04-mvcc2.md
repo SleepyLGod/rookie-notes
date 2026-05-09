@@ -140,7 +140,7 @@ Contention-Aware Validation and Early Consistency check
 ### References
 
 1. F. Farber, N. May, W. Lehner, P. Große, I. M¨ uller, H. Rauhe, and J. Dees. The sap hana database–an¨ architecture overview. _IEEE Data Eng. Bull._, 35(1):28–33, 2012.
-2. J. R. Jordan, J. Banerjee, and R. B. Batman. Precision locks. In _Proceedings of the 1981 ACM SIGMOD International Conference on Management of Data_, SIGMOD ’81, pages 143–147, 1981. doi: 10.1145/ 582318.582340. URL [http://doi.acm.org/10.1145/582318.582340.](http://doi.acm.org/10.1145/582318.582340)
+2. J. R. Jordan, J. Banerjee, and R. B. Batman. Precision locks. In _Proceedings of the 1981 ACM SIGMOD International Conference on Management of Data_, SIGMOD ’81, pages 143–147, 1981. doi: [10.1145/582318.582340](https://doi.org/10.1145/582318.582340).
 3. P.-A. Larson, S. Blanas, C. Diaconu, C. Freedman, J. M. Patel, and M. Zwilling. High-performance concurrency control mechanisms for main-memory databases. In _VLDB ’11: Proceedings of the VLDB Endowment_, volume 5, pages 298–309, December 2011. URL [https://dl.acm.org/citation.cfm? id=2095686.2095689.](https://dl.acm.org/citation.cfm?id=2095686.2095689)
 4. H. Lim, M. Kaminsky, and D. G. Andersen. Cicada: Dependably fast multi-core in-memory transactions. In _SIGMOD ’17: Proceedings of the 2008 ACM SIGMOD International Conference on Management of Data_, pages 21–35, 2017. doi: https://dl.acm.org/citation.cfm?id=2749436.
 5. T. Neumann, T. Muhlbauer, and A. Kemper. Fast serializable multi-version concurrency control for¨ main-memory database systems. In _SIGMOD ’15: Proceedings of the 2008 ACM SIGMOD International Conference on Management of Data_, pages 677–689, 2015. doi: https://dl.acm.org/citation.cfm? id=2749436.

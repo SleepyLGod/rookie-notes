@@ -105,7 +105,7 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
     using SafeMath  for uint;
 ```
 
-[SafeMath 库](https://docs.openzeppelin.com/contracts/2.x/api/math)用于避免整数上溢和 下溢。 这很重要，否则最终可能会出现这样的情况：本该是 `-1` 的值， 结果却成了 `2^256-1`。
+[SafeMath 库](https://docs.openzeppelin.com/contracts/3.x/api/math)用于避免整数上溢和 下溢。 这很重要，否则最终可能会出现这样的情况：本该是 `-1` 的值， 结果却成了 `2^256-1`。
 
 ```solidity
     using UQ112x112 for uint224;

@@ -149,9 +149,9 @@ Memory Allocation
 
 1. M. J. Franklin. Concurrency control and recovery. In _Computing Handbook, Third Edition: Information_
 
-_Systems and Information Technology_, pages 12: 1–21. 2014. URL [http://db.lcs.mit.edu/6.893/ F04/ccandr.pdf.](http://db.lcs.mit.edu/6.893/F04/ccandr.pdf)
+_Systems and Information Technology_, pages 12: 1–21. 2014. URL [Concurrency Control and Recovery in Database Systems](https://www.sigmod.org/publications/dblp/db/books/dbtext/bernstein87.html).
 
-1. S. Harizopoulos, D. J. Abadi, S. Madden, and M. Stonebraker. OLTP through the looking glass, and what we found there. In _SIGMOD ’08: Proceedings of the 2008 ACM SIGMOD International Conference on Management of Data_, pages 981–992, 2008. doi: http://doi.acm.org/10.1145/1376616.1376713.
+1. S. Harizopoulos, D. J. Abadi, S. Madden, and M. Stonebraker. OLTP through the looking glass, and what we found there. In _SIGMOD ’08: Proceedings of the 2008 ACM SIGMOD International Conference on Management of Data_, pages 981–992, 2008. doi: https://doi.org/10.1145/1376616.1376713.
 2. H. T. Kung and J. T. Robinson. On optimistic methods for concurrency control. _ACM Trans. Datab._
 
 _Syst_, 6(2), June 1981. URL [https://dl.acm.org/citation.cfm?id=319567.](https://dl.acm.org/citation.cfm?id=319567)

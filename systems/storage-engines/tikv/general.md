@@ -100,7 +100,7 @@ Key1-Version3 -> Value
 
 ### 事务
 
-TiKV 的事务模型类似于 Google 的[Percolator](https://ai.google/research/pubs/pub36726)，这是一个为处理大型数据集的更新而构建的系统。Percolator 使用增量更新模型代替基于批处理的模型。
+TiKV 的事务模型类似于 Google 的[Percolator](https://research.google/pubs/large-scale-incremental-processing-using-distributed-transactions-and-notifications/)，这是一个为处理大型数据集的更新而构建的系统。Percolator 使用增量更新模型代替基于批处理的模型。
 
 TiKV 的交易模型提供：
 

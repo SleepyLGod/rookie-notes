@@ -461,7 +461,7 @@ else {
 
 #### 3. debug的一些小技巧 <a href="#3debug-de-yi-xie-xiao-ji-qiao" id="3debug-de-yi-xie-xiao-ji-qiao"></a>
 
-* 利用[可视化网站](https://www.cs.usfca.edu/\~galles/visualization/BPlusTree.html)和代码中给的`b_plus_print_test`这个测试，把输入图打印成`xxx.dot`然后复制里面的内容在http://dreampuf.github.io/GraphvizOnline/显示进行对比。
+* 利用[可视化网站](https://www.cs.usfca.edu/\~galles/visualization/BPlusTree.html)和代码中给的`b_plus_print_test`这个测试，把输入图打印成`xxx.dot`然后复制里面的内容在 [GraphvizOnline](http://dreampuf.github.io/GraphvizOnline/) 显示进行对比。
 * 对于`Mac`系统利用Clion可以直接对测试文件debug。还是非常爽的。其中`lldb`的利用非常重要。
 
 #### 4. maxSize的含义 <a href="#4maxsize-de-han-yi" id="4maxsize-de-han-yi"></a>

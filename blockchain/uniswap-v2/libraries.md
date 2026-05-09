@@ -2,7 +2,7 @@
 
 ### 程序库 <a href="#libraries" id="libraries"></a>
 
-[SafeMath 库](https://docs.openzeppelin.com/contracts/2.x/api/math)是一个文档很完备的程序库，这里 便无需赘述了。
+[SafeMath 库](https://docs.openzeppelin.com/contracts/3.x/api/math)是一个文档很完备的程序库，这里 便无需赘述了。
 
 #### 数学 <a href="#math" id="math"></a>
 

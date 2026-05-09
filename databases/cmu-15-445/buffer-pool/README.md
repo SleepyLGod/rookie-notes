@@ -81,4 +81,4 @@ make check-clang-tidy
 zip project1-submission.zip src/include/buffer/lru_replacer.h src/buffer/lru_replacer.cpp src/include/buffer/buffer_pool_manager.h src/buffer/buffer_pool_manager.cpp
 ```
 
-* 然后前往 [**https://www.gradescope.com**](https://www.gradescope.com/) 提交代码
+* 然后前往 [**Gradescope**](https://www.gradescope.com/) 提交代码

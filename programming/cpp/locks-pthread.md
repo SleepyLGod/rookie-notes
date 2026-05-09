@@ -257,6 +257,6 @@ int pthread_spin_init (pthread_spinlock_t *lock, int pshared) {
 
 1. [^](locks-pthread.md#ref\_1\_0)1 **https://en.wikipedia.org/wiki/Reentrant\_mutex#Practical\_use**
 2. [^](locks-pthread.md#ref\_2\_0)2 \[**https://books.google.com.hk/books?id=Ps2SH727eCIC\&pg=PA647\&lpg=PA647\&dq=linux+programming+interface+wait+morphing\&source=bl\&ots=kMKcz2zPC7\&sig=ACfU3U1ZSbxBegrQhuVkfNAMTRkY-YavvA\&hl=en\&sa=X\&redir\_esc=y\&hl=zh-CN\&sourceid=cndr#v=onepage\&q=linux%20programming%20interface%20wait%20morphing\&f=false**]\(https://books.google.com.hk/books?id=Ps2SH727eCIC\&pg=PA647\&lpg=PA647\&dq=linux+programming+interface+wait+morphing\&source=bl\&ots=kMKcz2zPC7\&sig=ACfU3U1ZSbxBegrQhuVkfNAMTRkY-YavvA\&hl=en\&sa=X\&redir\_esc=y\&hl=zh-CN\&sourceid=cndr#v=onepage\&q=linux programming interface wait morphing\&f=false)
-3. [^](locks-pthread.md#ref\_3\_0)3 **https://github.com/lattera/glibc/blob/895ef79e04a953cac1493863bcae29ad85657ee1/nptl/pthread\_spin\_init.c**
+3. [^](locks-pthread.md#ref\_3\_0)3 [glibc `pthread_spin_init.c`](https://github.com/bminor/glibc/blob/master/nptl/pthread_spin_init.c)
 
 ## **C++11**
