@@ -1,12 +1,12 @@
 # Uniswap V2 Libraries
 
-### 程序库 <a href="#libraries" id="libraries"></a>
+### Libraries <a href="#libraries" id="libraries"></a>
 
-[SafeMath 库](https://docs.openzeppelin.com/contracts/3.x/api/math)是一个文档很完备的程序库，这里 便无需赘述了。
+The [SafeMath library](https://docs.openzeppelin.com/contracts/3.x/api/math) is well documented, so this note does not repeat its details.
 
-#### 数学 <a href="#math" id="math"></a>
+#### Math <a href="#math" id="math"></a>
 
-此库包含一些 Solidity 代码通常不需要的数学函数，因而它们不是 Solidity 语言的一部分。
+This library contains mathematical functions that Solidity code usually does not need, so they are not part of the Solidity language itself.
 
 ```solidity
 pragma solidity =0.5.16;
@@ -25,7 +25,7 @@ library Math {
             uint x = y / 2 + 1;
 ```
 
-首先赋予 x 一个大于平方根的估值（这是我们需要把 1-3 当作特殊情况处理的原因）。
+First, assign `x` an estimate greater than the square root. This is why values from 1 to 3 need to be handled as special cases.
 
 ```solidity
             while (x < z) {
@@ -33,7 +33,7 @@ library Math {
                 x = (y / x + x) / 2;
 ```
 
-获取一个更接近的估值，即前一个估值与我们试图找到的方根值的平均数除以 前一个估值。 重复计算，直到新的估值不再低于现有估值。 欲了解更多详情， [请参见此处](https://wikipedia.org/wiki/Methods\_of\_computing\_square\_roots#Babylonian\_method)。
+Compute a closer estimate: the average of the previous estimate and the value obtained by dividing the target by that previous estimate. Repeat until the new estimate is no longer lower than the existing estimate. For more details, [see the Babylonian method](https://wikipedia.org/wiki/Methods\_of\_computing\_square\_roots#Babylonian\_method).
 
 ```solidity
             }
@@ -41,7 +41,7 @@ library Math {
             z = 1;
 ```
 
-我们永远不需要零的平方根。 1、2 和 3 的平方根大致为 1（我们使用的是 整数，所以忽略分数）。
+The square root of zero is never needed in this branch. The square roots of 1, 2, and 3 are approximately 1 in integer arithmetic because fractional parts are ignored.
 
 ```solidity
         }
@@ -49,9 +49,9 @@ library Math {
 }
 ```
 
-#### 定点小数 (UQ112x112) <a href="#fixedpoint" id="fixedpoint"></a>
+#### Fixed Point Numbers (UQ112x112) <a href="#fixedpoint" id="fixedpoint"></a>
 
-该库处理小数，这些小数通常不属于以太坊计算的一部分。 为此，它将数值 _x_ 编码为 _x\*2^112_。 这使我们能够使用原来的加法和减法操作码，无需更改。
+This library handles fractional values, which are usually not part of Ethereum computation. It encodes a value _x_ as _x\*2^112_. This lets the contract use the original addition and subtraction opcodes without modification.
 
 ```solidity
 pragma solidity =0.5.16;
@@ -65,7 +65,7 @@ library UQ112x112 {
     uint224 constant Q112 = 2**112;
 ```
 
-`Q112` 是 1 的编码。
+`Q112` is the encoding of 1.
 
 ```solidity
     // encode a uint112 as a UQ112x112
@@ -74,7 +74,7 @@ library UQ112x112 {
     }
 ```
 
-因为 y 是`uint112`，所以最多可以是 2^112-1。 该数值还可以编码为 `UQ112x112`。
+Because `y` is a `uint112`, its maximum value is `2^112 - 1`. That value can still be encoded as `UQ112x112`.
 
 ```solidity
     // divide a UQ112x112 by a uint112, returning a UQ112x112
@@ -84,11 +84,11 @@ library UQ112x112 {
 }
 ```
 
-如果我们需要两个 `UQ112x112` 值相除，结果不需要再乘以 2^112。 因此， 我们为分母取一个整数。 我们需要使用类似的技巧来做乘法，但不需要将 `UQ112x112` 的值相乘。
+If two `UQ112x112` values were divided directly, the result would not need to be multiplied by `2^112` again. Therefore, this helper takes an integer denominator. A similar trick would be needed for multiplication, but Uniswap V2 does not need to multiply two `UQ112x112` values here.
 
 #### UniswapV2Library <a href="#uniswapv2library" id="uniswapv2library"></a>
 
-此库仅被外围合约使用
+This library is used only by the peripheral contracts.
 
 ```solidity
 pragma solidity >=0.5.0;
@@ -108,7 +108,7 @@ library UniswapV2Library {
     }
 ```
 
-按地址对这两个代币排序，所以我们将能够获得相应的配对交易地址。 这很有必要， 否则有两种可能性，一种是用于参数 A,B，而另一种是用于 参数 B,A，导致两次交易而非一个。
+The two token addresses are sorted so the corresponding pair address can be obtained deterministically. This is necessary because otherwise there would be two possibilities: one for parameters `A, B`, and another for parameters `B, A`, resulting in two exchanges instead of one.
 
 ```solidity
     // calculates the CREATE2 address for a pair without making any external calls
@@ -123,7 +123,7 @@ library UniswapV2Library {
     }
 ```
 
-此函数计算两种代币的配对交易地址。 此合约使用 [CREATE2 操作码](https://eips.ethereum.org/EIPS/eip-1014)创建，如果我们知道所使用的参数， 我们可以使用相同的算法计算地址。 这比查询工厂便宜得多，而且
+This function calculates the pair address for two tokens. Since the pair contract is created with the [CREATE2 opcode](https://eips.ethereum.org/EIPS/eip-1014), if we know the parameters used for creation, we can compute the address with the same algorithm. This is much cheaper than querying the factory and does not require an external call.
 
 ```solidity
     // fetches and sorts the reserves for a pair
@@ -134,7 +134,7 @@ library UniswapV2Library {
     }
 ```
 
-此函数返回配对交易所拥有的两种代币的储备金。 请注意，它可以任意顺序接收代币， 并将其排序，以便内部使用。
+This function returns the reserves of the two tokens held by the pair. Notice that it can receive the token addresses in any order, then sorts them for internal use.
 
 ```solidity
     // given some amount of an asset and pair reserves, returns an equivalent amount of the other asset
@@ -145,14 +145,14 @@ library UniswapV2Library {
     }
 ```
 
-如果不涉及交易费用的话，此函数将返回给您代币 A 兑换得到的代币 B。 此计算 考虑到转账可能会改变汇率。
+If there were no trading fee, this function would return how much token B corresponds to a given amount of token A. The calculation accounts for the reserves because the swap changes the exchange rate.
 
 ```solidity
     // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
     function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) internal pure returns (uint amountOut) {
 ```
 
-如果使用配对交易没有手续费，上述 `quote` 函数非常有效。 然而，如果有 0.3% 的 手续费，您实际得到的金额就会低于此值。 此函数可以计算缴纳交易费用后的金额。
+The `quote` function above works well when using a pair has no fee. However, with a 0.3% trading fee, the amount actually received is lower than the quoted value. This function calculates the amount after the trading fee is applied.
 
 ```solidity
         require(amountIn > 0, 'UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT');
@@ -164,7 +164,7 @@ library UniswapV2Library {
     }
 ```
 
-Solidity 本身不能进行小数计算，所以不能简单地将金额乘以 0.997。 作为替代方法， 我们将分子乘以 997，分母乘以 1000，也能取得相同的效果。
+Solidity itself does not support fractional arithmetic, so the contract cannot simply multiply the amount by `0.997`. Instead, it multiplies the numerator by `997` and the denominator by `1000`, which produces the same effect in integer arithmetic.
 
 ```solidity
     // given an output amount of an asset and pair reserves, returns a required input amount of the other asset
@@ -177,7 +177,7 @@ Solidity 本身不能进行小数计算，所以不能简单地将金额乘以 0
     }
 ```
 
-此函数大致完成相同的功能，但它会获取输出数额并提供输入代币的数量。
+This function performs the inverse calculation: it receives the desired output amount and returns the required input token amount.
 
 ```solidity
     // performs chained getAmountOut calculations on any number of pairs
@@ -204,11 +204,11 @@ Solidity 本身不能进行小数计算，所以不能简单地将金额乘以 0
 }
 ```
 
-在需要进行数次配对交易时，可以通过这两个函数获得相应数值。
+When a route requires multiple pair swaps, these two functions compute the corresponding amounts across the full path.
 
-#### 转账帮助 <a href="#transfer-helper" id="transfer-helper"></a>
+#### Transfer Helper <a href="#transfer-helper" id="transfer-helper"></a>
 
-[此库](https://github.com/Uniswap/uniswap-lib/blob/master/contracts/libraries/TransferHelper.sol)添加了围绕 ERC-20 和以太坊转账的成功检查，并以同样的方式处理回退和返回 `false` 值。
+[This library](https://github.com/Uniswap/uniswap-lib/blob/master/contracts/libraries/TransferHelper.sol) adds success checks around ERC20 and ETH transfers, and handles reverts and returned `false` values in a consistent way.
 
 ```solidity
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -226,10 +226,10 @@ library TransferHelper {
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x095ea7b3, to, value));
 ```
 
-我们可以通过以下两种方式调用不同的合约：
+There are two ways to call another contract:
 
-* 使用一个接口定义创建函数调用
-* 使用 [应用程序二进制接口 (ABI)](https://docs.soliditylang.org/en/v0.8.3/abi-spec.html)“手动” 创建调用。 这是代码作者的决定。
+* Define an interface and call the function through that interface.
+* Create the call manually with the [Application Binary Interface (ABI)](https://docs.soliditylang.org/en/v0.8.3/abi-spec.html). The authors of this code chose this approach.
 
 ```solidity
         require(
@@ -239,7 +239,7 @@ library TransferHelper {
     }
 ```
 
-为了与之前的 ERC-20 标准创建的代币反向兼容，ERC-20 调用 失败可能有两种情况：回退（在这种情况下 `success` 即是 `false`），或者调用成功但返回 `false` 值（在这种情况下有输出数据，将其解码为布尔值，会得到 `false`）。
+For backward compatibility with older ERC20 tokens, an ERC20 call can fail in two ways: the call can revert, in which case `success` is `false`, or the call can succeed but return `false`, in which case there is output data that decodes to the Boolean value `false`.
 
 ```solidity
     function safeTransfer(
@@ -256,7 +256,7 @@ library TransferHelper {
     }
 ```
 
-此函数实现了 [ERC-20 的转账功能](https://eips.ethereum.org/EIPS/eip-20#transfer)， 可使一个帐户花掉由不同帐户所提供的额度。
+This function implements the [ERC20 transfer operation](https://eips.ethereum.org/EIPS/eip-20#transfer), which transfers tokens from the caller to another account.
 
 ```solidity
     function safeTransferFrom(
@@ -274,7 +274,7 @@ library TransferHelper {
     }
 ```
 
-此函数实现了 [ERC-20 的 transferFrom 功能](https://eips.ethereum.org/EIPS/eip-20#transferfrom)， 可使一个帐户花掉由不同帐户所提供的额度。
+This function implements the [ERC20 `transferFrom` operation](https://eips.ethereum.org/EIPS/eip-20#transferfrom), which allows one account to spend an allowance provided by another account.
 
 ```solidity
     function safeTransferETH(address to, uint256 value) internal {
@@ -284,10 +284,10 @@ library TransferHelper {
 }
 ```
 
-此函数将以太币转至一个帐户。 任何对不同合约的调用都可以尝试发送以太币。 因为我们 实际上不需要调用任何函数，就不需要在调用中发送数据。
+This function transfers ether to an account. Any call to another contract can attempt to send ether. Because the function does not need to call a specific function on the receiver, it does not need to send calldata.
 
-### 结论 <a href="#conclusion" id="conclusion"></a>
+### Conclusion <a href="#conclusion" id="conclusion"></a>
 
-本篇文章较长，约有 50 页。 如果您已读到此处，恭喜您！ 希望您现在已经了解 编写真实应用程序（相对于短小的示例程序）的考虑因素，并且能够更好地为您自己的 用例编写合约。
+This source-code walkthrough is fairly long, roughly around 50 pages in the original article. If you have read this far, you now have a better understanding of the considerations involved in writing real applications, rather than only small examples, and should be better prepared to write contracts for your own use cases.
 
-现在去写点实用的东西吧，希望您能给我们惊喜。
+Now go build something useful, and hopefully something surprising.

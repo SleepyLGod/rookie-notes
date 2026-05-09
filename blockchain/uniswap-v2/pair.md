@@ -1,85 +1,85 @@
 # Uniswap V2 Pair
 
-### 核心合约与外围合约 <a href="#contract-types" id="contract-types"></a>
+### Core and Periphery Contracts <a href="#contract-types" id="contract-types"></a>
 
-Uniswap v2 可以分为两个部分，一个为核心部分，另一个为外围部分。 这种分法可以使拥有资产因而\_必须\_确保安全的核心合约更加简洁，且更易于审核。 而所有交易者需要的其它功能可以通过外围合约提供。
+Uniswap v2 can be divided into two parts: the core and the periphery. This division keeps the core contracts, which hold assets and therefore _must_ be secure, smaller and easier to audit. Other features needed by traders can be provided through periphery contracts.
 
-### 数据和控制流程 <a href="#flows" id="flows"></a>
+### Data and Control Flow <a href="#flows" id="flows"></a>
 
-执行 Uniswap 的三个主要操作时，会出现以下数据和控制流程：
+The following data and control flows appear when executing the three main Uniswap operations:
 
-1. 兑换不同代币
-2. 将资金添加到市场中提供流动性，并获得兑换中奖励的流动池 ERC-20 代币
-3. 消耗流动池 ERC-20 代币并收回交易所允许交易者兑换的 ERC-20 代币
+1. Swapping different tokens.
+2. Adding funds to a market to provide liquidity and receiving liquidity-pool ERC-20 tokens as the reward-bearing claim.
+3. Burning liquidity-pool ERC-20 tokens and receiving back the ERC-20 tokens that the exchange allows traders to swap.
 
-#### 兑换 <a href="#swap-flow" id="swap-flow"></a>
+#### Swap <a href="#swap-flow" id="swap-flow"></a>
 
-这是交易者最常用的流程：
+This is the flow most commonly used by traders.
 
-**调用者**
+**Caller**
 
-1. 向外围帐户提供兑换额度。
-2. 调用外围合约中的一个兑换函数。外围合约通常会有多种兑换函数，调用哪一个取决于是否涉及以太币、 交易者是否需要指定存入的代币金额，或指定提取的代币数量等）。 每个兑换函数都接受一个 `path`，即要执行的一系列兑换。
+1. Provides an allowance to the periphery account for the tokens to be swapped.
+2. Calls one of the swap functions in the periphery contract. The periphery contract usually has several swap functions. Which one is called depends on whether Ether is involved, whether the trader specifies the token amount to input, or specifies the token amount to receive, and so on. Each swap function accepts a `path`, meaning the sequence of swaps to execute.
 
-**在外围合约 (UniswapV2Router02.sol) 中**
+**In the periphery contract (UniswapV2Router02.sol)**
 
-1. 确定兑换路径中，每次兑换所需交易的代币数额。
-2. 沿路径迭代。 对于路径上的每次兑换，首先发送输入代币，然后调用交易所的 `swap` 函数。 在大多数情况下，代币输出的目的地址是路径中下一个配对交易。 在最终的兑换中，该地址是 交易者提供的地址。
+1. Determines the token amounts required for each swap along the swap path.
+2. Iterates along the path. For each swap on the path, it first sends the input token and then calls the pair exchange's `swap` function. In most cases, the destination address for the output token is the next pair in the path. In the final swap, that address is the address supplied by the trader.
 
-**在核心合约 (UniswapV2Pair.sol) 中**
+**In the core contract (UniswapV2Pair.sol)**
 
-1. 先乐观地将输出代币发送到目的地址；如果 `data` 非空，还会触发 flash swap 回调。
-2. 读取 Pair 当前余额，并根据余额和旧 reserve 的差值推导本次实际输入了多少代币。
-3. 用扣除手续费后的余额校验恒定乘积 invariant，确保核心合约没有被欺骗。
-4. 调用 `_update` 更新 reserve。
+1. Optimistically sends the output tokens to the destination address first; if `data` is not empty, it also triggers the flash-swap callback.
+2. Reads the Pair's current balances and infers how many tokens were actually input in this swap from the difference between the balances and the old reserves.
+3. Checks the constant-product invariant using balances after fee deduction, ensuring that the core contract has not been tricked.
+4. Calls `_update` to update the reserves.
 
-**回到外围合约 (UniswapV2Router02.sol)**
+**Back in the periphery contract (UniswapV2Router02.sol)**
 
-1. 执行所需的必要清理工作（例如，消耗包装以太币代币以返回以太币给交易者）
+1. Performs any necessary cleanup, such as burning wrapped Ether tokens to return Ether to the trader.
 
-#### 增加流动资金 <a href="#add-liquidity-flow" id="add-liquidity-flow"></a>
+#### Add Liquidity <a href="#add-liquidity-flow" id="add-liquidity-flow"></a>
 
-**调用者**
+**Caller**
 
-1. 向外围账户提交准备加入流动资金池的资金额度。
-2. 调用外围合约的一个 addLiquidity 函数。
+1. Gives the periphery account an allowance for the funds to be added to the liquidity pool.
+2. Calls one of the periphery contract's `addLiquidity` functions.
 
-**在外围合约 (UniswapV2Router02.sol) 中**
+**In the periphery contract (UniswapV2Router02.sol)**
 
-1. 必要时创建一个新的配对交易
-2. 如果存在现有配对交易，请计算要增加的代币数量。 两个代币应该有相同值，所以新代币与现有代币的比率是相同的。
-3. 检查金额是否可接受（调用者可以指定一个最低金额，低于此金额他们不能增加流动资金）
-4. 调用核心合约。
+1. Creates a new pair if necessary.
+2. If an existing pair is present, calculates the token amounts to add. The two tokens should have equal value, so the ratio of newly added tokens should match the ratio of existing tokens.
+3. Checks whether the amounts are acceptable. The caller can specify minimum amounts below which they refuse to add liquidity.
+4. Calls the core contract.
 
-**在核心合约 (UniswapV2Pair.sol) 中**
+**In the core contract (UniswapV2Pair.sol)**
 
-1. 生成流动池代币并将其发送给调用者
-2. 调用 `_update` 来更新储备金额
+1. Mints liquidity-pool tokens and sends them to the caller.
+2. Calls `_update` to update the reserves.
 
-#### 撤回流动资金 <a href="#remove-liquidity-flow" id="remove-liquidity-flow"></a>
+#### Remove Liquidity <a href="#remove-liquidity-flow" id="remove-liquidity-flow"></a>
 
-**调用者**
+**Caller**
 
-1. 向外围帐户提供一个流动池代币的额度，作为兑换底层代币所需的消耗。
-2. 调用外围合约的一个 removeLiquidity 函数。
+1. Gives the periphery account an allowance for the liquidity-pool tokens that must be burned in exchange for the underlying tokens.
+2. Calls one of the periphery contract's `removeLiquidity` functions.
 
-**在外围合约 (UniswapV2Router02.sol) 中**
+**In the periphery contract (UniswapV2Router02.sol)**
 
-1. 将流动池代币发送到该配对交易
+1. Sends the liquidity-pool tokens to the pair.
 
-**在核心合约 (UniswapV2Pair.sol) 中**
+**In the core contract (UniswapV2Pair.sol)**
 
-1. 按照消耗代币的比例发送兑换后的代币到目标地址。 例如，如果 流动池里有 1000 个 A 代币，500 个 B 代币和 90 个流动池代币，而我们被要求消耗 9 个 流动池代币，那么，我们将消耗 10% 的流动池代币，然后将返还用户 100 个 A 代币和 50 个 B 代币。
-2. 消耗流动池代币
-3. 调用`_update`来更新储备金额
+1. Sends the redeemed tokens to the target address according to the proportion of liquidity tokens burned. For example, if the pool contains 1,000 A tokens, 500 B tokens, and 90 liquidity-pool tokens, and we are asked to burn 9 liquidity-pool tokens, then 10% of the liquidity-pool tokens are burned and the user receives 100 A tokens and 50 B tokens.
+2. Burns the liquidity-pool tokens.
+3. Calls `_update` to update the reserves.
 
-### 核心合约 <a href="#core-contracts" id="core-contracts"></a>
+### Core Contracts <a href="#core-contracts" id="core-contracts"></a>
 
-这些是持有流动资金的安全合约。
+These are the security-critical contracts that hold liquidity.
 
 #### UniswapV2Pair.sol <a href="#uniswapv2pair" id="uniswapv2pair"></a>
 
-[本合约](https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2Pair.sol) 实现了 用于兑换代币的实际资金池。 这是 Uniswap 的核心功能。
+[This contract](https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2Pair.sol) implements the actual pool used for token swaps. This is Uniswap's core functionality.
 
 ```solidity
 pragma solidity =0.5.16;
@@ -93,131 +93,131 @@ import './interfaces/IUniswapV2Factory.sol';
 import './interfaces/IUniswapV2Callee.sol';
 ```
 
-这些都是合约需要知道的接口，因为合约实现了它们 （`IUniswapV2Pair` 和 `UniswapV2ERC20`），或因为合约调用了实现它们的合约。
+These are the interfaces the contract needs to know about, either because the contract implements them (`IUniswapV2Pair` and `UniswapV2ERC20`) or because it calls contracts that implement them.
 
 ```solidity
 contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 ```
 
-此合约继承自 `UniswapV2ERC20`，为流动池代币提供 ERC-20 代币功能。
+This contract inherits from `UniswapV2ERC20`, which provides ERC-20 token functionality for the liquidity-pool token.
 
 ```solidity
     using SafeMath  for uint;
 ```
 
-[SafeMath 库](https://docs.openzeppelin.com/contracts/3.x/api/math)用于避免整数上溢和 下溢。 这很重要，否则最终可能会出现这样的情况：本该是 `-1` 的值， 结果却成了 `2^256-1`。
+The [SafeMath library](https://docs.openzeppelin.com/contracts/3.x/api/math) is used to avoid integer overflow and underflow. This is important; otherwise, a value that should be `-1` might become `2^256-1`.
 
 ```solidity
     using UQ112x112 for uint224;
 ```
 
-流动池合约中的许多计算都需要分数。 但是，以太坊虚拟机本身不支持分数。 Uniswap 找到的解决方案是使用 224 位数值，整数值为 112 位，分数部分 为 112 位。 因此，`1.0` 用 `2^112` 表示，`1.5` 用 `2^112 + 2^111` 表示，以此类推。
+Many calculations in the liquidity-pool contract require fractions. However, the Ethereum Virtual Machine does not natively support fractions. The solution used by Uniswap is to use a 224-bit value, with 112 bits for the integer part and 112 bits for the fractional part. Therefore, `1.0` is represented as `2^112`, `1.5` is represented as `2^112 + 2^111`, and so on.
 
-关于这个函数库的更详细内容在[文档的稍后部分](README.md#FixedPoint)。
+This library is discussed in more detail later in the [documentation](README.md#FixedPoint).
 
-**变量**
+**Variables**
 
 ```solidity
     uint public constant MINIMUM_LIQUIDITY = 10**3;
 ```
 
-为了避免分母为零的情况，最低数量的流动池代币总是存在的 （但为账户零所拥有）。 该数字，即 **MINIMUM\_LIQUIDITY**，为 1000。
+To avoid a zero denominator, a minimum number of liquidity-pool tokens always exists, but they are owned by the zero address. This number, **MINIMUM_LIQUIDITY**, is 1000.
 
 ```solidity
     bytes4 private constant SELECTOR = bytes4(keccak256(bytes('transfer(address,uint256)')));
 ```
 
-这是 ERC-20 传输函数的应用程序二进制接口选择程序。 它用于在两个代币账户中转移 ERC-20 代币。
+This is the application binary interface selector for the ERC-20 transfer function. It is used to transfer ERC-20 tokens between token accounts.
 
 ```solidity
     address public factory;
 ```
 
-这就是由工厂合约创造的资金池地址。 每个资金池都是两个 ERC-20 代币之间的交换， 工厂是连接所有这些代币资金池的中心点。
+This is the address of the factory contract that created the pool. Each pool is an exchange between two ERC-20 tokens, and the factory is the central registry connecting all these token pools.
 
 ```solidity
     address public token0;
     address public token1;
 ```
 
-这两个地址是流动池可以兑换的 两类 ERC-20 代币的合约地址。
+These two addresses are the contract addresses of the two ERC-20 token types that the liquidity pool can swap.
 
 ```solidity
     uint112 private reserve0;           // uses single storage slot, accessible via getReserves
     uint112 private reserve1;           // uses single storage slot, accessible via getReserves
 ```
 
-每个代币类型都有储备的资源库。 我们假定两者代表相同数量的值， 因此每个 token0 的价值都等同于 reserve1/reserve0 token1。
+Each token type has its own reserve. We assume the two reserves represent equal total value, so each unit of token0 is worth `reserve1/reserve0` units of token1.
 
 ```solidity
     uint32  private blockTimestampLast; // uses single storage slot, accessible via getReserves
 ```
 
-发生兑换的最后一个区块的时间戳，用来追踪一段时间内的汇率。
+This is the timestamp of the last block in which an exchange occurred. It is used to track the exchange rate over time.
 
-以太坊合约中燃料消耗量最大的一项是存储，这种燃料消耗从一次合约调用持续到 下一次调用。 每个存储单元长度为 256 位。 因此，reserve0、reserve1 和 blockTimestampLast 三个变量的分配方式让 单个存储值可以包含全部这三个变量 (112+112+32=256)。
+One of the largest gas costs in Ethereum contracts is storage, because storage persists from one contract call to the next. Each storage slot is 256 bits. Therefore, `reserve0`, `reserve1`, and `blockTimestampLast` are laid out so a single storage slot can contain all three variables: 112 + 112 + 32 = 256.
 
 ```solidity
     uint public price0CumulativeLast;
     uint public price1CumulativeLast;
 ```
 
-这些变量存放每种代币的累计成本（每种代币在另一种代币的基础上计算）。 可以用来计算 一段时间内的平均汇率。
+These variables store the cumulative price of each token in terms of the other token. They can be used to calculate the average exchange rate over a period of time.
 
 ```solidity
     uint public kLast; // reserve0 * reserve1, as of immediately after the most recent liquidity event
 ```
 
-在配对交易中，决定 token0 和 token1 之间汇率的方式是在交易中 保留两个储备常量的乘数。 即 `kLast` 这个值。 当流动资金提供者存入或提取代币时，它就会发生变化，由于兑换市场的费用为 0.3%，它会略有增加。
+In a pair, the exchange rate between token0 and token1 is determined by keeping the product of the two reserves constant. That product is `kLast`. It changes when liquidity providers deposit or withdraw tokens, and it also increases slightly because swaps pay a 0.3% market fee.
 
-下面是一个示例。 请注意，为了简单起见，表格中的数字仅保留了小数点后三位，我们忽略了 0.3% 交易费，因此数字并不准确。
+Here is an example. For simplicity, the numbers in the table keep only three decimal places, and the 0.3% trading fee is ignored, so the numbers are not exact.
 
-| 事件                                      |  reserve0 |  reserve1 | reserve0 \* reserve1 | 平均汇率 (token1 / token0) |
-| --------------------------------------- | --------: | --------: | -------------------: | ---------------------- |
-| 初始设置                                    | 1,000.000 | 1,000.000 |            1,000,000 |                        |
-| 交易者 A 用 50 个 token0 兑换 47.619 个 token1  | 1,050.000 |   952.381 |            1,000,000 | 0.952                  |
-| 交易者 B 用 10 个 token0 兑换 8.984 个 token1   | 1,060.000 |   943.396 |            1,000,000 | 0.898                  |
-| 交易者 C 用 40 个 token0 兑换 34.305 个 token1  | 1,100.000 |   909.090 |            1,000,000 | 0.858                  |
-| 交易者 D 用 100 个 token1 兑换 109.01 个 token0 |   990.990 | 1,009.090 |            1,000,000 | 0.917                  |
-| 交易者 E 用 10 个 token0 兑换 10.079 个 token1  | 1,000.990 |   999.010 |            1,000,000 | 1.008                  |
+| Event | reserve0 | reserve1 | reserve0 * reserve1 | Average exchange rate (token1 / token0) |
+| ---- | --------: | --------: | -------------------: | ---------------------- |
+| Initial setup | 1,000.000 | 1,000.000 | 1,000,000 | |
+| Trader A swaps 50 token0 for 47.619 token1 | 1,050.000 | 952.381 | 1,000,000 | 0.952 |
+| Trader B swaps 10 token0 for 8.984 token1 | 1,060.000 | 943.396 | 1,000,000 | 0.898 |
+| Trader C swaps 40 token0 for 34.305 token1 | 1,100.000 | 909.090 | 1,000,000 | 0.858 |
+| Trader D swaps 100 token1 for 109.01 token0 | 990.990 | 1,009.090 | 1,000,000 | 0.917 |
+| Trader E swaps 10 token0 for 10.079 token1 | 1,000.990 | 999.010 | 1,000,000 | 1.008 |
 
-由于交易者提供了更多 token0，token1 的相对价值增加了，反之亦然，这取决于供求。
+As traders provide more token0, the relative value of token1 increases, and vice versa. This is driven by supply and demand.
 
-**锁定**
+**Lock**
 
 ```solidity
     uint private unlocked = 1;
 ```
 
-有一类基于 [重入攻击](https://medium.com/coinmonks/ethernaut-lvl-10-re-entrancy-walkthrough-how-to-abuse-execution-ordering-and-reproduce-the-dao-7ec88b912c14)的安全问题。 Uniswap 需要转让不同数值的 ERC-20 代币，这意味着调用的 ERC-20 合约可能会导致调用合约的 Uniswap 市场遭受攻击。 使用 `unlocked` 变量， 我们可以防止函数在运行时被调用(在相同的交易内)。
+There is a class of security issues based on [reentrancy attacks](https://medium.com/coinmonks/ethernaut-lvl-10-re-entrancy-walkthrough-how-to-abuse-execution-ordering-and-reproduce-the-dao-7ec88b912c14). Uniswap needs to transfer different ERC-20 token amounts, which means the called ERC-20 contract might try to attack the Uniswap market that called it. By using the `unlocked` variable, we can prevent a function from being called while it is already running in the same transaction.
 
 ```solidity
     modifier lock() {
 ```
 
-此函数是一个 [modifier](https://docs.soliditylang.org/en/v0.8.3/contracts.html#function-modifiers) 函数，用于以某种方式改变正常函数的行为。
+This function is a [modifier](https://docs.soliditylang.org/en/v0.8.3/contracts.html#function-modifiers), which changes normal function behavior in a specific way.
 
 ```solidity
         require(unlocked == 1, 'UniswapV2: LOCKED');
         unlocked = 0;
 ```
 
-如果 `unlocked` 变量值为 1，将其设置为 0。 如果已经是 0，则撤销调用，返回失败。
+If `unlocked` is 1, set it to 0. If it is already 0, revert the call and fail.
 
 ```solidity
         _;
 ```
 
-在修饰符中，`_;` 是原始函数调用（含所有参数）。 这里表明仅在 `unlocked` 变量值为 1 时 才能调用函数，而当函数运行时，`unlocked` 值为 0。
+Inside a modifier, `_;` represents the original function call with all its parameters. Here it means the function can only be called when `unlocked` is 1, and while the function is running, `unlocked` is 0.
 
 ```solidity
         unlocked = 1;
     }
 ```
 
-当主函数返回后，释放锁定。
+After the main function returns, release the lock.
 
-**其他 函数**
+**Other Functions**
 
 ```solidity
     function getReserves() public view returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) {
@@ -227,37 +227,37 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
     }
 ```
 
-此函数返回给调用者当前的兑换状态。 请注意，Solidity 函数[可以返回多个 值](https://docs.soliditylang.org/en/v0.8.3/contracts.html#returning-multiple-values)。
+This function returns the current exchange state to the caller. Note that Solidity functions [can return multiple values](https://docs.soliditylang.org/en/v0.8.3/contracts.html#returning-multiple-values).
 
 ```solidity
     function _safeTransfer(address token, address to, uint value) private {
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(SELECTOR, to, value));
 ```
 
-此内部函数可以从交易所转账一定数额的 ERC20 代币给其他账户。 `SELECTOR` 指定 我们调用的函数是 `transfer(address,uint)`（参见上面的定义）。
+This internal function transfers a certain amount of ERC-20 tokens from the exchange to another account. `SELECTOR` specifies that the function being called is `transfer(address,uint)`, as defined above.
 
-为了避免必须为代币函数导入接口，我们需要使用其中一个 [ABI 函数](https://docs.soliditylang.org/en/v0.8.3/units-and-global-variables.html#abi-encoding-and-decoding-functions) 来“手动”创建调用。
+To avoid importing an interface for token functions, the contract uses one of the [ABI functions](https://docs.soliditylang.org/en/v0.8.3/units-and-global-variables.html#abi-encoding-and-decoding-functions) to manually create the call.
 
 ```solidity
         require(success && (data.length == 0 || abi.decode(data, (bool))), 'UniswapV2: TRANSFER_FAILED');
     }
 ```
 
-ERC-20 的转移调用有两种方式可能失败：
+An ERC-20 transfer call can fail in two ways:
 
-1. 回滚 如果对外部合约的调用回滚，则布尔返回值为 `false`
-2. 正常结束但报告失败。 在这种情况下，返回值的缓冲为非零长度，将其解码为布尔值时，其值为 `false`
+1. It reverts. If the external contract call reverts, the boolean return value is `false`.
+2. It completes normally but reports failure. In this case, the returned buffer has non-zero length, and when decoded as a boolean, its value is `false`.
 
-一旦出现这两种情况，转移调用就会回退。
+If either case occurs, the transfer call is reverted.
 
-**事件**
+**Events**
 
 ```solidity
     event Mint(address indexed sender, uint amount0, uint amount1);
     event Burn(address indexed sender, uint amount0, uint amount1, address indexed to);
 ```
 
-当流动资金提供者存入流动资金 (`Mint`) 或提取流动资金 (`Burn`) 时，会发出这两个事件。 在 这两种情况下，存入或提取出的 token0 和 token1 的金额是事件的一部分， 以及调用合约的账户地址 (`Sender`)。 在提取资金时，事件中还包括获得代币的目标地址 (`to`) 这个地址可能与发送合约的账户地址不同。
+These two events are emitted when a liquidity provider deposits liquidity (`Mint`) or withdraws liquidity (`Burn`). In both cases, the amounts of token0 and token1 deposited or withdrawn are part of the event, as is the account address that called the contract (`sender`). When withdrawing liquidity, the event also includes the target address (`to`) that receives the tokens. This address may differ from the account address that sent the contract call.
 
 ```solidity
     event Swap(
@@ -270,17 +270,17 @@ ERC-20 的转移调用有两种方式可能失败：
     );
 ```
 
-当交易者用一种代币交换另一种代币时，会激发此事件。 同样，代币发送者和兑换后代币的存入目的账户可能不一样。 每种代币都可以发送到交易所，或者从交易所接收。
+This event is emitted when a trader swaps one token for another. Again, the token sender and the destination account that receives the swapped tokens may be different. Each token can either be sent to the exchange or received from the exchange.
 
 ```solidity
     event Sync(uint112 reserve0, uint112 reserve1);
 ```
 
-最后，每次存入或提取代币时都会发出 `Sync`，无论出于何种原因，提供最新的储备信息 （从而提供汇率）。
+Finally, `Sync` is emitted every time tokens are deposited or withdrawn for any reason, providing the latest reserve information and therefore the exchange rate.
 
-**设置函数**
+**Setup Functions**
 
-这些函数应在建立新的配对交易时调用。
+These functions should be called when a new pair is created.
 
 ```solidity
     constructor() public {
@@ -288,7 +288,7 @@ ERC-20 的转移调用有两种方式可能失败：
     }
 ```
 
-构造函数确保我们能够跟踪产生配对的工厂合约的地址。 `initialize` 函数和工厂合约执行费（如果有）需要此信息
+The constructor ensures that the pair can track the address of the factory contract that created it. The `initialize` function and the factory contract fee setting, if any, need this information.
 
 ```solidity
     // called once by the factory at time of deployment
@@ -299,24 +299,24 @@ ERC-20 的转移调用有两种方式可能失败：
     }
 ```
 
-这个函数允许工厂（而且只允许工厂）指定配对中进行兑换的两种 ERC-20 代币。
+This function allows the factory, and only the factory, to specify the two ERC-20 tokens traded by the pair.
 
-**内部更新函数**
+**Internal Update Functions**
 
-**\_update**
+**_update**
 
 ```solidity
     // update reserves and, on the first call per block, price accumulators
     function _update(uint balance0, uint balance1, uint112 _reserve0, uint112 _reserve1) private {
 ```
 
-每次存入或提取代币时，会调用此函数。
+This function is called every time tokens are deposited or withdrawn.
 
 ```solidity
         require(balance0 <= uint112(-1) && balance1 <= uint112(-1), 'UniswapV2: OVERFLOW');
 ```
 
-如果 balance0 或 balance1 (uint256) 高于 uint112(-1) (=2^112-1)（因此当转换为 uint112 时会溢出并返回 0) 拒绝 继续 \_update 以防止溢出。 一般的代币可以细分成 10^18 个单元，这意味着 代币每次的兑换限制大约为每个代币的 5.1\*10^15。 迄今为止，这并不是一个问题。
+If `balance0` or `balance1`, both `uint256`, is greater than `uint112(-1)` (= 2^112 - 1), converting it to `uint112` would overflow. The call is rejected to prevent overflow. Typical tokens can be subdivided into 10^18 units, which means the exchange limit is about 5.1 * 10^15 units of each token. So far, this has not been a practical issue.
 
 ```solidity
         uint32 blockTimestamp = uint32(block.timestamp % 2**32);
@@ -324,7 +324,7 @@ ERC-20 的转移调用有两种方式可能失败：
         if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
 ```
 
-如果流逝的时间值不是零，这意味着本交易是此区块上的第一笔兑换交易。 在这种情况下，我们需要更新累积成本值。
+If `timeElapsed` is not zero, this transaction is the first exchange transaction in this block. In that case, the cumulative price values need to be updated.
 
 ```solidity
             // * never overflows, and + overflow is desired
@@ -333,20 +333,20 @@ ERC-20 的转移调用有两种方式可能失败：
         }
 ```
 
-每个累积成本值都用最新成本值（另一个代币的储备金额/本代币的储备金额）乘以以秒为单位的流逝时间加以更新。 要获得平均兑换价格，需要读取两个累积成本值，并除以它们之间的时间差。 例如，假设下面这些事件序列：
+Each cumulative price value is updated by adding the latest price, meaning the reserve amount of the other token divided by the reserve amount of this token, multiplied by elapsed time in seconds. To obtain the average exchange price, read two cumulative price values and divide their difference by the time difference between the two observations. For example, suppose the following event sequence:
 
-| 事件                                 |  reserve0 |  reserve1 | 时间戳   | 边际汇率 (reserve1 / reserve0) |       price0CumulativeLast |
-| ---------------------------------- | --------: | --------: | ----- | -------------------------: | -------------------------: |
-| 初始设置                               | 1,000.000 | 1,000.000 | 5,000 |                      1.000 |                          0 |
-| 交易者 A 存入 50 个代币 0 获得 47.619 个代币 1  | 1,050.000 |   952.381 | 5,020 |                      0.907 |                         20 |
-| 交易者 B 存入 10 个代币 0 获得 8.984 个代币 1   | 1,060.000 |   943.396 | 5,030 |                       0.89 |       20+10\*0.907 = 29.07 |
-| 交易者 C 存入 40 个代币 0 获得 34.305 个代币 1  | 1,100.000 |   909.090 | 5,100 |                      0.826 |    29.07+70\*0.890 = 91.37 |
-| 交易者 D 存入 100 个代币 0 获得 109.01 个代币 1 |   990.990 | 1,009.090 | 5,110 |                      1.018 |    91.37+10\*0.826 = 99.63 |
-| 交易者 E 存入 10 个代币 0 获得 10.079 个代币 1  | 1,000.990 |   999.010 | 5,150 |                      0.998 | 99.63+40\*1.1018 = 143.702 |
+| Event | reserve0 | reserve1 | Timestamp | Marginal exchange rate (reserve1 / reserve0) | price0CumulativeLast |
+| ---- | --------: | --------: | ----- | -------------------------: | -------------------------: |
+| Initial setup | 1,000.000 | 1,000.000 | 5,000 | 1.000 | 0 |
+| Trader A deposits 50 token0 and receives 47.619 token1 | 1,050.000 | 952.381 | 5,020 | 0.907 | 20 |
+| Trader B deposits 10 token0 and receives 8.984 token1 | 1,060.000 | 943.396 | 5,030 | 0.89 | 20+10*0.907 = 29.07 |
+| Trader C deposits 40 token0 and receives 34.305 token1 | 1,100.000 | 909.090 | 5,100 | 0.826 | 29.07+70*0.890 = 91.37 |
+| Trader D deposits 100 token0 and receives 109.01 token1 | 990.990 | 1,009.090 | 5,110 | 1.018 | 91.37+10*0.826 = 99.63 |
+| Trader E deposits 10 token0 and receives 10.079 token1 | 1,000.990 | 999.010 | 5,150 | 0.998 | 99.63+40*1.1018 = 143.702 |
 
-比如说我们想要计算时间戳 5,030 到 5,150 之间**代币 0** 的平均价格。 `price0Cumulative` 的差值 为 143.702-29.07=114.632。 此为两分钟（120 秒）间的平均值。 因此，平均价格为 114.632/120 = 0.955。
+For example, suppose we want to calculate the average price of **token0** between timestamp 5,030 and 5,150. The difference in `price0Cumulative` is 143.702 - 29.07 = 114.632. This covers two minutes, or 120 seconds. Therefore, the average price is 114.632 / 120 = 0.955.
 
-此价格计算是我们需要知道原有资金储备规模的原因。
+This price calculation is why we need to know the old reserve sizes.
 
 ```solidity
         reserve0 = uint112(balance0);
@@ -356,38 +356,38 @@ ERC-20 的转移调用有两种方式可能失败：
     }
 ```
 
-最后，更新全局变量并发布一个 `Sync` 事件。
+Finally, the global variables are updated and a `Sync` event is emitted.
 
-**\_mintFee**
+**_mintFee**
 
 ```solidity
     // if fee is on, mint liquidity equivalent to 1/6th of the growth in sqrt(k)
     function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool feeOn) {
 ```
 
-在 Uniswap 2.0 的合约中规定交易者为使用兑换市场支付 0.30% 的费用。 这笔费用的大部分（交易的 0.25%）支付给流动资金提供者。 余下的 0.5% 可以支付给流动资金提供者或由工厂合约指定的账户地址作为协议费，可以用于支付 Uniswap 团队的开发费用。
+The Uniswap 2.0 contracts specify that traders pay a 0.30% fee to use the exchange market. Most of this fee, 0.25% of the trade, is paid to liquidity providers. The remaining 0.05% may be paid either to liquidity providers or to the account specified by the factory contract as the protocol fee, which can be used to fund Uniswap development.
 
-为了减少计算次数（因此减少燃料费用），这笔费用只在流动资金被添加或移除时才计算，而不是在每次兑换交易时计算。
+To reduce the number of computations and therefore gas cost, this fee is calculated only when liquidity is added or removed, not on every swap.
 
 ```solidity
         address feeTo = IUniswapV2Factory(factory).feeTo();
         feeOn = feeTo != address(0);
 ```
 
-读取工厂的费用支付地址。 如果返回值为零，则代表没有协议费， 也不需要来计算这笔费用。
+Read the factory's fee recipient address. If the returned value is zero, there is no protocol fee and no fee needs to be calculated.
 
 ```solidity
         uint _kLast = kLast; // gas savings
 ```
 
-`kLast` 状态变量位于内存中，所以在合约的不同调用中都有一个值。 虽然函数内存每次在函数调用后都会清空，但由于访问存储的费用要比访问内存要高得多， 所以我们使用内存的内部变量来代表存储变量的值，以降低燃料费用。
+The `kLast` state variable is in storage, so it has a value across contract calls. Function memory is cleared after each function call, but because storage access is much more expensive than memory access, this local memory variable is used to represent the storage value and reduce gas cost.
 
 ```solidity
         if (feeOn) {
             if (_kLast != 0) {
 ```
 
-流动资金提供者仅仅因为提供流动性代币而得到所属的费用。 但是协议 费用要求发行新的流动性代币，并提供给 `feeTo` 的账户地址。
+Liquidity providers earn fees simply because they provide liquidity tokens. The protocol fee, however, requires minting new liquidity tokens and giving them to the `feeTo` account.
 
 ```solidity
                 uint rootK = Math.sqrt(uint(_reserve0).mul(_reserve1));
@@ -395,7 +395,7 @@ ERC-20 的转移调用有两种方式可能失败：
                 if (rootK > rootKLast) {
 ```
 
-如果有新的流动性变化需要收取协议费。 你可以在 [本文后面](README.md#Math)看到平方根函数。
+If there has been new liquidity growth, a protocol fee may need to be charged. The square-root function is discussed [later in this document](README.md#Math).
 
 ```solidity
                     uint numerator = totalSupply.mul(rootK.sub(rootKLast));
@@ -403,7 +403,7 @@ ERC-20 的转移调用有两种方式可能失败：
                     uint liquidity = numerator / denominator;
 ```
 
-这种复杂的费用计算方法在[白皮书](https://uniswap.org/whitepaper.pdf)第 5 页中作了解释。 在计算 `kLast` 的间隔期间，流动性没有变化（因为每次计算 都是在流动性发生实际变化时发生），所以 `reserve0 * reserve1` 的变化 一定是从交易费用中产生（没有交易费用的话 `reserve0 * reserve1` 值为常量）。
+This complicated fee calculation is explained on page 5 of the [whitepaper](https://uniswap.org/whitepaper.pdf). During the interval in which `kLast` is calculated, liquidity has not changed, because every calculation occurs when liquidity actually changes. Therefore, the change in `reserve0 * reserve1` must come from trading fees; without trading fees, `reserve0 * reserve1` would remain constant.
 
 ```solidity
                     if (liquidity > 0) _mint(feeTo, liquidity);
@@ -411,7 +411,7 @@ ERC-20 的转移调用有两种方式可能失败：
             }
 ```
 
-使用 `UniswapV2ERC20._mint` 函数产生更多的流动池代币并发送到 `feeTo` 地址。
+Use the `UniswapV2ERC20._mint` function to create more liquidity-pool tokens and send them to the `feeTo` address.
 
 ```solidity
         } else if (_kLast != 0) {
@@ -420,26 +420,26 @@ ERC-20 的转移调用有两种方式可能失败：
     }
 ```
 
-如果不需收费则将 `klast` 设为 0（如果 klast 不为 0）。 编写该合约时，有一个[燃料返还功能](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3298.md)，用于鼓励合约将其不需要的存储释放，从而减少以太坊上状态变量的整体存储大小。 此段代码在可行时返还。
+If no fee is required, set `kLast` to 0 if it is not already 0. When this contract was written, there was a [gas refund feature](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3298.md) that encouraged contracts to release storage they no longer needed, reducing the total state stored on Ethereum. This code claimed the refund when possible.
 
-**外部可访问函数**
+**Externally Accessible Functions**
 
-请注意，虽然这些函数\_可以\_被任意交易或合约调用，其设计目的是用于外部合约调用。 如果直接调用，您无法骗过配对交易， 可能因错误而丢失价值。
+Although these functions _can_ be called by any transaction or contract, they are designed to be called by external contracts. If called directly, you cannot trick the pair, and you may lose value due to mistakes.
 
-**铸币**
+**Mint**
 
 ```solidity
     // this low-level function should be called from a contract which performs important safety checks
     function mint(address to) external lock returns (uint liquidity) {
 ```
 
-当流动资金提供者为资金池增加流动资金时，将会调用此函数。 它将产生额外的流动池 代币作为奖励。 在 [外围合约](README.md#UniswapV2Router02)中增加流动性后调用这个函数，以确保二者在同一交易中（因此其他人都不能提交向合法所有者要求新流动资金的交易）。
+This function is called when a liquidity provider adds liquidity to the pool. It mints additional liquidity-pool tokens as the reward. The function is called after liquidity is added in the [periphery contract](README.md#UniswapV2Router02), ensuring both actions happen in the same transaction, so no one else can submit a transaction claiming the new liquidity from the legitimate owner.
 
 ```solidity
         (uint112 _reserve0, uint112 _reserve1,) = getReserves(); // gas savings
 ```
 
-这是 Solidity 函数中读取多个返回值的方式。 这里我们忽略了最后 返回的值，即区块时间戳，因为不需要它。
+This is how Solidity reads multiple return values. Here the final returned value, the block timestamp, is ignored because it is not needed.
 
 ```solidity
         uint balance0 = IERC20(token0).balanceOf(address(this));
@@ -448,13 +448,13 @@ ERC-20 的转移调用有两种方式可能失败：
         uint amount1 = balance1.sub(_reserve1);
 ```
 
-获取当前余额并查看每个代币类型中添加的数量。
+Get the current balances and see how much of each token type was added.
 
 ```solidity
         bool feeOn = _mintFee(_reserve0, _reserve1);
 ```
 
-如果有协议费用的话，计算需要收取的费用，并相应地产生流动池代币。 因为输入 `_mintFee` 函数的参数是原有的储备价值，相应费用的计算只是基于费用 导致的流动池变化。
+If a protocol fee exists, calculate the fee to be collected and mint liquidity-pool tokens accordingly. Because the inputs to `_mintFee` are the old reserve values, the fee calculation is based only on pool growth caused by fees.
 
 ```solidity
         uint _totalSupply = totalSupply; // gas savings, must be defined here since totalSupply can update in _mintFee
@@ -463,35 +463,35 @@ ERC-20 的转移调用有两种方式可能失败：
            _mint(address(0), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
 ```
 
-如果这是第一笔存款，会创建数量为 `MINIMUM_LIQUIDITY` 的代币并将它们发送到地址 0 进行锁定。 这些代币 无法被获取，也就是说流动池永远不会为空（避免之后的计算中 出现除零错误）。 `MINIMUM_LIQUIDITY` 的值是 1000，因为考虑到大多数 ERC-20 被细分成 1 个代币的 10^-18 个单位，而以太币则被分为 wei，为 1 个代币价值的 10^-15。 成本不高。
+If this is the first deposit, `MINIMUM_LIQUIDITY` tokens are created and sent to address 0 for permanent locking. These tokens cannot be retrieved, meaning the liquidity pool is never empty, which avoids division-by-zero errors in later calculations. `MINIMUM_LIQUIDITY` is 1000. Given that most ERC-20 tokens are subdivided into 10^-18 units of one token, while Ether is divided into wei, this is only 10^-15 of a token and is not expensive.
 
-在首次存款时，我们不知道两个代币的相对价值，所以假定两种代币都具有相同的价值，只需要两者数量的乘积并取一下方根。
+On the first deposit, the relative value of the two tokens is not known, so the contract assumes the two token amounts have equal value and simply takes the square root of their product.
 
-我们可以相信这一点，因为提供同等价值、避免套利符合存款人的利益。 比方说，这两种代币的价值是相同的，但我们的存款人存入的 **Token1** 是 **Token0** 的四倍。 通过配对交易，交易者可以认为 **Token0** 的价值 比较高。
+We can rely on this because it is in the depositor's interest to provide equal value and avoid arbitrage. Suppose the two tokens have the same value, but the depositor deposits four times as much **Token1** as **Token0**. Through the pair, traders can treat **Token0** as more valuable.
 
-| 事件                                            | reserve0 | reserve1 | reserve0 \* reserve1 | 流动池价值 (reserve0 + reserve1) |
-| --------------------------------------------- | -------: | -------: | -------------------: | --------------------------: |
-| 初始设置                                          |        8 |       32 |                  256 |                          40 |
-| 交易者存入 8 个 **Token0** 代币，获得 16 个 **Token1** 代币 |       16 |       16 |                  256 |                          32 |
+| Event | reserve0 | reserve1 | reserve0 * reserve1 | Pool value (reserve0 + reserve1) |
+| ---- | -------: | -------: | -------------------: | --------------------------: |
+| Initial setup | 8 | 32 | 256 | 40 |
+| Trader deposits 8 **Token0** and receives 16 **Token1** | 16 | 16 | 256 | 32 |
 
-正如您可以看到的，交易者额外获得了 8 个代币，这是由于流动池价值下降造成的，损害了拥有流动池的存款人。
+As shown, the trader receives 8 extra tokens. This comes from a decrease in pool value and harms the depositor who owns the pool.
 
 ```solidity
         } else {
             liquidity = Math.min(amount0.mul(_totalSupply) / _reserve0, amount1.mul(_totalSupply) / _reserve1);
 ```
 
-对于随后每一笔存款，我们都知道了两种资产之间的汇率。我们期望流动资金提供者提供 等值的两种代币。 如果他们没有，我们根据他们提供的较低价值代币来支付他们的流动池代币以做惩罚。
+For every later deposit, the exchange rate between the two assets is already known. We expect liquidity providers to provide equal value in the two tokens. If they do not, they are penalized by receiving liquidity-pool tokens based on the lower-value token amount they provided.
 
-无论是最初存入还是后续存入，流动池的代币金额均等于 `reserve0*reserve1` 的 平方根，而流动池代币的价值不变（除非存入的资金为不等值的代币类型， 那么就会分派“罚金”）。 这里有另一个例子，两种代币具有相同价值，有三个良性的存款和一个恶性的存款 （即只存入一种类型的代币，所以不会产生任何流动池代币）。
+For both the initial deposit and later deposits, the amount of liquidity-pool tokens is equal to the square root of `reserve0*reserve1`, and the value of each liquidity-pool token remains constant, unless the deposit contains unequal-value token types, in which case a "penalty" is allocated. Here is another example where the two tokens have equal value, with three normal deposits and one malicious deposit, meaning only one token type is deposited and therefore no liquidity-pool tokens are created.
 
-| 事件         | reserve0 | reserve1 | reserve0 \* reserve1 | 流动池价值 (reserve0 + reserve1) | 存入资金而产生的流动池代币 | 流动池代币总值 | 每个流动池代币的值 |
-| ---------- | -------: | -------: | -------------------: | --------------------------: | ------------: | ------: | --------: |
-| 初始设置       |    8.000 |    8.000 |                   64 |                      16.000 |             8 |       8 |     2.000 |
-| 每种代币存入 4 个 |   12.000 |   12.000 |                  144 |                      24.000 |             4 |      12 |     2.000 |
-| 每种代币存入 2 个 |   14.000 |   14.000 |                  196 |                      28.000 |             2 |      14 |     2.000 |
-| 不等值的存款     |   18.000 |   14.000 |                  252 |                      32.000 |             0 |      14 |   \~2.286 |
-| 套利后        | \~15.874 | \~15.874 |                  252 |                    \~31.748 |             0 |      14 |   \~2.267 |
+| Event | reserve0 | reserve1 | reserve0 * reserve1 | Pool value (reserve0 + reserve1) | Liquidity-pool tokens minted by deposit | Total liquidity-pool tokens | Value per liquidity-pool token |
+| ---- | -------: | -------: | -------------------: | --------------------------: | ------------: | ------: | --------: |
+| Initial setup | 8.000 | 8.000 | 64 | 16.000 | 8 | 8 | 2.000 |
+| Deposit 4 of each token | 12.000 | 12.000 | 144 | 24.000 | 4 | 12 | 2.000 |
+| Deposit 2 of each token | 14.000 | 14.000 | 196 | 28.000 | 2 | 14 | 2.000 |
+| Unequal-value deposit | 18.000 | 14.000 | 252 | 32.000 | 0 | 14 | ~2.286 |
+| After arbitrage | ~15.874 | ~15.874 | 252 | ~31.748 | 0 | 14 | ~2.267 |
 
 ```solidity
         }
@@ -499,7 +499,7 @@ ERC-20 的转移调用有两种方式可能失败：
         _mint(to, liquidity);
 ```
 
-使用 `UniswapV2ERC20._mint` 函数产生更多流动池代币并发送到正确的账户地址。
+Use the `UniswapV2ERC20._mint` function to create more liquidity-pool tokens and send them to the correct account address.
 
 ```solidity
         _update(balance0, balance1, _reserve0, _reserve1);
@@ -508,16 +508,16 @@ ERC-20 的转移调用有两种方式可能失败：
     }
 ```
 
-更新相应的状态变量（`reserve0`、`reserve1`，必要时还包含 `kLast`）并激发相应事件。
+Update the corresponding state variables, `reserve0`, `reserve1`, and, if necessary, `kLast`, and emit the corresponding event.
 
-**销毁**
+**Burn**
 
 ```solidity
     // this low-level function should be called from a contract which performs important safety checks
     function burn(address to) external lock returns (uint amount0, uint amount1) {
 ```
 
-当流动资金被提取且相应的流动池代币需要被销毁时，将调用此函数。 还需要[从一个外围账户](README.md#UniswapV2Router02)调用。
+This function is called when liquidity is withdrawn and the corresponding liquidity-pool tokens need to be burned. It should also be called [from a periphery account](README.md#UniswapV2Router02).
 
 ```solidity
         (uint112 _reserve0, uint112 _reserve1,) = getReserves(); // gas savings
@@ -528,7 +528,7 @@ ERC-20 的转移调用有两种方式可能失败：
         uint liquidity = balanceOf[address(this)];
 ```
 
-外围合约在调用函数之前，首先将要销毁的流动资金转到本合约中。 这样 我们知道有多少流动资金需要销毁，并可以确保它被销毁。
+Before calling this function, the periphery contract first transfers the liquidity to be burned into this contract. This lets the pair know how much liquidity should be burned and ensures that it can be burned.
 
 ```solidity
         bool feeOn = _mintFee(_reserve0, _reserve1);
@@ -538,7 +538,7 @@ ERC-20 的转移调用有两种方式可能失败：
         require(amount0 > 0 && amount1 > 0, 'UniswapV2: INSUFFICIENT_LIQUIDITY_BURNED');
 ```
 
-流动资金提供者获得等值数量的两种代币。 这样不会改变兑换汇率。
+The liquidity provider receives equal-value amounts of both tokens. This does not change the exchange rate.
 
 ```solidity
         _burn(address(this), liquidity);
@@ -553,16 +553,16 @@ ERC-20 的转移调用有两种方式可能失败：
     }
 ```
 
-`burn` 函数的其余部分是上述 `mint` 函数的镜像。
+The rest of the `burn` function mirrors the `mint` function described above.
 
-**兑换**
+**Swap**
 
 ```solidity
     // this low-level function should be called from a contract which performs important safety checks
     function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external lock {
 ```
 
-此函数也应该从[外围合约](README.md#UniswapV2Router02)调用。
+This function should also be called from the [periphery contract](README.md#UniswapV2Router02).
 
 ```solidity
         require(amount0Out > 0 || amount1Out > 0, 'UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT');
@@ -574,7 +574,7 @@ ERC-20 的转移调用有两种方式可能失败：
         { // scope for _token{0,1}, avoids stack too deep errors
 ```
 
-本地变量可以存储在内存中，或者如果变量数目不太多，直接存储进堆栈。 如果我们可以限制变量数量，那么建议使用堆栈以减少燃料消耗。 更多详情见 [以太坊黄皮书](https://ethereum.github.io/yellowpaper/paper.pdf)（以前的以太坊规范）p. 26“方程式 298”。
+Local variables can be stored in memory, or, if there are not too many variables, directly on the stack. If the number of variables can be limited, using the stack reduces gas consumption. For details, see the [Ethereum Yellow Paper](https://ethereum.github.io/yellowpaper/paper.pdf), formerly the Ethereum specification, p. 26, "Equation 298".
 
 ```solidity
             address _token0 = token0;
@@ -584,13 +584,13 @@ ERC-20 的转移调用有两种方式可能失败：
             if (amount1Out > 0) _safeTransfer(_token1, to, amount1Out); // optimistically transfer tokens
 ```
 
-这种转移应该是会成功的，因为在转移之前我们确信所有条件都得到满足。 在以太坊中这样操作是可以的， 原因在于如果调用条件没有得到满足，我们可以恢复操作及造成的改变。
+These transfers should succeed because all required conditions have already been checked before the transfer. This is safe in Ethereum because if later conditions are not satisfied, the transaction can revert and undo the changes.
 
 ```solidity
             if (data.length > 0) IUniswapV2Callee(to).uniswapV2Call(msg.sender, amount0Out, amount1Out, data);
 ```
 
-如果收到请求，则通知接收者要进行兑换。
+If requested, notify the receiver that a swap is being performed.
 
 ```solidity
             balance0 = IERC20(_token0).balanceOf(address(this));
@@ -598,7 +598,7 @@ ERC-20 的转移调用有两种方式可能失败：
         }
 ```
 
-获取当前余额。 外围合约在调用交换函数之前，需要向合约发送要兑换的代币。 这个功能可以使得合约检查它没有受到欺骗，这个检查\_必须\_通过核心合约调用（因为本功能可能被除我们外围合约之外的其它单位调用）。
+Read the current balances. The periphery contract must send the token being swapped to the pair before calling the swap function. This allows the contract to verify that it has not been tricked. This check _must_ be performed by the core contract, because the function may be called by entities other than the intended periphery contract.
 
 ```solidity
         uint amount0In = balance0 > _reserve0 - amount0Out ? balance0 - (_reserve0 - amount0Out) : 0;
@@ -610,7 +610,7 @@ ERC-20 的转移调用有两种方式可能失败：
             require(balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2), 'UniswapV2: K');
 ```
 
-这是一项健全性检查，确保我们不会因兑换而损失代币。 在任何情况下交换都不应减少 `reserve0*reserve1`。 这也是我们确保为兑换发送 0.3% 费用的方式；在对 K 值进行完整性检查之前，我们将两个余额乘以 1000 减去 3 倍的金额，这意味着在将其 K 值与当前准备金 K 值进行比较之前，从余额中扣除 0.3% (3/1000 = 0.003 = 0.3%)。
+This is a sanity check that ensures the swap does not make the pair lose tokens. Under no circumstances should a swap reduce `reserve0*reserve1`. This is also how the contract ensures the 0.3% swap fee is paid: before checking the K invariant, both balances are multiplied by 1000 and three times the input amount is subtracted. This deducts 0.3% from the input balance, because 3/1000 = 0.003 = 0.3%, before comparing the adjusted K value with the current reserve K value.
 
 ```solidity
         }
@@ -620,16 +620,16 @@ ERC-20 的转移调用有两种方式可能失败：
     }
 ```
 
-更新 `reserve0` 和 `reserve1` 的值，并在必要时更新价格累积值和时间戳并激发相应事件。
+Update `reserve0` and `reserve1`, and when necessary update the price cumulative values and timestamp, then emit the corresponding event.
 
-**同步或提取**
+**Sync or Skim**
 
-实际余额有可能与配对交易所认为的储备金余额没有同步。 没有合约的认同，就无法撤回代币，但存款却不同。 帐户 可以将代币转移到交易所，而无需调用 `mint` 或 `swap`。
+The actual balances may become unsynchronized with the reserves that the pair believes it has. Tokens cannot be withdrawn without the contract's consent, but deposits are different. An account can transfer tokens into the exchange without calling `mint` or `swap`.
 
-在这种情况下，有两种解决办法：
+In this situation, there are two possible solutions:
 
-* `sync`，将储备金更新为当前余额
-* `skim`，撤回额外的金额。 请注意任何账户都可以调用 `skim` 函数，因为无法知道是谁 存入的代币。 此信息是在一个事件中发布的，但这些事件无法从区块链中访问。
+* `sync`: update the reserves to the current balances.
+* `skim`: withdraw the extra amount. Note that any account can call `skim`, because there is no way to know who deposited the tokens. That information is published in an event, but events cannot be read from the blockchain by contracts.
 
 ```solidity
     // force balances to match reserves

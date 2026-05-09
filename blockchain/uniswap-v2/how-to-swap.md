@@ -1,91 +1,89 @@
 ---
-description: 参考原文：https://medium.com/uv-labs/uniswap-testing-1d88ca523bf0
+description: "Reference: https://medium.com/uv-labs/uniswap-testing-1d88ca523bf0"
 ---
 
-# 😭 对接 Uniswap V2 兑换代币
+# Integrating Uniswap V2 Token Swaps
 
 > [**Uniswap**](https://learnblockchain.cn/tags/Uniswap)
 
-对接 Uniswap V2 兑换代币，并测试验证。
+This note shows how to integrate with Uniswap V2 to swap tokens, and how to verify the behavior through tests.
 
 ![Uniswap & eth](https://img.learnblockchain.cn/pics/20220608144145.jpeg!/scale/60)
 
-在本文中，我们将和正式的 Uniswap V2 交互，实现使用[Uniswap](https://uniswap.org/)进行代币兑换（swap）并通过测试验证兑换功能；
+In this article, we interact with the real Uniswap V2 contracts, implement a token swap with [Uniswap](https://uniswap.org/), and verify the swap through tests.
 
-通过测试验证智能合约的行为是一个很好的方式，测试让你相信代码以我们想要的方式执行，而不是以它不应该的方式执行。
+Testing smart contract behavior is a good way to gain confidence that the code executes the way we expect, rather than doing something unintended.
 
-在本文中，我们还将学习到如何 fork 主网，并冒充（模拟）一个链上账号进行交易，并编写测试。
+In this article, we will also learn how to fork mainnet, impersonate an on-chain account to send transactions, and write tests around that flow.
 
-## 关于Uniswap V2
+## About Uniswap V2
 
-但在深入研究之前，为了本文完整，让我们再次介绍一下 Uniswap，Uniswap是一个去中心化的交易所（DEX），运行在以太坊区块链上（主网和其他一些网络）。顾名思义，Uniswap是用来交易ERC20代币的。
+Before diving in, let us briefly introduce Uniswap again so that this note is self-contained. Uniswap is a decentralized exchange (DEX) that runs on the Ethereum blockchain, including mainnet and several other networks. As its name suggests, Uniswap is used to trade ERC20 tokens.
 
-Uniswap有3个主要功能:
+Uniswap has three main functions:
 
-* 在不同的代币之间进行兑换
-* 添加代币对流动性，获得LP ERC-20流动性代币
-* 销毁 LP ERC-20流动性代币，取回配对的ERC-20代币
+* Swap between different tokens.
+* Add liquidity to a token pair and receive LP ERC20 liquidity tokens.
+* Burn LP ERC20 liquidity tokens and retrieve the paired ERC20 tokens.
 
-在这篇文章中，我们将重点讨论使用fork 主网在不同的代币之间进行兑换。
+In this article, we focus on swapping between different tokens by using a forked mainnet.
 
-**所以让我们开始吧！** 🥳🥳🥳
+## Create and initialize the project
 
-## 创建一个项目并初始化
-
-在命令行（CLI）上使用以下命令来初始化项目。
+Use the following commands in the CLI to initialize the project:
 
 ```bash
 mkdir uni_swap && cd uni_swap
 npm init -y
 ```
 
-安装项目所需的依赖项，运行：
+Install the dependencies required by the project:
 
 ```bash
 npm install --save hardhat @nomiclabs/hardhat-ethers @nomiclabs/hardhat-waffle ethers @uniswap/v2-core dotenv
 ```
 
-## 初始化Hardhat项目
+## Initialize the Hardhat project
 
-要初始化你的Hardhat项目，在CLI中运行`npx hardhat`命令，并创建一个空的_config.js_文件。
+To initialize the Hardhat project, run `npx hardhat` in the CLI and create an empty _config.js_ file.
 
-并定制你的Hardhat配置，因为我们要fork主网来与Uniswap交互。因此，Hardhat配置应该看起来类似于这样：
+Then customize the Hardhat configuration, because we need to fork mainnet to interact with Uniswap. The Hardhat configuration should look similar to this:
 
 ![img](https://img.learnblockchain.cn/pics/20220608144228.png)
 
-注意：用你的自己[Alchemy](https://alchemy.com/?r=7d60e34c-b30a-4ffa-89d4-3c4efea4e14b)API密钥替换URL中的`<key>`部分。
+Note: replace the `<key>` part in the URL with your own [Alchemy](https://alchemy.com/?r=7d60e34c-b30a-4ffa-89d4-3c4efea4e14b) API key.
 
-## 编写合约实现兑换
+## Write the swap contract
 
-为合约、脚本和测试创建目录，以便更好地组织代码。
+Create directories for contracts, scripts, and tests so the code is organized more clearly.
 
-在你的CLI中使用以下代码创建目录：
+Use the following commands in the CLI to create those directories:
 
 ```bash
 mkdir contracts && mkdir scripts && mkdir tests
 ```
 
-为了编写兑换合约，在合约目录内创建一个文件，命名为`testSwap.sol`。
+To write the swap contract, create a file inside the contracts directory and name it `testSwap.sol`.
 
-在你的 `testSwap.sol` 中导入Uniswap 等接口，并创建一个名为**testSwap**的合约。
+In `testSwap.sol`, import the Uniswap-related interfaces and create a contract named **testSwap**.
 
-它应该看起来像这样：
+It should look like this:
 
 ![img](https://img.learnblockchain.cn/pics/20220608144250.png)
 
-现在，在`testSwap`中，我们需要包括**Uniswap Router**的地址，我们使用它来完成代币兑换。
+Now, inside `testSwap`, we need to include the address of the **Uniswap Router**, which we use to perform the token swap.
 
-使用下面的代码：
+Use the following code:
 
 ```solidity
-//address of the uniswap v2 router
+// Address of the Uniswap V2 router.
 address private constant UNISWAP_V2_ROUTER = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
 ```
 
-现在，定义要用来兑换的函数：
+Next, define the function that will be used for the swap:
 
 ```solidity
-// 兑换函数
+// Swap function.
     function swap (
         address _tokenIn,
         address _tokenOut,
@@ -95,33 +93,33 @@ address private constant UNISWAP_V2_ROUTER = 0x7a250d5630B4cF539739dF2C5dAcb4c65
     ) external {}
 ```
 
-函数命名为\*\*swap，\*\*里面有
+The function is named **swap**, and it contains the following parameters:
 
-* **\_tokenIn**： 是我们要兑换的代币的地址。
-* **\_tokenOut**：是我们想从这次交易中获得的代币的地址。
-* **\_amountIn**： 是我们要交易的代币的数量。
-* **\_to**：交易兑换出的代币发送到这个地址。
-* **\_deadline**：是交易应该被执行的时间期限。如果超过了最后期限，交易就会失败。
+* **\_tokenIn**: the address of the token we want to swap from.
+* **\_tokenOut**: the address of the token we want to receive from this transaction.
+* **\_amountIn**: the amount of the input token we want to trade.
+* **\_to**: the address that receives the output tokens from the swap.
+* **\_deadline**: the latest timestamp at which the transaction may be executed. If the deadline is exceeded, the transaction fails.
 
-在兑换函数里面，我们要做的第一件事是在合约里面把所需数量的_**\_tokenIn**_ 转移到合约里，使用`msg.sender`：
+Inside the swap function, the first thing we need to do is transfer the required amount of _**\_tokenIn**_ from `msg.sender` into the contract:
 
 ```solidity
-// 把 token 从用户转移到合约
+// Transfer tokens from the user to the contract.
 IERC20(_tokenIn).transferFrom(msg.sender, address(this), _amountIn);
 ```
 
-一旦调用执行，**\_amountIn** 数量的 **\_tokenIn**就会转入到`testSwap`合约中
+Once this call is executed, **\_amountIn** of **\_tokenIn** is transferred into the `testSwap` contract.
 
-接下来，通过调用**IERC20** 授权，允许Uniswap合约花费`testSwap`合约中**\_amountIn**数量的代币。
+Next, by calling **IERC20** `approve`, we allow the Uniswap contract to spend **\_amountIn** of the token held by the `testSwap` contract.
 
 ```solidity
-// by calling IERC20 approve you allow the uniswap contract to spend the tokens in this contract
+// By calling IERC20 approve, you allow the Uniswap contract to spend the tokens in this contract.
 IERC20(_tokenIn).approve(UNISWAP_V2_ROUTER, _amountIn);
 ```
 
-在使用 Uniswap Router 兑换，需要为兑换代币的设置**路径**，路径上第一“站”是使用的代币，最后一“站”期望收到的代币。
+When swapping through the Uniswap Router, we need to set the **path** for the token swap. The first "hop" in the path is the token we provide, and the last "hop" is the token we expect to receive.
 
-所以，我们将声明一个名为`path`的地址数组，填入 **\_tokenIn** 的地址和 **\_tokenOut** 的地址。
+Therefore, we declare an address array named `path` and fill it with the **\_tokenIn** and **\_tokenOut** addresses.
 
 ```solidity
 address[] memory path;
@@ -130,7 +128,7 @@ path[0] = _tokenIn; // DAI
 path[1] = _tokenOut; // WETH
 ```
 
-接下来，我们调用函数**getAmountsOut**，以预估可以兑换代币数量，对真实兑换之前预知可兑换数量是很有用的。**getAmountsOut**函数需要一个输入金额和一个代币地址的路径数组：
+Next, we call **getAmountsOut** to estimate how many output tokens we can receive. It is useful to know the expected output amount before executing the real swap. The **getAmountsOut** function requires an input amount and an array of token addresses representing the path:
 
 ```solidity
 uint256[] memory amountsExpected = IUniswapV2Router(UNISWAP_V2_ROUTER).getAmountsOut(
@@ -139,33 +137,33 @@ uint256[] memory amountsExpected = IUniswapV2Router(UNISWAP_V2_ROUTER).getAmount
 );
 ```
 
-最后，我们调用 Uniswap Router 的函数 **swapExactTokensForTokens**，并传入参数。这个函数的第一个参数是精确输入金额 `amountIn`，第二个参数才是最小可接受输出金额 `amountOutMin`；不要把预估输出数组里的值误当成输入语义。
+Finally, we call the Uniswap Router function **swapExactTokensForTokens** and pass in the parameters. The first parameter of this function is the exact input amount, `amountIn`; the second parameter is the minimum acceptable output amount, `amountOutMin`. Do not confuse the estimated output array with the input amount semantics.
 
 ```solidity
 uint256[] memory amountsReceived = IUniswapV2Router(UNISWAP_V2_ROUTER).swapExactTokensForTokens(
             _amountIn,
-            (amountsExpected[1]*990)/1000, // 接受 1% 的滑点
+            (amountsExpected[1]*990)/1000, // Accept 1% slippage.
             path,
             _to,
             _deadline
 );
 ```
 
-**恭喜你**! 我们的的兑换合约已经准备好了。🎉
+The swap contract is now ready.
 
-完整的看起来应该类似是这样：
+The complete contract should look similar to this:
 
 ![img](https://img.learnblockchain.cn/pics/20220608144306.png)
 
-使用命令`npx hardhat compile`来检查我们的智能合约中是否有错误。
+Use `npx hardhat compile` to check whether the smart contract has any errors.
 
-现在，是时候为我们的合约运行一些测试了
+Now it is time to run tests for the contract.
 
-## 编写测试脚本
+## Write the test script
 
-在_tests_文件夹中创建一个文件，并将其命名为\*\*\*`sample-test.js`\*\*\*。
+Create a file under the _tests_ folder and name it ***`sample-test.js`***.
 
-首先，要从Uniswap导入ERC20合约的ABI，同时，定义测试的结构和我们要使用的合约的地址。
+First, import the ERC20 contract ABI from Uniswap, and define the test structure and the contract addresses we will use.
 
 ```javascript
 const ERC20ABI = require("@uniswap/v2-core/build/ERC20.json").abi;
@@ -178,13 +176,13 @@ describe("Test Swap", function () {
 }
 ```
 
-这里，我们使用了4个地址：
+Here we use four addresses:
 
-* **DAIAddress**和**WETHAddress**分别是Dai 合约和WETH 合约的地址，它们将在交易中使用
-* **MyAddress**是交易者的地址。
-* **DAIHolder**是我们要冒充的地址。
+* **DAIAddress** and **WETHAddress** are the contract addresses of Dai and WETH. They are the tokens used in the trade.
+* **MyAddress** is the trader address.
+* **DAIHolder** is the address we want to impersonate.
 
-现在，在编写测试脚本之前，我们将部署**testSwap**智能合约。为此，我们使用以下代码：
+Before writing the test case itself, we deploy the **testSwap** smart contract. We use the following code:
 
 ```javascript
 let TestSwapContract;
@@ -202,7 +200,7 @@ beforeEach(async () => {
 })
 ```
 
-为测试脚本创建一个测试用例，并“冒充”我们之前定义的**DAIHolder**地址。
+Create a test case for the test script and impersonate the **DAIHolder** address defined above.
 
 ```javascript
 it("should swap", async () => { 
@@ -213,9 +211,9 @@ it("should swap", async () => {
 const impersonateSigner = await ethers.getSigner(DAIHolder);
 ```
 
-在下一步，我们将通过使用冒充的账户获得其**DAI代币**的初始余额。之后，我们将使用该余额进行兑换交易。
+In the next step, we use the impersonated account to get its initial **DAI token** balance. Later, we will use this balance for the swap transaction.
 
-同样，我们也获取**WETH代币**的余额，以便观察代币的兑换情况。
+We also fetch the **WETH token** balance so that we can observe the result of the token swap.
 
 ```javascript
 const DAIContract = new ethers.Contract(DAIAddress, ERC20ABI, impersonateSigner)
@@ -227,23 +225,23 @@ const myBalance = await WETHContract.balanceOf(MyAddress);
 console.log("Initial WETH Balance:", ethers.utils.formatUnits(myBalance.toString()));
 ```
 
-然后，我们将使用DAI合约来批准（授权）TestSwap 可使用兑换的金额：
+Then, we use the DAI contract to approve `TestSwap` to spend the amount to be swapped:
 
 ```javascript
 await DAIContract.approve(TestSwapContract.address, DAIHolderBalance)
 ```
 
-对于最后兑换截止时间，先获取最新区块的当前时间戳：
+For the final swap deadline, first get the current timestamp from the latest block:
 
 ```javascript
-// getting current timestamp
+// Get the current timestamp.
 const latestBlock = await ethers.provider.getBlockNumber();
 const timestamp = (await ethers.provider.getBlock(latestBlock)).timestamp;
 ```
 
-通过调用我们编写的**swap**函数进行交易。传入我们在上面配置的参数：
+Execute the transaction by calling the **swap** function we wrote. Pass in the parameters configured above.
 
-这个交易将从通过**DAIHolder**发起：
+This transaction is initiated through **DAIHolder**:
 
 ```javascript
 await TestSwapContract.connect(impersonateSigner).swap(
@@ -251,11 +249,11 @@ await TestSwapContract.connect(impersonateSigner).swap(
             WETHAddress,
             DAIHolderBalance,
             MyAddress,
-            timestamp + 1000 // adding 100 milliseconds to the current blocktime
+            timestamp + 1000 // Add 1000 seconds to the current block timestamp.
 )
 ```
 
-最后，验证兑换交易：
+Finally, verify the swap transaction:
 
 ```javascript
 const myBalance_updated = await WETHContract.balanceOf(MyAddress);
@@ -263,34 +261,34 @@ console.log("Balance after Swap:", ethers.utils.formatUnits(myBalance_updated.to
 const DAIHolderBalance_updated = await DAIContract.balanceOf(impersonateSigner.address);
 ```
 
-在这里，检查了兑换功能执行后我们账户的余额。
+Here, we check the account balances after the swap function has executed.
 
-在这下面，我们写了一些测试以检查交易是否真实完成：
+Below, we write tests to check whether the transaction was actually completed:
 
 ```javascript
 expect(DAIHolderBalance_updated.eq(BigNumber.from(0))).to.be.true
 expect(myBalance_updated.gt(myBalance)).to.be.true;
 ```
 
-* 由于我们使用了所有的余额进行交易，因此在第一个测试中，我们期望DAI代币余额应该等于0。
-* 在第二个测试中，检查我们账户中的**余额**是否比之前的大。
+* Because we used the entire balance for the trade, in the first assertion we expect the DAI token balance to equal 0.
+* In the second assertion, we check whether the **balance** in our account is greater than it was before.
 
-因此，这就是我们要进行的两个测试。
+These are the two tests we want to perform.
 
-sample-test.js 应该类似于下面的样子，请注意文件开头的 `require` 语句：
+`sample-test.js` should look similar to the following. Note the `require` statements at the beginning of the file:
 
 ![img](https://img.learnblockchain.cn/pics/20220608144317.png)
 
-当然，请自由探索，用它们尝试更多的测试。
+Of course, feel free to explore and try more tests with these building blocks.
 
-现在，我们要用`npx hardhat test`命令来运行这些测试。
+Now, run the tests with `npx hardhat test`.
 
-结果应该是这样的：
+The result should look like this:
 
 ![img](https://img.learnblockchain.cn/pics/20220608144853.png)
 
-正如你所看到的，我们的初始余额在兑换完成后有所增加。
+As you can see, the initial balance increases after the swap is completed.
 
-而我们编写的测试也成功了！！。🎉🎉🎉
+The tests we wrote also pass.
 
-如果你一直跟到最后，那么恭喜你，你已经做得很好了。
+If you followed along to the end, then you have completed the flow.

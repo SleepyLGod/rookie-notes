@@ -2,7 +2,7 @@
 
 #### UniswapV2Factory.sol <a href="#uniswapv2factory" id="uniswapv2factory"></a>
 
-[此合约](https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2Factory.sol)实现配对 兑换。
+[This contract](https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2Factory.sol) implements pair creation for token swaps.
 
 ```solidity
 pragma solidity =0.5.16;
@@ -15,26 +15,26 @@ contract UniswapV2Factory is IUniswapV2Factory {
     address public feeToSetter;
 ```
 
-这些状态变量是执行协议费用所必需的（请见[白皮书](https://uniswap.org/whitepaper.pdf)的第 5 页）。 `feeTo` 地址用于累加协议费用的流动池代币，而 `feeToSetter` 是允许更改 `feeTo` 为 不同地址的地址值。
+These state variables are required for protocol fees. See page 5 of the [whitepaper](https://uniswap.org/whitepaper.pdf). The `feeTo` address receives the liquidity pool tokens that represent accrued protocol fees, while `feeToSetter` is the address allowed to change `feeTo` to a different address.
 
 ```solidity
     mapping(address => mapping(address => address)) public getPair;
     address[] public allPairs;
 ```
 
-这些变量用以跟踪配对，即两种代币之间的兑换。
+These variables track pairs, meaning the exchanges between two tokens.
 
-第一个变量，`getPair` 是一个映射，根据兑换的两个 ERC-20 代币 来识别配对交易合约。 ERC-20 代币通过实现合约的地址来识别，所以关键字和值都是地址。 为了获取 配对交易的地址，以便能够从 `tokenA` 转换为 `tokenB`，可以使用 `getPair [<tokenA address><tokenB address>]`（或反之）。
+The first variable, `getPair`, is a mapping that identifies a pair contract by the two ERC20 tokens being exchanged. ERC20 tokens are identified by the addresses of their implementing contracts, so both keys and values are addresses. To obtain the pair address for swapping from `tokenA` to `tokenB`, use `getPair[<tokenA address>][<tokenB address>]` or the reverse order.
 
-第二个变量，`allPairs` 是一个数组，其中包括该工厂创建的所有 配对交易的地址。 在以太坊中，您无法循环访问映射内容， 或获取所有关键字的列表，所以，这个变量是唯一能够知道此工厂 管理哪个兑换的方法。
+The second variable, `allPairs`, is an array containing the addresses of all pairs created by this factory. In Ethereum, a contract cannot iterate over the contents of a mapping or retrieve a list of all keys. Therefore, this array is the only way to know which exchanges are managed by this factory.
 
-注意: 您不能循环访问所有关键字的原因是合约数据 存储\_十分昂贵\_，所以我们越少用越好，且越少改变 越好。 您可以创建[支持循环访问的映射](https://github.com/ethereum/dapp-bin/blob/master/library/iterable\_mapping.sol)， 但它们需要额外存储关键字列表。 但在大多数应用程序中并不需要。
+Note: the reason you cannot iterate over all mapping keys is that contract storage is _very expensive_, so contracts should use and modify as little storage as possible. You can create [iterable mappings](https://github.com/ethereum/dapp-bin/blob/master/library/iterable\_mapping.sol), but they require storing an additional key list. Most applications do not need that extra storage.
 
 ```solidity
     event PairCreated(address indexed token0, address indexed token1, address pair, uint);
 ```
 
-当新的配对交易创建时，将激发此事件。 它包括代币地址、 配对交易地址以及工厂管理的兑换交易总数。
+This event is emitted when a new pair is created. It includes the token addresses, the pair address, and the total number of exchange pairs managed by the factory.
 
 ```solidity
     constructor(address _feeToSetter) public {
@@ -42,7 +42,7 @@ contract UniswapV2Factory is IUniswapV2Factory {
     }
 ```
 
-构造函数做的唯一事情是指定 `feeToSetter`。 工厂开始时没有 费用，只有 `feeSetter` 可以更改这种情况。
+The constructor only specifies `feeToSetter`. The factory starts without protocol fees, and only `feeSetter` can change that configuration.
 
 ```solidity
     function allPairsLength() external view returns (uint) {
@@ -50,33 +50,33 @@ contract UniswapV2Factory is IUniswapV2Factory {
     }
 ```
 
-此函数返回交易配对的数量。
+This function returns the number of trading pairs.
 
 ```solidity
     function createPair(address tokenA, address tokenB) external returns (address pair) {
 ```
 
-这是工厂的主要函数，可以在两个 ERC-20 代币之间创建配对交易。 注意， 任何人都可以调用此函数。 并不需要 Uniswap 许可就能创建新的配对 兑换。
+This is the main function of the factory. It creates a pair between two ERC20 tokens. Notice that anyone can call this function. Creating a new pair does not require permission from Uniswap.
 
 ```solidity
         require(tokenA != tokenB, 'UniswapV2: IDENTICAL_ADDRESSES');
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
 ```
 
-我们希望新兑换的地址可以确定， 这样它可以在链下预计算 （这对于[第二层的交易](https://ethereum.org/en/developers/docs/scaling/) 来说比较有用）。 为了做到这一点，我们需要代币地址始终按顺序排列，无论收到代币地址的顺序如何， 都需要在这里排序。
+We want the address of the new exchange contract to be deterministic, so it can be precomputed off-chain. This is useful, for example, for [layer-2 transactions](https://ethereum.org/en/developers/docs/scaling/). To make this possible, the token addresses must always be ordered consistently, regardless of the order in which the function receives them.
 
 ```solidity
         require(token0 != address(0), 'UniswapV2: ZERO_ADDRESS');
         require(getPair[token0][token1] == address(0), 'UniswapV2: PAIR_EXISTS'); // single check is sufficient
 ```
 
-大流动资金池优于小流动资金池，因为其价格比较稳定。 对于每一对代币， 我们不想有多个流动资金池。 如果已经有一个配对交易，则无需为相同的代币对 创建另一个配对交易。
+Large liquidity pools are preferable to small liquidity pools because their prices are more stable. For each token pair, we do not want multiple liquidity pools. If a pair already exists, there is no need to create another pair for the same two tokens.
 
 ```solidity
         bytes memory bytecode = type(UniswapV2Pair).creationCode;
 ```
 
-为了创建一个新的合约，我们需要获得创建代码（包括构造函数和写入 用于存储实际合约以太坊虚拟机字节码的代码）。 在 Solidity 语言中，通常使用 `addr = new <name of contract>(<constructor parameters>)` 的格式语句，然后编译器就可以完成所有的工作，不过为了获取一个确定的合约地址，需要使用 [CREATE2 操作码](https://eips.ethereum.org/EIPS/eip-1014)。 当这个代码编写出来时，Solidity 还不支持操作码，因此需要手动获取 代码。 目前这已经不再是问题，因为 [Solidity 现已支持 CREATE2](https://docs.soliditylang.org/en/v0.8.3/control-structures.html#salted-contract-creations-create2)。
+To create a new contract, we need the creation code, which includes the constructor and the code that writes the actual Ethereum Virtual Machine bytecode into storage. In Solidity, this is usually written as `addr = new <name of contract>(<constructor parameters>)`, and the compiler handles the details. However, to obtain a deterministic contract address, the factory needs the [CREATE2 opcode](https://eips.ethereum.org/EIPS/eip-1014). When this code was written, Solidity did not yet support this opcode directly, so the contract manually obtains the bytecode. This is no longer a problem because [Solidity now supports CREATE2](https://docs.soliditylang.org/en/v0.8.3/control-structures.html#salted-contract-creations-create2).
 
 ```solidity
         bytes32 salt = keccak256(abi.encodePacked(token0, token1));
@@ -85,13 +85,13 @@ contract UniswapV2Factory is IUniswapV2Factory {
         }
 ```
 
-当 Solidity 不支持操作码时，我们可以通过[内联汇编](https://docs.soliditylang.org/en/v0.8.3/assembly.html)来调用。
+When Solidity did not support the opcode directly, it could be invoked through [inline assembly](https://docs.soliditylang.org/en/v0.8.3/assembly.html).
 
 ```solidity
         IUniswapV2Pair(pair).initialize(token0, token1);
 ```
 
-调用 `initialize` 函数来告诉新兑换交易可以兑换哪两种代币。
+The factory calls `initialize` to tell the newly created exchange which two tokens it can swap.
 
 ```solidity
         getPair[token0][token1] = pair;
@@ -101,7 +101,7 @@ contract UniswapV2Factory is IUniswapV2Factory {
     }
 ```
 
-在状态变量中保存新的配对信息，并激发一个事件来告知外界新的配对交易合约已生成。
+The factory stores the new pair information in its state variables and emits an event to notify the outside world that a new pair contract has been created.
 
 ```solidity
     function setFeeTo(address _feeTo) external {
@@ -116,13 +116,13 @@ contract UniswapV2Factory is IUniswapV2Factory {
 }
 ```
 
-这两个函数，允许 `setFeeTo` 管理费用的接收者（如有），并将 `setFeeToSetter` 更改为一个新 地址。
+These two functions allow `setFeeTo` to manage the protocol-fee recipient, if fees are enabled, and allow `setFeeToSetter` to be changed to a new address.
 
 #### UniswapV2ERC20.sol <a href="#uniswapv2erc20" id="uniswapv2erc20"></a>
 
-[本合约](https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2ERC20.sol)实现了 ERC-20 流动代币。 这与 [OpenZeppelin ERC-20 合约](https://ethereum.org/en/developers/tutorials/erc20-annotated-code/)相似，因此 这里仅解释不同的部分，`permit` 的功能。
+[This contract](https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2ERC20.sol) implements the ERC20 liquidity token. It is similar to the [OpenZeppelin ERC20 contract](https://ethereum.org/en/developers/tutorials/erc20-annotated-code/), so this note only explains the different part: the `permit` functionality.
 
-以太坊上的交易需要消耗以太币 (ETH)，相当于实际货币。 如果您有 ERC-20 代币但没有以太币，就无法发送 交易，因而不能用代币做任何事情。 避免该问题的一个解决方案是 [元交易](https://docs.uniswap.org/protocol/V2/guides/smart-contract-integration/supporting-meta-transactions/)。 代币的所有者签署一个交易，许可他人将代币从链上取出，并通过网络将其发送给 接收人。 接收人拥有以太币，可以代表所有者提交许可。
+Transactions on Ethereum consume ether (ETH), which functions as the native currency of the network. If you have ERC20 tokens but no ether, you cannot send transactions, and therefore you cannot do anything with those tokens on-chain. One solution to this problem is [meta-transactions](https://docs.uniswap.org/protocol/V2/guides/smart-contract-integration/supporting-meta-transactions/). The token owner signs a transaction authorizing someone else to move tokens on-chain, sends that authorization through the network, and the recipient, who has ether, submits the permit on behalf of the owner.
 
 ```solidity
     bytes32 public DOMAIN_SEPARATOR;
@@ -130,13 +130,13 @@ contract UniswapV2Factory is IUniswapV2Factory {
     bytes32 public constant PERMIT_TYPEHASH = 0x6e71edae12b1b97f4d1f60370fef10105fa2faae0126114a169c64845d6126c9;
 ```
 
-此哈希值是[这种交易类型的标识](https://eips.ethereum.org/EIPS/eip-712#rationale-for-typehash)。 在这里 我们唯一支持的是带有这些参数的 `Permit`。
+This hash is the [identifier for this transaction type](https://eips.ethereum.org/EIPS/eip-712#rationale-for-typehash). Here, the only supported typed message is `Permit` with these parameters.
 
 ```solidity
     mapping(address => uint) public nonces;
 ```
 
-接收人无法伪造数字签名。 但是，可以两次发送相同的交易 （这是一种[重放攻击](https://wikipedia.org/wiki/Replay\_attack)形式）。 为防止这种情况，我们使用 一个[随机数](https://wikipedia.org/wiki/Cryptographic\_nonce)。 如果新 `Permit` 的随机数不是上一次的使用的随机数加一， 我们便判定它无效。
+The recipient cannot forge a digital signature. However, the same transaction can be submitted twice, which is a form of [replay attack](https://wikipedia.org/wiki/Replay\_attack). To prevent this, the contract uses a [nonce](https://wikipedia.org/wiki/Cryptographic\_nonce). If the nonce of a new `Permit` is not the previous nonce plus one, the permit is considered invalid.
 
 ```solidity
     constructor() public {
@@ -146,7 +146,7 @@ contract UniswapV2Factory is IUniswapV2Factory {
         }
 ```
 
-这是获取[链标识符](https://chainid.network/)的代码。 它使用名为 [Yul](https://docs.soliditylang.org/en/v0.8.4/yul.html) 的以太坊虚拟机编译语言。 请注意，在当前版本 Yul 中，您必须使用 `chainid()`， 而非 `chainid`。
+This code obtains the [chain identifier](https://chainid.network/). It uses the Ethereum Virtual Machine's intermediate language, [Yul](https://docs.soliditylang.org/en/v0.8.4/yul.html). Note that in current Yul syntax, `chainid()` should be used instead of `chainid`.
 
 ```solidity
         DOMAIN_SEPARATOR = keccak256(
@@ -161,19 +161,19 @@ contract UniswapV2Factory is IUniswapV2Factory {
     }
 ```
 
-计算 EIP-712 的[域分隔符](https://eips.ethereum.org/EIPS/eip-712#rationale-for-domainseparator)。
+This computes the EIP-712 [domain separator](https://eips.ethereum.org/EIPS/eip-712#rationale-for-domainseparator).
 
 ```solidity
     function permit(address owner, address spender, uint value, uint deadline, uint8 v, bytes32 r, bytes32 s) external {
 ```
 
-这是实现批准功能的函数。 它接收相关字段的参数，以及[数字签名](https://yos.io/2018/11/16/ethereum-signatures/) 的三个标量值（v、r 和 s）。
+This function implements approval through a signed permit. It receives the relevant fields as parameters, along with the three scalar values of the [digital signature](https://yos.io/2018/11/16/ethereum-signatures/): `v`, `r`, and `s`.
 
 ```solidity
         require(deadline >= block.timestamp, 'UniswapV2: EXPIRED');
 ```
 
-截止日期后请勿接受交易。
+The transaction must not be accepted after the deadline.
 
 ```solidity
         bytes32 digest = keccak256(
@@ -185,15 +185,15 @@ contract UniswapV2Factory is IUniswapV2Factory {
         );
 ```
 
-`abi.encodePacked(...)` 是我们预计将收到的信息。 我们知道随机数应该是什么，所以不需要 将它作为一个参数
+`abi.encodePacked(...)` is the message we expect to receive. The contract already knows what the nonce should be, so the nonce does not need to be supplied as an independent trusted value.
 
-以太坊签名算法预计获得 256 位用于签名，所以我们使用 `keccak256` 哈希函数。
+The Ethereum signing algorithm expects a 256-bit value to sign, so the contract uses the `keccak256` hash function.
 
 ```solidity
         address recoveredAddress = ecrecover(digest, v, r, s);
 ```
 
-从摘要和签名中，我们可以用 [ecrecover](https://coders-errand.com/ecrecover-signature-verification-ethereum/) 函数计算出签名的地址。
+From the digest and the signature, the contract can compute the signing address with [ecrecover](https://coders-errand.com/ecrecover-signature-verification-ethereum/).
 
 ```solidity
         require(recoveredAddress != address(0) && recoveredAddress == owner, 'UniswapV2: INVALID_SIGNATURE');
@@ -201,4 +201,4 @@ contract UniswapV2Factory is IUniswapV2Factory {
     }
 ```
 
-如果一切正常，则将其视为 [ERC-20 批准](https://eips.ethereum.org/EIPS/eip-20#approve)。
+If everything is valid, the permit is treated as an [ERC20 approval](https://eips.ethereum.org/EIPS/eip-20#approve).
